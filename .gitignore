@@ -11,7 +11,6 @@
 **/build/
 **/coverage/
 **/target/
-**/docs/
 
 # Cache
 **/.cache/
@@ -23,7 +22,6 @@
 # Environment variables
 **/.env
 **/.env.*
-!**/.env.example
 
 # Logs
 **/*.log
