@@ -1,0 +1,60 @@
+# Dependencies
+**/node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+.npm/
+
+# Build outputs
+**/.next/
+**/out/
+**/dist/
+**/build/
+**/coverage/
+**/target/
+
+# Cache
+**/.cache/
+**/.turbo/
+**/.parcel-cache/
+**/*.tsbuildinfo
+.eslintcache
+
+# Environment variables
+**/.env
+**/.env.*
+!**/.env.example
+
+# Logs
+**/*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Test outputs
+**/test-results/
+**/playwright-report/
+**/test-report/
+
+# Docker local data
+infra/data/
+infra/volumes/
+**/*.sqlite
+**/*.sqlite3
+**/*.db
+
+# IDE
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
