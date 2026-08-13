@@ -11,6 +11,7 @@
 **/build/
 **/coverage/
 **/target/
+**/docs/
 
 # Cache
 **/.cache/
