@@ -1,0 +1,64 @@
+import {
+  Column,
+  Entity,
+  JoinColumn,
+  ManyToOne,
+  PrimaryColumn,
+  CreateDateColumn,
+  UpdateDateColumn,
+} from 'typeorm';
+import { Room } from '../../rooms/entities/room.entity';
+
+export enum ParticipantRole {
+  HOST = 'HOST',
+  MEMBER = 'MEMBER',
+}
+
+export enum ParticipantStatus {
+  JOINED = 'JOINED',
+  RESPONDED = 'RESPONDED',
+  LEFT = 'LEFT',
+  REMOVED = 'REMOVED',
+}
+
+@Entity({ name: 'participants' })
+export class Participant {
+  @PrimaryColumn({ type: 'uuid' })
+  id!: string;
+
+  // 이 MVP에서 관계로 매핑되는 ID는 roomId뿐이다. roomId 컬럼을 관계의
+  // 조인 컬럼으로 사용하여 participants.roomId에 외래 키 하나만 생성한다.
+  @Column({ type: 'uuid' })
+  roomId!: string;
+
+  @ManyToOne(() => Room, (room) => room.participants, {
+    nullable: false,
+    onDelete: 'CASCADE',
+  })
+  @JoinColumn({ name: 'roomId', referencedColumnName: 'id' })
+  room!: Room;
+
+  @Column({ type: 'varchar', length: 30 })
+  displayName!: string;
+
+  @Column({ type: 'varchar', length: 20, default: ParticipantRole.MEMBER })
+  role!: ParticipantRole;
+
+  @Column({ type: 'varchar', length: 20, default: ParticipantStatus.JOINED })
+  status!: ParticipantStatus;
+
+  @Column({ type: 'varchar', length: 128 })
+  tokenHash!: string;
+
+  @Column({ type: 'timestamptz' })
+  tokenExpiresAt!: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  tokenRevokedAt!: Date | null;
+
+  @CreateDateColumn({ type: 'timestamptz' })
+  joinedAt!: Date;
+
+  @UpdateDateColumn({ type: 'timestamptz' })
+  updatedAt!: Date;
+}
