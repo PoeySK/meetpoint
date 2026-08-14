@@ -21,6 +21,10 @@ export type CreateRoomInput = {
   };
 };
 
+export type JoinParticipantInput = {
+  displayName: string;
+};
+
 export type RoomPayload = {
   id: string;
   roomCode: string;
@@ -49,6 +53,19 @@ export type CreatedRoomResponse = {
   access: {
     hostToken: string;
     inviteUrl: string;
+  };
+};
+
+export type JoinedParticipantResponse = {
+  requestId: string;
+  room: {
+    id: string;
+    roomCode: string;
+    status: RoomStatus;
+  };
+  participant: PublicParticipant;
+  access: {
+    participantToken: string;
   };
 };
 
@@ -133,6 +150,22 @@ export function createRoom(input: CreateRoomInput) {
     },
     body: JSON.stringify(input),
   });
+}
+
+export function joinRoom(
+  roomCode: string,
+  input: JoinParticipantInput,
+) {
+  return request<JoinedParticipantResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomCode)}/participants`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
 }
 
 export function getRoom(roomId: string, token: string) {

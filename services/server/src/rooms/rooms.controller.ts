@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
 import type { CreateRoomDto } from './dto/create-room.dto';
+import type { JoinParticipantDto } from './dto/join-participant.dto';
 import { RoomsService } from './rooms.service';
 
 @Controller('api/v1/rooms')
@@ -9,6 +10,14 @@ export class RoomsController {
   @Post()
   createRoom(@Body() body: CreateRoomDto) {
     return this.roomsService.createRoom(body);
+  }
+
+  @Post(':roomCode/participants')
+  joinParticipant(
+    @Param('roomCode') roomCode: string,
+    @Body() body: JoinParticipantDto
+  ) {
+    return this.roomsService.joinParticipant(roomCode, body);
   }
 
   @Get(':roomId')

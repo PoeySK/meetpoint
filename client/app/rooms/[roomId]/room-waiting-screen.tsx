@@ -29,21 +29,21 @@ function describeRoomError(error: unknown): RoomLoadError {
     if (error.code === "TOKEN_EXPIRED") {
       return {
         title: "접근 토큰이 만료되었습니다.",
-        message: "방을 만든 브라우저에서 다시 시도하거나 새 방을 만들어 주세요.",
+        message: "방 코드로 다시 입장해 주세요.",
       };
     }
 
     if (error.code === "INVALID_TOKEN") {
       return {
         title: "접근 토큰을 확인할 수 없습니다.",
-        message: "이 방을 만든 브라우저에서 다시 열어 주세요.",
+        message: "방 코드와 이름을 입력해 다시 입장해 주세요.",
       };
     }
 
     if (error.status === 404) {
       return {
         title: "방을 찾을 수 없습니다.",
-        message: "주소가 정확한지 확인하거나 방을 새로 만들어 주세요.",
+        message: "주소를 확인하거나 방 코드로 다시 입장해 주세요.",
       };
     }
 
@@ -100,9 +100,9 @@ function ErrorView({
           </button>
           <Link
             className="rounded-xl border border-slate-300 px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-950 hover:text-slate-950"
-            href="/"
+            href="/join"
           >
-            새 방 만들기
+            방 코드로 다시 입장
           </Link>
         </div>
       </section>
@@ -234,8 +234,8 @@ export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
 
     if (!token) {
       setError({
-        title: "이 방에 접근할 token이 없습니다.",
-        message: "방을 만든 브라우저에서 다시 열거나 새 방을 만들어 주세요.",
+        title: "이 방에 접근할 토큰이 없습니다.",
+        message: "방 코드와 이름을 입력해 다시 입장해 주세요.",
       });
       setIsLoading(false);
       return;

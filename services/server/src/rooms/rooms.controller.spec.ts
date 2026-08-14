@@ -54,9 +54,26 @@ function createMockDatabase(): MockDatabase {
       rooms.set(room.id, room);
       return room;
     }),
+    findOne: jest.fn((options: { where?: Partial<Room> }) => {
+      const room = [...rooms.values()].find((candidate) =>
+        Object.entries(options.where ?? {}).every(
+          ([key, value]) => candidate[key as keyof Room] === value
+        )
+      );
+
+      return room ? { ...room } : null;
+    }),
     findOneBy: jest.fn(async (criteria: Partial<Room>) => {
       if (criteria.id) {
         return rooms.get(criteria.id) ?? null;
+      }
+
+      if (criteria.roomCode) {
+        return (
+          [...rooms.values()].find(
+            (room) => room.roomCode === criteria.roomCode
+          ) ?? null
+        );
       }
 
       return null;
@@ -245,6 +262,185 @@ describe('RoomsController', () => {
     expect(response.body.candidates).toEqual([]);
     expect(response.body.latestScoreResult).toBeNull();
     expect(response.body.decision).toBeNull();
+  });
+
+  it('creates a MEMBER Participant and allows the MEMBER token to read the Room', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+
+    const joined = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${created.body.room.roomCode.toLowerCase()}/participants`
+      )
+      .send({ displayName: 'Member test' })
+      .expect(201);
+
+    expect(joined.body.room).toEqual({
+      id: created.body.room.id,
+      roomCode: created.body.room.roomCode,
+      status: RoomStatus.OPEN,
+    });
+    expect(joined.body.participant).toMatchObject({
+      displayName: 'Member test',
+      role: ParticipantRole.MEMBER,
+      status: ParticipantStatus.JOINED,
+    });
+    expect(joined.body.access.participantToken).toEqual(expect.any(String));
+
+    const persistedParticipant = database.participants.get(
+      joined.body.participant.id
+    );
+    expect(persistedParticipant).toBeDefined();
+    expect(persistedParticipant?.role).toBe(ParticipantRole.MEMBER);
+    expect(persistedParticipant?.tokenHash).not.toBe(
+      joined.body.access.participantToken
+    );
+    expect(persistedParticipant?.tokenHash).toHaveLength(64);
+
+    const serializedJoinResponse = JSON.stringify(joined.body);
+    expect(serializedJoinResponse).not.toContain('tokenHash');
+    expect(serializedJoinResponse).not.toContain('tokenExpiresAt');
+
+    const roomResponse = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .expect(200);
+
+    const serializedRoomResponse = JSON.stringify(roomResponse.body);
+    expect(serializedRoomResponse).not.toContain('tokenHash');
+    expect(serializedRoomResponse).not.toContain('tokenExpiresAt');
+    expect(serializedRoomResponse).not.toContain('tokenRevokedAt');
+    expect(serializedRoomResponse).not.toContain(
+      joined.body.access.participantToken
+    );
+
+    expect(roomResponse.body.hostParticipant.role).toBe(ParticipantRole.HOST);
+    expect(roomResponse.body.participants).toHaveLength(2);
+    expect(roomResponse.body.participants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: joined.body.participant.id,
+          role: ParticipantRole.MEMBER,
+          status: ParticipantStatus.JOINED,
+        }),
+      ])
+    );
+  });
+
+  it.each([
+    ['missing displayName', {}],
+    ['displayName longer than 30 characters', { displayName: 'm'.repeat(31) }],
+  ])(
+    'returns 400 for invalid Participant input: %s',
+    async (_caseName, payload) => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+        .send(payload)
+        .expect(400);
+
+      expect(response.body.message).toBe('VALIDATION_ERROR');
+      expect(database.participants.size).toBe(1);
+    }
+  );
+
+  it('returns 404 for an unknown or invalid Room code', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/rooms/NOTFOUND/participants')
+      .send({ displayName: 'Member test' })
+      .expect(404);
+
+    expect(response.body.message).toBe('ROOM_NOT_FOUND_OR_INVALID_CODE');
+  });
+
+  it('rejects Participant entry when the Room is full', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+
+    for (let index = 1; index < 6; index += 1) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+        .send({ displayName: `Member ${index}` })
+        .expect(201);
+    }
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Too many' })
+      .expect(409);
+
+    expect(response.body.message).toBe('ROOM_STATE_CONFLICT');
+    expect(database.participants.size).toBe(6);
+  });
+
+  it.each([RoomStatus.CONFIRMED, RoomStatus.CLOSED])(
+    'rejects Participant entry when the Room is %s',
+    async (status) => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201);
+      const room = database.rooms.get(created.body.room.id);
+
+      expect(room).toBeDefined();
+      room!.status = status;
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+        .send({ displayName: 'Member test' })
+        .expect(409);
+
+      expect(response.body.message).toBe('ROOM_STATE_CONFLICT');
+      expect(database.participants.size).toBe(1);
+    }
+  );
+
+  it('returns TOKEN_EXPIRED when a MEMBER token has expired', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Member test' })
+      .expect(201);
+    const participant = database.participants.get(joined.body.participant.id);
+
+    expect(participant).toBeDefined();
+    participant!.tokenExpiresAt = new Date(Date.now() - 1_000);
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .expect(401);
+
+    expect(response.body.message).toBe('TOKEN_EXPIRED');
+  });
+
+  it('rolls back a MEMBER Participant and Room status when persistence fails', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    database.failParticipantSave = true;
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Member test' })
+      .expect(500);
+
+    expect(database.rooms.get(created.body.room.id)?.status).toBe(
+      RoomStatus.DRAFT
+    );
+    expect(database.participants.size).toBe(1);
   });
 
   it.each([

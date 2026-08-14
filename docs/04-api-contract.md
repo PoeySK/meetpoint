@@ -25,10 +25,10 @@
 
 ### 이번 단계의 Room API 범위
 
-- Room과 HOST Participant만 영속화한다.
-- 일반 참여자 입장, 참여자 목록 관리, 후보·조건·응답 수정 API는 다음 단계에서 구현한다.
+- Room과 HOST·MEMBER Participant를 영속화한다. MEMBER는 방 코드 입장 API로 생성한다.
+- 참여자 조건·응답 수정과 후보 API는 다음 단계에서 구현한다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
-- Room 조회의 `participants`에는 현재 구현 범위에 존재하는 HOST Participant를 반환한다.
+- Room 조회의 `participants`에는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보를 반환한다.
 - 아직 구현하지 않은 후보·계산·결정 데이터는 각각 `[]`, `null`, `null`로 반환한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 

@@ -5,8 +5,8 @@
 - **확정**: `Room`이 방 단위의 aggregate root다. 서버만 방 상태와 참여자·후보·응답·결정을 변경한다.
 - **확정**: Solver는 아래 도메인 객체를 데이터베이스에서 읽지 않는다. 서버가 한 번의 계산에 필요한 스냅샷을 만들어 Solver 입력으로 전달한다.
 - **확정**: 후보 시간과 후보 장소는 서로 다른 값 객체지만, MVP의 비교 단위인 `Candidate` 안에서 한 쌍으로 관리한다.
-- **확정**: 이번 Room 단계에서는 방 생성에 필요한 최소 `Participant`를 함께 영속화한다. 방 생성은 Room과 HOST Participant를 하나의 트랜잭션으로 처리한다.
-- **확정**: 이번 단계의 Participant 영속화 범위는 HOST의 ID, 표시 이름, 역할, 토큰 해시, 토큰 만료 시각, 토큰 폐기 시각이다. 일반 참여자 입장과 참여자 입력은 다음 단계에서 구현한다.
+- **확정**: Room 생성 시 HOST Participant를 함께 영속화하고, 방 코드 입장 시 MEMBER Participant를 생성한다. Room과 HOST Participant 생성은 하나의 트랜잭션으로 처리한다.
+- **확정**: 이번 단계의 Participant 영속화 범위는 ID, Room 소속, 표시 이름, 역할, 상태, 토큰 해시, 토큰 만료 시각, 토큰 폐기 시각이다. 참여자 조건과 후보별 응답 입력은 다음 단계에서 구현한다.
 - **확정**: Room과 Participant는 논리적으로 양방향 관계를 갖지만, 이번 MVP의 DB 외래 키는 `Participant.roomId → Room.id`에만 둔다. `Room.hostParticipantId`의 유효성은 NestJS 서비스에서 검증한다.
 - **미결정**: 실제 ORM 엔티티명, 테이블 분할, ID 생성 방식(UUID·문자열 등)은 구현 단계에서 정한다. 문서의 ID는 API 예시용 문자열이다.
 
@@ -98,18 +98,18 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 ### 이번 단계의 최소 영속화 범위
 
-이번 단계에서는 방 생성에 필요한 HOST Participant만 저장한다. 다음 필드를 영속화한다.
+이번 단계에서는 방 생성과 방 코드 입장에 필요한 HOST·MEMBER Participant를 저장한다. 다음 필드를 영속화한다.
 
 - `id`
 - `roomId`
 - `displayName`
-- `role` (`HOST`)
+- `role` (`HOST` 또는 `MEMBER`)
 - `status` (`JOINED`)
 - `tokenHash`
 - `tokenExpiresAt`
 - `tokenRevokedAt` (초기값 `null`)
 
-일반 참여자 입장, 참여자 목록 관리, 조건·응답 수정은 다음 단계에서 구현한다.
+참여자 조건·응답 수정은 다음 단계에서 구현한다. 방 조회에서는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보만 반환한다.
 
 ### 주요 필드
 
