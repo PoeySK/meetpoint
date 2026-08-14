@@ -50,6 +50,8 @@
 }
 ```
 
+Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전달할 값이 없으면 빈 객체를 반환하며, `requestId`는 서버가 요청마다 생성한다.
+
 공통 오류 코드는 다음과 같다.
 
 | HTTP 상태 | 코드 | 의미 |
@@ -201,7 +203,8 @@
 
 - `400 VALIDATION_ERROR`: 표시 이름이 1~30자가 아님
 - `404 ROOM_NOT_FOUND_OR_INVALID_CODE`: 코드가 틀렸거나 방을 입장할 수 없음
-- `409 ROOM_STATE_CONFLICT`: 방이 `CONFIRMED` 또는 `CLOSED`이거나 정원이 가득 참
+- `409 ROOM_STATE_CONFLICT`: 방이 `CALCULATING`, `CALCULATED`, `CONFIRMED`, `CLOSED`이거나 정원이 가득 참
+- Room은 `DRAFT` 또는 `OPEN` 상태에서만 Participant 입장을 허용한다.
 - 방 코드는 대문자로 정규화하고, 오류 메시지에서 실제 방 존재 여부를 구별하지 않는다.
 
 ### 4. 후보 등록

@@ -152,9 +152,7 @@ export class RoomsService {
     }
 
     if (!created) {
-      throw new ConflictException(
-        '방 코드를 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.'
-      );
+      throw new ConflictException('ROOM_STATE_CONFLICT');
     }
 
     return {
@@ -193,8 +191,8 @@ export class RoomsService {
         }
 
         if (
-          room.status === RoomStatus.CONFIRMED ||
-          room.status === RoomStatus.CLOSED
+          room.status !== RoomStatus.DRAFT &&
+          room.status !== RoomStatus.OPEN
         ) {
           throw new ConflictException('ROOM_STATE_CONFLICT');
         }

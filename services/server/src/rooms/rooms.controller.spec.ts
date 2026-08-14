@@ -181,6 +181,17 @@ function validPayload(overrides: CreateRoomPayload = {}) {
   };
 }
 
+function expectRoomError(response: { body: unknown }, code: string) {
+  expect(response.body).toEqual({
+    error: {
+      code,
+      message: expect.any(String),
+      details: {},
+      requestId: expect.stringMatching(/^req_/),
+    },
+  });
+}
+
 describe('RoomsController', () => {
   let app: INestApplication<App>;
   let database: MockDatabase;
@@ -345,7 +356,7 @@ describe('RoomsController', () => {
         .send(payload)
         .expect(400);
 
-      expect(response.body.message).toBe('VALIDATION_ERROR');
+      expectRoomError(response, 'VALIDATION_ERROR');
       expect(database.participants.size).toBe(1);
     }
   );
@@ -356,7 +367,7 @@ describe('RoomsController', () => {
       .send({ displayName: 'Member test' })
       .expect(404);
 
-    expect(response.body.message).toBe('ROOM_NOT_FOUND_OR_INVALID_CODE');
+    expectRoomError(response, 'ROOM_NOT_FOUND_OR_INVALID_CODE');
   });
 
   it('rejects Participant entry when the Room is full', async () => {
@@ -377,11 +388,39 @@ describe('RoomsController', () => {
       .send({ displayName: 'Too many' })
       .expect(409);
 
-    expect(response.body.message).toBe('ROOM_STATE_CONFLICT');
+    expectRoomError(response, 'ROOM_STATE_CONFLICT');
     expect(database.participants.size).toBe(6);
   });
 
-  it.each([RoomStatus.CONFIRMED, RoomStatus.CLOSED])(
+  it.each([RoomStatus.DRAFT, RoomStatus.OPEN])(
+    'allows Participant entry when the Room is %s',
+    async (status) => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201);
+      const room = database.rooms.get(created.body.room.id);
+
+      expect(room).toBeDefined();
+      room!.status = status;
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+        .send({ displayName: 'Member test' })
+        .expect(201);
+
+      expect(response.body.room.status).toBe(RoomStatus.OPEN);
+      expect(response.body.participant.role).toBe(ParticipantRole.MEMBER);
+      expect(database.participants.size).toBe(2);
+    }
+  );
+
+  it.each([
+    RoomStatus.CALCULATING,
+    RoomStatus.CALCULATED,
+    RoomStatus.CONFIRMED,
+    RoomStatus.CLOSED,
+  ])(
     'rejects Participant entry when the Room is %s',
     async (status) => {
       const created = await request(app.getHttpServer())
@@ -398,7 +437,7 @@ describe('RoomsController', () => {
         .send({ displayName: 'Member test' })
         .expect(409);
 
-      expect(response.body.message).toBe('ROOM_STATE_CONFLICT');
+      expectRoomError(response, 'ROOM_STATE_CONFLICT');
       expect(database.participants.size).toBe(1);
     }
   );
@@ -422,7 +461,7 @@ describe('RoomsController', () => {
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
       .expect(401);
 
-    expect(response.body.message).toBe('TOKEN_EXPIRED');
+    expectRoomError(response, 'TOKEN_EXPIRED');
   });
 
   it('rolls back a MEMBER Participant and Room status when persistence fails', async () => {
@@ -432,11 +471,12 @@ describe('RoomsController', () => {
       .expect(201);
     database.failParticipantSave = true;
 
-    await request(app.getHttpServer())
+    const response = await request(app.getHttpServer())
       .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
       .send({ displayName: 'Member test' })
       .expect(500);
 
+    expectRoomError(response, 'INTERNAL_ERROR');
     expect(database.rooms.get(created.body.room.id)?.status).toBe(
       RoomStatus.DRAFT
     );
@@ -467,7 +507,7 @@ describe('RoomsController', () => {
       .send(payload)
       .expect(400);
 
-    expect(response.body.message).toBe('VALIDATION_ERROR');
+    expectRoomError(response, 'VALIDATION_ERROR');
     expect(database.rooms.size).toBe(0);
     expect(database.participants.size).toBe(0);
   });
@@ -483,7 +523,7 @@ describe('RoomsController', () => {
       .set('Authorization', 'Bearer nonexistent-token')
       .expect(401);
 
-    expect(response.body.message).toBe('INVALID_TOKEN');
+    expectRoomError(response, 'INVALID_TOKEN');
   });
 
   it('returns 404 when a token belongs to another Room', async () => {
@@ -501,7 +541,7 @@ describe('RoomsController', () => {
       .set('Authorization', `Bearer ${secondRoom.body.access.hostToken}`)
       .expect(404);
 
-    expect(response.body.message).toBe('RESOURCE_NOT_FOUND');
+    expectRoomError(response, 'RESOURCE_NOT_FOUND');
   });
 
   it('returns 401 for an expired token', async () => {
@@ -521,7 +561,7 @@ describe('RoomsController', () => {
       .set('Authorization', `Bearer ${created.body.access.hostToken}`)
       .expect(401);
 
-    expect(response.body.message).toBe('TOKEN_EXPIRED');
+    expectRoomError(response, 'TOKEN_EXPIRED');
   });
 
   it('does not expose private token fields in the GET response', async () => {

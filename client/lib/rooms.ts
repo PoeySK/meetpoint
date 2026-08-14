@@ -79,11 +79,21 @@ export type RoomDetailsResponse = {
   decision: null;
 };
 
+export type RoomApiErrorPayload = {
+  error: {
+    code: string;
+    message: string;
+    details: Record<string, unknown>;
+    requestId: string;
+  };
+};
+
 export class RoomApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
     public readonly code?: string,
+    public readonly requestId?: string,
   ) {
     super(message);
     this.name = "RoomApiError";
@@ -98,13 +108,27 @@ const API_BASE_URL = (
 
 const ROOM_TOKEN_STORAGE_PREFIX = "meetpoint:room-token:";
 
-function getErrorField(payload: unknown, field: "message" | "error") {
+function getRoomError(payload: unknown) {
   if (typeof payload !== "object" || payload === null) {
     return undefined;
   }
 
-  const value = (payload as Record<string, unknown>)[field];
-  return typeof value === "string" ? value : undefined;
+  const error = (payload as Partial<RoomApiErrorPayload>).error;
+  if (typeof error !== "object" || error === null) {
+    return undefined;
+  }
+
+  if (
+    typeof error.code !== "string" ||
+    typeof error.message !== "string" ||
+    typeof error.requestId !== "string" ||
+    typeof error.details !== "object" ||
+    error.details === null
+  ) {
+    return undefined;
+  }
+
+  return error;
 }
 
 async function request<T>(path: string, options: RequestInit = {}) {
@@ -127,15 +151,13 @@ async function request<T>(path: string, options: RequestInit = {}) {
   }
 
   if (!response.ok) {
-    const message =
-      getErrorField(payload, "message") ??
-      getErrorField(payload, "error") ??
-      "요청을 처리하지 못했습니다.";
+    const error = getRoomError(payload);
 
     throw new RoomApiError(
-      message,
+      error?.message ?? "요청을 처리하지 못했습니다.",
       response.status,
-      getErrorField(payload, "message"),
+      error?.code,
+      error?.requestId,
     );
   }
 

@@ -1,9 +1,19 @@
-import { Body, Controller, Get, Headers, Param, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Headers,
+  Param,
+  Post,
+  UseFilters,
+} from '@nestjs/common';
 import type { CreateRoomDto } from './dto/create-room.dto';
 import type { JoinParticipantDto } from './dto/join-participant.dto';
+import { RoomsErrorFilter } from './rooms-error.filter';
 import { RoomsService } from './rooms.service';
 
 @Controller('api/v1/rooms')
+@UseFilters(RoomsErrorFilter)
 export class RoomsController {
   constructor(private readonly roomsService: RoomsService) {}
 

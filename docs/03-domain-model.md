@@ -64,6 +64,8 @@ Room에는 `expiresAt`을 두지 않는다. Room 자체는 시간에 따라 자�
 - `CONFIRMED`: 현재 최종 결정이 있다. 기본적으로 데이터 변경을 막는다.
 - `CLOSED`: 더 이상 입장·수정·계산하지 않는 종결 상태다. 이번 MVP에서는 자동 종결 로직을 구현하지 않는다.
 
+Participant 입장은 `DRAFT`와 `OPEN` 상태에서만 허용한다. `CALCULATING`, `CALCULATED`, `CONFIRMED`, `CLOSED` 상태에서는 새 Participant를 생성하지 않는다.
+
 상태 전이는 다음 규칙을 따른다. 계산 실패나 타임아웃은 별도의 `Room` 상태를 만들지 않고 `CALCULATING → OPEN`으로 되돌리며, 해당 `ScoreResult`만 `FAILED`로 저장한다. 실패한 계산 때문에 이전 입력을 성공으로 오인하지 않도록 호스트는 새 계산을 요청해야 한다.
 
 | 사건 | 이전 상태 | 이후 상태 | 함께 변경되는 객체 |
