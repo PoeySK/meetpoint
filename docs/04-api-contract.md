@@ -25,10 +25,10 @@
 
 ### 이번 단계의 Room API 범위
 
-- Room과 HOST Participant만 영속화한다.
-- 일반 참여자 입장, 참여자 목록 관리, 후보·조건·응답 수정 API는 다음 단계에서 구현한다.
+- Room과 HOST·MEMBER Participant를 영속화한다. MEMBER는 방 코드 입장 API로 생성한다.
+- 참여자 조건·응답 수정과 후보 API는 다음 단계에서 구현한다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
-- Room 조회의 `participants`에는 현재 구현 범위에 존재하는 HOST Participant를 반환한다.
+- Room 조회의 `participants`에는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보를 반환한다.
 - 아직 구현하지 않은 후보·계산·결정 데이터는 각각 `[]`, `null`, `null`로 반환한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 
@@ -49,6 +49,8 @@
   }
 }
 ```
+
+Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전달할 값이 없으면 빈 객체를 반환하며, `requestId`는 서버가 요청마다 생성한다.
 
 공통 오류 코드는 다음과 같다.
 
@@ -201,7 +203,8 @@
 
 - `400 VALIDATION_ERROR`: 표시 이름이 1~30자가 아님
 - `404 ROOM_NOT_FOUND_OR_INVALID_CODE`: 코드가 틀렸거나 방을 입장할 수 없음
-- `409 ROOM_STATE_CONFLICT`: 방이 `CONFIRMED` 또는 `CLOSED`이거나 정원이 가득 참
+- `409 ROOM_STATE_CONFLICT`: 방이 `CALCULATING`, `CALCULATED`, `CONFIRMED`, `CLOSED`이거나 정원이 가득 참
+- Room은 `DRAFT` 또는 `OPEN` 상태에서만 Participant 입장을 허용한다.
 - 방 코드는 대문자로 정규화하고, 오류 메시지에서 실제 방 존재 여부를 구별하지 않는다.
 
 ### 4. 후보 등록

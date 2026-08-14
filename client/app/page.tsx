@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createRoom,
@@ -250,6 +251,12 @@ export default function Home() {
             </button>
             <p className="text-center text-xs leading-5 text-slate-400">
               호스트 접근 토큰은 이 브라우저의 sessionStorage에만 보관됩니다.
+            </p>
+            <p className="text-center text-sm text-slate-500">
+              초대받은 참가자라면{" "}
+              <Link className="font-semibold text-emerald-700 hover:text-emerald-800" href="/join">
+                방 코드로 입장하기
+              </Link>
             </p>
           </form>
         </section>

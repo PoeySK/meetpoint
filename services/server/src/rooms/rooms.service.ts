@@ -14,6 +14,7 @@ import {
   ParticipantRole,
   ParticipantStatus,
 } from '../participants/entities/participant.entity';
+import { JoinParticipantDto } from './dto/join-participant.dto';
 import { Room, RoomStatus } from './entities/room.entity';
 import { CreateRoomDto } from './dto/create-room.dto';
 
@@ -67,6 +68,19 @@ export interface RoomDetailsResponse {
   candidates: [];
   latestScoreResult: null;
   decision: null;
+}
+
+export interface JoinedParticipantResponse {
+  requestId: string;
+  room: {
+    id: string;
+    roomCode: string;
+    status: RoomStatus;
+  };
+  participant: PublicParticipant;
+  access: {
+    participantToken: string;
+  };
 }
 
 @Injectable()
@@ -138,9 +152,7 @@ export class RoomsService {
     }
 
     if (!created) {
-      throw new ConflictException(
-        '방 코드를 생성하지 못했습니다. 잠시 후 다시 시도해 주세요.'
-      );
+      throw new ConflictException('ROOM_STATE_CONFLICT');
     }
 
     return {
@@ -150,6 +162,86 @@ export class RoomsService {
       access: {
         hostToken,
         inviteUrl: this.createInviteUrl(created.roomCode),
+      },
+    };
+  }
+
+  async joinParticipant(
+    roomCode: string,
+    input: JoinParticipantDto
+  ): Promise<JoinedParticipantResponse> {
+    const normalizedRoomCode = roomCode.trim().toUpperCase();
+    const displayName = this.validateJoinParticipantInput(input);
+    const participantId = randomUUID();
+    const participantToken = randomBytes(32).toString('base64url');
+    const tokenHash = this.hashToken(participantToken);
+    const tokenExpiresAt = new Date(Date.now() + ACCESS_TOKEN_TTL_MS);
+
+    const joined = await this.dataSource.transaction(
+      async (manager: EntityManager) => {
+        const roomRepository = manager.getRepository(Room);
+        const participantRepository = manager.getRepository(Participant);
+        const room = await roomRepository.findOne({
+          where: { roomCode: normalizedRoomCode },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (!room) {
+          throw new NotFoundException('ROOM_NOT_FOUND_OR_INVALID_CODE');
+        }
+
+        if (
+          room.status !== RoomStatus.DRAFT &&
+          room.status !== RoomStatus.OPEN
+        ) {
+          throw new ConflictException('ROOM_STATE_CONFLICT');
+        }
+
+        const participants = await participantRepository.find({
+          where: { roomId: room.id },
+        });
+        const activeParticipantCount = participants.filter(
+          (participant) =>
+            participant.status !== ParticipantStatus.LEFT &&
+            participant.status !== ParticipantStatus.REMOVED
+        ).length;
+
+        if (activeParticipantCount >= room.maxParticipants) {
+          throw new ConflictException('ROOM_STATE_CONFLICT');
+        }
+
+        if (room.status === RoomStatus.DRAFT) {
+          room.status = RoomStatus.OPEN;
+        }
+
+        const participant = participantRepository.create({
+          id: participantId,
+          roomId: room.id,
+          displayName,
+          role: ParticipantRole.MEMBER,
+          status: ParticipantStatus.JOINED,
+          tokenHash,
+          tokenExpiresAt,
+          tokenRevokedAt: null,
+        });
+
+        const savedRoom = await roomRepository.save(room);
+        const savedParticipant = await participantRepository.save(participant);
+
+        return { room: savedRoom, participant: savedParticipant };
+      }
+    );
+
+    return {
+      requestId: this.createRequestId(),
+      room: {
+        id: joined.room.id,
+        roomCode: joined.room.roomCode,
+        status: joined.room.status,
+      },
+      participant: this.toPublicParticipant(joined.participant),
+      access: {
+        participantToken,
       },
     };
   }
@@ -242,6 +334,20 @@ export class RoomsService {
     }
 
     return { title, timezone, displayName };
+  }
+
+  private validateJoinParticipantInput(input: JoinParticipantDto): string {
+    const candidate = input as unknown as { displayName?: unknown };
+    const displayName =
+      typeof candidate.displayName === 'string'
+        ? candidate.displayName.trim()
+        : '';
+
+    if (!displayName || displayName.length > 30) {
+      throw new BadRequestException('VALIDATION_ERROR');
+    }
+
+    return displayName;
   }
 
   private assertHostParticipant(room: Room, participant: Participant): void {
