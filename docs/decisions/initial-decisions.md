@@ -175,7 +175,7 @@ meetpoint/
 
 ### 결정
 
-NestJS의 PostgreSQL 접근에는 `@nestjs/typeorm`, TypeORM, `pg`를 사용한다. 초기 구성에서는 `synchronize=false`, `migrationsRun=false`로 두고, 도메인 엔티티와 migration은 문서 대조 후 다음 단계에서 추가한다.
+NestJS의 PostgreSQL 접근에는 `@nestjs/typeorm`, TypeORM, `pg`를 사용한다. `synchronize=false`, `migrationsRun=false`를 유지하고, Room 단계부터 명시적인 TypeORM `DataSource`와 migration으로 스키마를 관리한다. 이번 단계에서는 Room과 방 생성에 필요한 최소 HOST Participant 엔티티·migration을 추가한다.
 
 ### 이유
 
@@ -186,7 +186,15 @@ NestJS의 PostgreSQL 접근에는 `@nestjs/typeorm`, TypeORM, `pg`를 사용한�
 
 ### 영향
 
-이번 단계에서는 연결 설정과 health check의 `SELECT 1`만 제공한다. TypeORM entity, repository, migration 파일은 만들지 않는다.
+Room 단계에서는 Room과 최소 HOST Participant의 entity, repository, API, migration을 제공한다. Candidate, ParticipantResponse, ScoreResult, Decision과 일반 참여자 입장·입력 API는 이후 단계에서 추가한다. 애플리케이션 시작 시 schema 자동 동기화와 migration 자동 실행은 사용하지 않는다.
+
+### Room과 Participant 관계 제약
+
+Room과 Participant는 논리적으로 양방향 관계를 갖는다. DB 외래 키는 `Participant.roomId`에서 `Room.id`를 참조하도록 설정한다. `Room.hostParticipantId`는 필수 UUID 컬럼으로 저장하지만 이번 MVP에서는 DB 외래 키를 설정하지 않는다.
+
+NestJS 서비스는 `hostParticipantId`에 해당하는 Participant가 존재하는지, 현재 Room과 같은 `roomId`인지, `role=HOST`인지 검증한다. Room ID와 Participant ID를 먼저 생성한 뒤 하나의 트랜잭션에서 Room과 HOST Participant를 저장하고, 검증 실패 시 전체를 rollback한다. PostgreSQL `DEFERRABLE` 또는 `INITIALLY DEFERRED` 외래 키는 사용하지 않으며, 추후 필요하면 DB 수준의 순환 참조 제약을 검토한다.
+
+`roomCode`는 unique 제약을 갖고 중복 발생 시 새 코드를 생성해 재시도한다. `tokenHash`에는 조회 인덱스를 둔다.
 
 ## 10. Rust HTTP 프레임워크
 
@@ -210,7 +218,7 @@ Rust Solver의 HTTP 서버에는 Axum과 Tokio를 사용한다. 기본 포트는
 
 - Docker에서 Server·Solver까지 함께 실행하는 Compose 구성
 - TypeORM migration 파일의 생성·실행 명령과 CI 적용 방식
-- 익명 room-scoped token의 방 만료·데이터 삭제 정책. 토큰 자체는 24시간 유효, 서버에는 해시 저장, Client에는 방별 `sessionStorage` 저장, MVP 갱신 API 없음으로 확정했다.
+- Room 자체의 자동 만료·자동 `CLOSED` 전환은 MVP에서 구현하지 않는다. 익명 room-scoped token 자체는 24시간 유효하고, 서버에는 원문이 아닌 해시와 만료 정보만 저장하며, Client에는 방별 `sessionStorage`에 저장한다. 방 데이터 삭제·보존 기간은 추후 결정한다.
 - 배포 환경에서 PostgreSQL을 계속 컨테이너로 운영할지, 별도 운영 PostgreSQL을 사용할지
 - 방과 계산 이력의 보존 기간 및 삭제 요청 정책
 
@@ -225,6 +233,9 @@ Rust Solver의 HTTP 서버에는 Axum과 Tokio를 사용한다. 기본 포트는
 | AI | 추후 NestJS에서 직접 OpenAI 호출, 점수 계산에는 사용하지 않음 |
 | Frontend API | Next.js API Route/Server Action 없이 NestJS REST 호출 |
 | 인증 | MVP는 로그인 없이 방 코드·방 범위 토큰, 24시간 유효·해시 저장·방별 `sessionStorage` |
+| Room 단계 데이터 | Room과 최소 HOST Participant를 하나의 트랜잭션으로 생성, Candidate 등은 이후 단계 |
+| Room-Participant FK | 실제 DB FK는 `Participant.roomId`에만 설정, `Room.hostParticipantId`는 NestJS 서비스에서 검증 |
+| Room 만료 | Room 자동 만료 없음, 24시간 만료는 접근 토큰에만 적용 |
 | 지도 | MVP 제외, 자기 기입 이동 부담(`EASY/NORMAL/HARD`) |
 | 저장소 구조 | 현재 `client/services/server/services/solver/infra` 유지 |
 | 모노레포 도구 | Turborepo 사용하지 않음 |

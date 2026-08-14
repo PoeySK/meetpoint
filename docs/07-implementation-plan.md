@@ -5,8 +5,10 @@
 - **확정**: 기존 `client`, `services/server`, `services/solver` 구조를 유지하고 기능을 단계적으로 연결한다.
 - **확정**: 1일차에는 저장·방 API, 2일차에는 참여자 입력과 결과용 데이터, 3일차에는 Solver·확정 흐름을 완성한다.
 - **확정**: MVP 토큰은 방별 불투명 토큰으로 발급하고 24시간 유효하게 하며, Client의 방별 `sessionStorage`에 저장한다. 서버는 원문이 아닌 해시를 보관한다.
-- **미결정**: 실제 ORM/DB 라이브러리와 배포 방식은 이 문서에서 선택하지 않는다.
-- **이번 문서 작업의 제한**: 계획만 작성하며 패키지 설치, 코드 작성, 프로젝트 설정 변경은 수행하지 않는다.
+- **확정**: NestJS의 PostgreSQL 접근은 `@nestjs/typeorm`, TypeORM, `pg`를 사용하고 명시적 migration으로 관리한다. `synchronize=false`, `migrationsRun=false`를 유지한다.
+- **확정**: 1일차 Room 단계에는 Room과 방 생성에 필요한 최소 HOST Participant 영속화가 포함된다. 일반 참여자 입장과 참여자 입력은 2일차 범위다.
+- **확정**: Room 자체는 자동 만료하지 않는다. 24시간 만료 대상은 방 범위 접근 토큰이며, 방 데이터 삭제·보존 기간은 추후 결정한다.
+- **이번 문서의 역할**: 구현 순서를 정의하며, 실제 패키지 설치·코드·설정 변경은 각 구현 단계에서 수행한다.
 
 ## 개발 전 공통 확인
 
@@ -20,6 +22,8 @@
 - 미응답은 0점·확정 차단, 완전 일치 후보 없음은 정상 결과
 - 실제 지도 API 없이 참가자 자기 기입 이동 부담 사용
 - Client는 NestJS API만 호출하고 Solver·PostgreSQL을 직접 호출하지 않음
+- Room 자체의 자동 만료·자동 `CLOSED` 전환은 MVP에서 구현하지 않음
+- 토큰 만료와 Room 만료를 구분하고, 방 데이터 삭제·보존 기간은 추후 결정함
 
 ## 1일차 — 저장 기반과 방 수명주기
 
@@ -36,22 +40,40 @@
    - Solver health를 Server health에 무조건 종속시키지 않는다. 계산 요청 시점의 Solver 오류와 기본 서버 생존을 분리한다.
 
 3. **기본 도메인 구조**
-   - `Room`, `Participant`, `Candidate`, `ParticipantResponse`, `ScoreResult`, `Decision`의 책임과 상태를 문서 모델에 맞춘다.
-   - `ParticipantCondition`은 Participant에 속한 값 객체로 시작한다.
-   - 방 코드·호스트 참여자·방 상태를 저장하고, 후보와 응답의 `roomId` 범위를 검증한다.
+   - 이번 단계에서는 `Room`과 최소 `Participant`의 책임과 상태를 문서 모델에 맞춘다.
+   - Room에는 방 코드, 호스트 Participant 참조, 방 상태, nullable 최신 계산·결정 참조를 저장한다.
+   - 최소 Participant에는 ID, Room 소속, 표시 이름, `HOST` 역할, `JOINED` 상태, 토큰 해시·만료·폐기 시각을 저장한다.
+   - Room과 Participant는 논리적으로 양방향 관계지만 DB 외래 키는 `Participant.roomId`에만 설정한다. `Room.hostParticipantId`는 서비스에서 Participant 존재 여부, 같은 Room 소속 여부, `HOST` 역할을 검증한다.
+   - `Candidate`, `ParticipantResponse`, `ScoreResult`, `Decision`은 다음 단계에서 추가한다.
 
 4. **방 생성 및 조회**
-   - 방 생성 시 Room과 HOST Participant를 함께 만든다.
+   - 애플리케이션에서 Room ID와 Participant ID를 먼저 생성한다.
+   - Room을 저장한 뒤 HOST Participant를 저장하고, `hostParticipantId`와 Participant ID가 일치하는지 검증한 뒤 커밋한다.
+   - 방 생성 시 Room과 HOST Participant를 하나의 데이터베이스 트랜잭션으로 처리하며 어느 단계에서든 실패하면 rollback한다.
    - 6자리 방 코드와 방 범위 호스트 토큰을 반환한다.
+   - `roomCode` unique 충돌 시 새 코드를 생성해 제한된 횟수만큼 재시도한다.
    - 방 조회 시 참여자 상태, 후보 목록, 최신 계산 요약을 결과 화면이 사용할 수 있는 형태로 반환한다.
    - 아직 후보가 없고 참가자가 호스트뿐인 방도 조회 가능해야 한다.
+
+5. **명시적 migration 관리**
+   - CLI용 TypeORM `DataSource`를 별도로 구성한다.
+   - `CreateRoomsTable` migration에는 `roomCode` unique 제약, 필수 `hostParticipantId`, nullable `latestScoreResultId`·`currentDecisionId`를 추가하고 `hostParticipantId` DB 외래 키는 추가하지 않는다.
+   - `CreateParticipantsTable` migration에는 `Participant.roomId → Room.id` 외래 키와 `tokenHash` 조회 인덱스를 추가한다.
+   - PostgreSQL `DEFERRABLE` 또는 `INITIALLY DEFERRED` 외래 키는 사용하지 않는다.
+   - `pnpm migration:generate`, `pnpm migration:run`, `pnpm migration:revert` 명령으로 migration을 관리한다.
+   - 애플리케이션 시작 시 자동 schema 동기화나 자동 migration 실행은 사용하지 않는다.
 
 ### 1일차 완료 기준
 
 - PostgreSQL Docker 컨테이너가 로컬에서 시작·종료되고 데이터 볼륨 정책이 확인된다.
 - NestJS health check가 Server와 DB 상태를 구분해 응답한다.
 - 방을 만들면 호스트 참여자와 방 코드가 함께 생긴다.
+- Room과 HOST Participant가 한 트랜잭션에서 생성되고, 생성 실패 시 서로 함께 롤백된다.
+- 호스트 토큰 원문은 응답에서만 한 번 반환되고 데이터베이스에는 저장되지 않는다.
+- 다른 Room의 Participant를 `hostParticipantId`로 지정하거나 `HOST`가 아닌 Participant를 호스트로 지정할 수 없다.
+- Room과 HOST Participant 생성 실패 시 두 레코드가 함께 rollback된다.
 - 생성한 방을 같은 방 범위 토큰으로 조회할 수 있다.
+- Room 조회 시 후보는 빈 배열, 최신 계산 결과와 결정은 `null`로 반환된다.
 - 방 상태와 도메인 ID가 문서의 객체 관계와 일치한다.
 
 ## 2일차 — 참여자 입력과 결과 화면용 API

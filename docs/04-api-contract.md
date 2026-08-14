@@ -7,8 +7,9 @@
 - **확정**: 모든 날짜·시간은 ISO 8601 문자열로 전달하고, 시간대가 필요한 값에는 `timezone`을 함께 둔다.
 - **확정**: 금액은 부동소수점이 아닌 KRW 정수(`estimatedCostPerPersonKrw`, `maxBudgetKrw`)로 전달한다.
 - **확정**: MVP 토큰은 방 코드와 별개의 불투명 난수 토큰으로 발급하고 서버에는 해시만 저장한다. Client는 방별 `sessionStorage`에 보관하며 URL·로그에는 넣지 않는다. 토큰은 발급 후 24시간 유효하고 갱신 API는 MVP에서 제공하지 않는다.
-- **확정**: MVP 외부 API에는 `CLOSED` 전환 endpoint를 제공하지 않는다. `CLOSED`는 추후 방 만료·관리 기능에서만 사용할 예약 상태다.
-- **미결정**: API 문서 도구(OpenAPI 등), 방 만료 정책은 구현 전에 확정한다.
+- **확정**: MVP 외부 API에는 `CLOSED` 전환 endpoint를 제공하지 않는다. Room 자체는 자동 만료되지 않으며, 이번 단계에서는 시간에 따른 `CLOSED` 전환도 구현하지 않는다.
+- **확정**: 방 생성 API는 Room과 최소 HOST Participant를 하나의 트랜잭션으로 생성한다. 호스트 토큰 원문은 응답에서 한 번만 반환하고 서버에는 해시와 만료 정보만 저장한다.
+- **미결정**: API 문서 도구(OpenAPI 등), 방 데이터 삭제·보존 기간은 추후 확정한다.
 
 ## 기본 규칙
 
@@ -21,6 +22,15 @@
 - 후보·조건·응답이 변경되면 관련 최신 `ScoreResult`는 `STALE`로 표시된다.
 - 서버는 `requestId`를 생성하여 응답과 오류에 포함한다.
 - 계산 후보의 `matchLevel`은 `FULL`, `PARTIAL`, `CONFLICTED`, `INCOMPLETE` 중 하나이며, 전체 계산의 `recommendationStatus`와 구분한다.
+
+### 이번 단계의 Room API 범위
+
+- Room과 HOST Participant만 영속화한다.
+- 일반 참여자 입장, 참여자 목록 관리, 후보·조건·응답 수정 API는 다음 단계에서 구현한다.
+- Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
+- Room 조회의 `participants`에는 현재 구현 범위에 존재하는 HOST Participant를 반환한다.
+- 아직 구현하지 않은 후보·계산·결정 데이터는 각각 `[]`, `null`, `null`로 반환한다.
+- `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 
 ## 공통 오류 응답
 
@@ -106,6 +116,9 @@
 - `400 VALIDATION_ERROR`: 제목이 비어 있거나 80자를 초과, 표시 이름이 1~30자가 아님, 잘못된 시간대
 - `409 ROOM_STATE_CONFLICT`: 서버가 방 코드 발급 중 충돌을 해결하지 못함
 - 호스트 토큰은 이 요청에서 필요하지 않으며 응답에서 한 번 발급한다.
+- Room과 HOST Participant 생성은 하나의 트랜잭션으로 처리하며, 어느 한쪽이라도 실패하면 전체 생성을 롤백한다.
+- `roomCode` unique 충돌이 발생하면 서버는 새 코드를 생성해 재시도하고, 재시도 한도를 넘으면 `409 ROOM_STATE_CONFLICT`를 반환한다.
+- `hostParticipantId`는 Room 생성 트랜잭션 안에서 생성한 Participant ID와 일치하는지 서비스가 검증한다. Participant 존재 여부, Room 소속, `HOST` 역할도 서비스에서 검증한다.
 
 ### 2. 방 조회
 
@@ -121,75 +134,32 @@
     "roomCode": "A7K9P2",
     "title": "토요일 저녁 모임",
     "timezone": "Asia/Seoul",
-    "status": "CALCULATED",
+    "status": "DRAFT",
     "hostParticipantId": "participant_host"
+  },
+  "hostParticipant": {
+    "id": "participant_host",
+    "displayName": "민수",
+    "role": "HOST",
+    "status": "JOINED"
   },
   "participants": [
     {
       "id": "participant_host",
       "displayName": "민수",
       "role": "HOST",
-      "status": "RESPONDED",
-      "conditionSubmitted": true,
-      "responseCount": 3,
-      "expectedResponseCount": 3
-    },
-    {
-      "id": "participant_02",
-      "displayName": "지수",
-      "role": "MEMBER",
-      "status": "JOINED",
-      "conditionSubmitted": true,
-      "responseCount": 2,
-      "expectedResponseCount": 3
-    },
-    {
-      "id": "participant_03",
-      "displayName": "현우",
-      "role": "MEMBER",
-      "status": "RESPONDED",
-      "conditionSubmitted": true,
-      "responseCount": 3,
-      "expectedResponseCount": 3
+      "status": "JOINED"
     }
   ],
-  "candidates": [
-    {
-      "id": "candidate_01",
-      "displayOrder": 1,
-      "status": "ACTIVE",
-      "time": {
-        "startsAt": "2026-08-15T19:00:00+09:00",
-        "endsAt": "2026-08-15T21:00:00+09:00",
-        "timezone": "Asia/Seoul"
-      },
-      "place": {
-        "name": "역삼 조용한 식당",
-        "address": "서울 강남구 테헤란로 1",
-        "area": "강남"
-      },
-      "estimatedCostPerPersonKrw": 28000,
-      "tags": ["INDOOR", "QUIET"],
-      "version": 1,
-      "archivedAt": null
-    }
-  ],
-  "latestScoreResult": {
-    "id": "score_20260813_01",
-    "status": "COMPLETED",
-    "policyVersion": "mvp-1",
-    "coverage": {
-      "submittedResponses": 8,
-      "expectedResponses": 9
-    }
-  },
+  "candidates": [],
+  "latestScoreResult": null,
   "decision": null
 }
 ```
 
 #### 주요 실패 상태와 유효성 검사
 
-- `401 MISSING_TOKEN` 또는 `INVALID_TOKEN`
+- `401 MISSING_TOKEN`, `INVALID_TOKEN` 또는 `TOKEN_EXPIRED`
 - `404 RESOURCE_NOT_FOUND`: 토큰의 방 범위와 일치하지 않는 방 ID도 상세 없이 404로 처리
 - 조회 응답에는 다른 방의 참여자·후보·계산 결과를 포함하지 않는다.
 
@@ -911,4 +881,5 @@ NestJS는 Solver의 `requestId`와 오류 코드를 보존하여 외부 API의 `
 - **확정**: 외부 API의 책임은 NestJS가 가지며, Solver API는 계산 입력과 출력에만 집중한다.
 - **확정**: 결과에는 숫자 점수뿐 아니라 참가자별 breakdown, 근거, 충돌, 커버리지를 포함한다.
 - **확정**: 토큰은 불투명 난수이며 24시간 후 만료되고, MVP에는 토큰 갱신 API가 없다. 구현 시 원문 대신 해시만 저장한다.
-- **미결정**: API 버전별 호환 기간, 계산 결과 페이지의 이력 조회 범위와 `If-Match-Version` 필수 여부는 구현 전에 결정한다.
+- **확정**: Room 자체는 자동 만료되지 않으며 `TOKEN_EXPIRED`는 만료된 방 범위 토큰에만 적용한다.
+- **미결정**: 방 데이터 삭제·보존 기간, API 버전별 호환 기간, 계산 결과 페이지의 이력 조회 범위와 `If-Match-Version` 필수 여부는 추후 결정한다.

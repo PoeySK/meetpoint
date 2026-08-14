@@ -5,6 +5,9 @@
 - **확정**: `Room`이 방 단위의 aggregate root다. 서버만 방 상태와 참여자·후보·응답·결정을 변경한다.
 - **확정**: Solver는 아래 도메인 객체를 데이터베이스에서 읽지 않는다. 서버가 한 번의 계산에 필요한 스냅샷을 만들어 Solver 입력으로 전달한다.
 - **확정**: 후보 시간과 후보 장소는 서로 다른 값 객체지만, MVP의 비교 단위인 `Candidate` 안에서 한 쌍으로 관리한다.
+- **확정**: 이번 Room 단계에서는 방 생성에 필요한 최소 `Participant`를 함께 영속화한다. 방 생성은 Room과 HOST Participant를 하나의 트랜잭션으로 처리한다.
+- **확정**: 이번 단계의 Participant 영속화 범위는 HOST의 ID, 표시 이름, 역할, 토큰 해시, 토큰 만료 시각, 토큰 폐기 시각이다. 일반 참여자 입장과 참여자 입력은 다음 단계에서 구현한다.
+- **확정**: Room과 Participant는 논리적으로 양방향 관계를 갖지만, 이번 MVP의 DB 외래 키는 `Participant.roomId → Room.id`에만 둔다. `Room.hostParticipantId`의 유효성은 NestJS 서비스에서 검증한다.
 - **미결정**: 실제 ORM 엔티티명, 테이블 분할, ID 생성 방식(UUID·문자열 등)은 구현 단계에서 정한다. 문서의 ID는 API 예시용 문자열이다.
 
 ## 객체 관계
@@ -47,8 +50,10 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 - `roomCode`: 링크가 없을 때 입장에 사용하는 6자리 코드
 - `timezone`: 입력하지 않은 시간의 기본 시간대
 - `status`: 방의 현재 작업 가능 상태
-- `latestScoreResultId`: 가장 최근 계산 결과를 가리키는 선택적 참조
-- `currentDecisionId`: 현재 확정 또는 재검토 중인 결정 참조
+- `latestScoreResultId`: 가장 최근 계산 결과를 가리키는 선택적 참조. 아직 계산 결과가 없으면 `null`이다.
+- `currentDecisionId`: 현재 확정 또는 재검토 중인 결정 참조. 아직 결정이 없으면 `null`이다.
+
+Room에는 `expiresAt`을 두지 않는다. Room 자체는 시간에 따라 자동 만료되거나 `CLOSED`로 전환되지 않으며, 이번 MVP에서 만료 대상은 Room이 아니라 방 범위 접근 토큰이다. 방 데이터 삭제와 보존 기간은 추후 결정한다.
 
 ### 상태값
 
@@ -57,7 +62,7 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 - `CALCULATING`: 최신 입력 스냅샷을 Solver가 처리 중이다.
 - `CALCULATED`: 유효한 계산 결과가 있고 아직 최종 확정하지 않았다.
 - `CONFIRMED`: 현재 최종 결정이 있다. 기본적으로 데이터 변경을 막는다.
-- `CLOSED`: 더 이상 입장·수정·계산하지 않는 종결 상태다. MVP의 자동 종결은 아직 미결정이다.
+- `CLOSED`: 더 이상 입장·수정·계산하지 않는 종결 상태다. 이번 MVP에서는 자동 종결 로직을 구현하지 않는다.
 
 상태 전이는 다음 규칙을 따른다. 계산 실패나 타임아웃은 별도의 `Room` 상태를 만들지 않고 `CALCULATING → OPEN`으로 되돌리며, 해당 `ScoreResult`만 `FAILED`로 저장한다. 실패한 계산 때문에 이전 입력을 성공으로 오인하지 않도록 호스트는 새 계산을 요청해야 한다.
 
@@ -77,9 +82,11 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 
 하나의 `Room`은 여러 `Participant`, `Candidate`, `ScoreResult`, `Decision`을 가진다. 모든 하위 객체는 `roomId`로 소속을 확인하고 다른 방의 ID를 참조할 수 없다.
 
+Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`는 Room을 참조하는 실제 DB 외래 키로 설정한다. `Room.hostParticipantId`는 필수 UUID 컬럼으로 저장하지만 이번 MVP에서는 DB 외래 키를 설정하지 않는다. NestJS 서비스는 해당 Participant의 존재 여부, 현재 Room과의 `roomId` 일치 여부, `role=HOST` 여부를 검증한다. 추후 필요하면 DB 수준의 순환 참조 제약을 검토한다.
+
 ### 생성 및 변경 시점
 
-- 방 생성 요청 때 호스트 참여자와 함께 생성한다.
+- 방 생성 요청 때 애플리케이션에서 Room ID와 HOST Participant ID를 먼저 생성하고, Room과 HOST Participant를 하나의 트랜잭션으로 저장한다. Room의 `hostParticipantId`가 생성한 Participant ID와 일치하는지 검증한 뒤 커밋하며, 둘 중 하나라도 실패하면 두 객체 모두 저장되지 않는다.
 - 후보·참여자·조건·응답이 변경될 때 `updatedAt`을 바꾸고 최신 계산 참조를 무효화할 수 있다.
 - 계산 시작·완료·결정 확정·재검토 시 상태를 전이한다.
 
@@ -88,6 +95,21 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 ### 목적
 
 해당 방에서 한 사람의 표시 이름, 역할, 참여 상태, 개인 조건을 나타낸다. 로그인 계정이 아니라 방에 한정된 참여자 기록이다.
+
+### 이번 단계의 최소 영속화 범위
+
+이번 단계에서는 방 생성에 필요한 HOST Participant만 저장한다. 다음 필드를 영속화한다.
+
+- `id`
+- `roomId`
+- `displayName`
+- `role` (`HOST`)
+- `status` (`JOINED`)
+- `tokenHash`
+- `tokenExpiresAt`
+- `tokenRevokedAt` (초기값 `null`)
+
+일반 참여자 입장, 참여자 목록 관리, 조건·응답 수정은 다음 단계에서 구현한다.
 
 ### 주요 필드
 
@@ -117,7 +139,7 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 }
 ```
 
-접근 자격 메타데이터는 공개 Participant 응답과 분리해 서버 내부에 보관한다.
+접근 자격 메타데이터는 공개 Participant 응답과 분리해 서버 내부에 보관한다. 이번 단계에서는 별도 임의 테이블을 만들지 않고 최소 Participant 레코드의 내부 필드로 저장한다.
 
 ```json
 {
@@ -147,7 +169,7 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 
 `HOST` 역할의 참여자도 상태와 조건 구조는 동일하다. `INVITED`는 링크를 보냈지만 아직 `Participant` 레코드가 만들어지지 않은 사람을 UI에서 표현하는 파생 상태로 사용하며, 입장 전에는 별도 참여자 객체를 만들지 않는다.
 
-토큰 원문은 `Participant`에 저장하지 않는다. 서버는 토큰 해시, `tokenExpiresAt`, `revokedAt` 같은 접근 자격 메타데이터만 보관하며 API 응답에는 노출하지 않는다. 호스트 식별은 `role=HOST`와 토큰의 `participantId`를 함께 검증하고, 참여자 작업은 토큰의 참여자 ID와 경로 ID가 일치해야 한다.
+토큰 원문은 `Participant`에 저장하지 않는다. 서버는 토큰 해시, `tokenExpiresAt`, `revokedAt` 같은 접근 자격 메타데이터만 보관하며 API 응답에는 노출하지 않는다. 토큰은 발급 후 24시간 유효하다. 호스트 식별은 `role=HOST`와 토큰의 `participantId`를 함께 검증하고, 참여자 작업은 토큰의 참여자 ID와 경로 ID가 일치해야 한다.
 
 ### 관계
 
@@ -369,4 +391,6 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 
 - **확정**: 도메인 변경의 기준은 `Room`이며, `ScoreResult`는 이력 보존형이고 `Decision`은 별도 확정 기록이다.
 - **확정**: 후보 시간과 장소를 각각 값 객체로 저장하되, MVP의 후보 비교 단위는 둘을 묶은 `Candidate`다.
-- **미결정**: 방 만료·삭제, 응답 변경 이력의 보존 수준, ORM 테이블의 세부 분할, 참여자 이탈·제거의 공개 API 여부는 구현 전에 정한다.
+- **확정**: Room 자체 만료와 시간에 따른 자동 `CLOSED` 전환은 이번 MVP에서 구현하지 않는다. 24시간 만료 대상은 방 범위 접근 토큰이다.
+- **확정**: Room과 Participant의 관계는 논리적으로 양방향이지만 DB 외래 키는 `Participant.roomId`에만 설정한다. `Room.hostParticipantId`는 서비스 검증으로 보장하며, 순환 FK는 추후 검토한다.
+- **미결정**: 방 데이터 삭제·보존 기간, 응답 변경 이력의 보존 수준, 참여자 이탈·제거의 공개 API 여부는 추후 정한다.
