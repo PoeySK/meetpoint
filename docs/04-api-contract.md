@@ -26,7 +26,7 @@
 ### 이번 단계의 Room API 범위
 
 - Room과 HOST·MEMBER Participant를 영속화하고, HOST의 Candidate 등록과 참여자의 Candidate별 `ParticipantResponse` 제출·수정을 제공한다. MEMBER는 방 코드 입장 API로 생성한다.
-- 참여자 개인 조건, Candidate 수정·보관, ScoreResult·Decision API는 다음 단계에서 구현한다.
+- 현재 계산 vertical slice에서는 ScoreResult 계산 시작·polling·최신 결과 조회 API를 제공한다. 참여자 개인 조건, Candidate 수정·보관, Decision API는 다음 단계에서 구현한다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
 - Room 조회의 `participants`에는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보를 반환한다.
 - Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
@@ -462,6 +462,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
     "roomId": "room_01",
     "status": "RUNNING",
     "policyVersion": "mvp-1",
+    "scoringProfile": "MVP_NO_CONDITIONS",
     "createdAt": "2026-08-13T04:50:00Z"
   },
   "pollUrl": "/api/v1/rooms/room_01/calculations/score_20260813_02"
@@ -474,7 +475,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `409 CALCULATION_IN_PROGRESS`: 같은 방에 실행 중 계산이 있음
 - `422 PARTICIPANT_COUNT_OUT_OF_RANGE`: 활성 참가자가 3~6명이 아님
 - `422 NO_ACTIVE_CANDIDATES`: 활성 후보가 2개 미만이거나 5개 초과
-- `422 CONDITION_INCOMPLETE`: 활성 참가자의 조건이 모두 제출되지 않음
+- `422 CONDITION_INCOMPLETE`: condition-aware profile에서 활성 참가자의 조건이 모두 제출되지 않음. 현재 `MVP_NO_CONDITIONS`에서는 발생하지 않는다.
 - 후보별 응답 누락은 계산을 거부하지 않고 결과의 `coverage`와 `MISSING_RESPONSE`로 표시한다.
 - `clientRequestId`가 같은 재시도 요청은 동일 계산을 재사용하도록 설계하지만, 이 키의 보존 기간은 미결정이다.
 
@@ -741,24 +742,11 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 {
   "requestId": "score_20260813_02",
   "policyVersion": "mvp-1",
+  "scoringProfile": "MVP_NO_CONDITIONS",
   "roomId": "room_01",
   "participants": [
     {
       "participantId": "participant_02",
-      "condition": {
-        "availabilityWindows": [
-          {
-            "startsAt": "2026-08-15T19:00:00+09:00",
-            "endsAt": "2026-08-15T22:00:00+09:00"
-          }
-        ],
-          "maxBudgetKrw": 30000,
-        "preferences": {
-          "requiredTags": ["INDOOR"],
-          "preferredTags": ["QUIET"],
-          "avoidTags": ["SMOKING"]
-        }
-      },
       "responses": [
         {
           "candidateId": "candidate_01",
@@ -806,7 +794,12 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 {
   "requestId": "score_20260813_02",
   "policyVersion": "mvp-1",
+  "scoringProfile": "MVP_NO_CONDITIONS",
   "status": "COMPLETED",
+  "metadata": {
+    "scoringProfile": "MVP_NO_CONDITIONS",
+    "weights": { "time": 40, "travelBurden": 25, "budget": 20, "preference": 15 }
+  },
   "recommendationStatus": "PARTIAL_MATCH",
   "recommendationWarnings": [],
   "coverage": {

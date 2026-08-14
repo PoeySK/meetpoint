@@ -23,6 +23,14 @@ const ERROR_MESSAGES = {
   ROOM_STATE_CONFLICT: '현재 Room 상태에서는 요청을 처리할 수 없습니다.',
   CANDIDATE_LIMIT_EXCEEDED: '활성 후보는 최대 5개까지 등록할 수 있습니다.',
   INTERNAL_ERROR: '서버 내부 오류가 발생했습니다.',
+  CALCULATION_IN_PROGRESS: 'A calculation is already running for this Room.',
+  PARTICIPANT_COUNT_OUT_OF_RANGE:
+    'A calculation requires between 3 and 6 active participants.',
+  NO_ACTIVE_CANDIDATES:
+    'A calculation requires between 2 and 5 active candidates.',
+  SCORE_RESULT_NOT_FOUND: 'No calculation result exists for this Room.',
+  SOLVER_ERROR: 'The Solver returned a structured calculation error.',
+  SOLVER_UNAVAILABLE: 'The Solver is unavailable or timed out.',
 } as const;
 
 type RoomErrorCode = keyof typeof ERROR_MESSAGES;

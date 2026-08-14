@@ -52,10 +52,10 @@ function createInitialResponse(): ResponseForm {
 function describeResponseError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === "TOKEN_EXPIRED" || error.code === "INVALID_TOKEN") {
-      return "입장 token이 유효하지 않습니다. Room에 다시 입장해 주세요.";
+      return "입장 토큰이 유효하지 않습니다. 방에 다시 입장해 주세요.";
     }
     if (error.code === "ROOM_STATE_CONFLICT") {
-      return "현재 Room 상태에서는 응답을 수정할 수 없습니다.";
+      return "현재 방 상태에서는 응답을 수정할 수 없습니다.";
     }
     if (error.code === "RESOURCE_NOT_FOUND") {
       return "응답 대상 후보를 찾을 수 없습니다.";
@@ -137,7 +137,7 @@ export function ParticipantResponsePanel({
   return (
     <section className="space-y-4">
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-emerald-700">PARTICIPANT RESPONSE</p>
+        <p className="text-sm font-semibold text-emerald-700">참여자 응답</p>
         <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
           후보별 응답
         </h2>
@@ -149,7 +149,7 @@ export function ParticipantResponsePanel({
 
       {candidates.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6 text-sm leading-6 text-slate-500">
-          HOST가 후보를 등록하면 이곳에서 응답할 수 있습니다.
+          호스트가 후보를 등록하면 이곳에서 응답할 수 있습니다.
         </div>
       ) : (
         <div className="grid gap-4 lg:grid-cols-2">

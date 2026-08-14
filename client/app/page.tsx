@@ -157,10 +157,10 @@ export default function Home() {
 
         <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8">
           <div className="mb-8 space-y-2">
-            <p className="text-sm font-semibold text-emerald-700">새 Room</p>
+            <p className="text-sm font-semibold text-emerald-700">새 방</p>
             <h2 className="text-2xl font-semibold tracking-tight">모임 정보 입력</h2>
             <p className="text-sm leading-6 text-slate-500">
-              방을 만든 사람은 자동으로 HOST가 됩니다.
+              방을 만든 사람은 자동으로 호스트가 됩니다.
             </p>
           </div>
 

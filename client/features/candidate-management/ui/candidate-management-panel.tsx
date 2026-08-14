@@ -106,10 +106,10 @@ function describeCandidateError(error: unknown) {
       return "활성 후보는 최대 5개까지 등록할 수 있습니다.";
     }
     if (error.code === "HOST_ONLY") {
-      return "HOST만 후보를 등록할 수 있습니다.";
+      return "호스트만 후보를 등록할 수 있습니다.";
     }
     if (error.code === "ROOM_STATE_CONFLICT") {
-      return "현재 Room 상태에서는 후보를 등록할 수 없습니다.";
+      return "현재 방 상태에서는 후보를 등록할 수 없습니다.";
     }
     if (error.code === "VALIDATION_ERROR") {
       return "후보 입력을 다시 확인하세요.";
@@ -212,7 +212,7 @@ export function CandidateManagementPanel({
   return (
     <section className="rounded-[2rem] border border-emerald-100 bg-emerald-50/60 p-5 sm:p-8">
       <div className="mb-6 space-y-2">
-        <p className="text-sm font-semibold text-emerald-700">HOST</p>
+        <p className="text-sm font-semibold text-emerald-700">호스트</p>
         <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
           장소 후보 등록
         </h2>
@@ -223,7 +223,7 @@ export function CandidateManagementPanel({
 
       {isRoomClosed ? (
         <p className="rounded-xl bg-white px-4 py-3 text-sm leading-6 text-slate-600">
-          확정되거나 종료된 Room에는 새 후보를 등록할 수 없습니다.
+          확정되거나 종료된 방에는 새 후보를 등록할 수 없습니다.
         </p>
       ) : (
         <form className="space-y-5" onSubmit={handleSubmit} noValidate>

@@ -15,6 +15,19 @@ export type ParticipantStatus =
 export type CandidateStatus = "ACTIVE" | "ARCHIVED";
 export type AvailabilityStatus = "AVAILABLE" | "MAYBE" | "UNAVAILABLE";
 export type TravelBurden = "EASY" | "NORMAL" | "HARD";
+export type ScoreResultStatus =
+  | "REQUESTED"
+  | "RUNNING"
+  | "COMPLETED"
+  | "FAILED"
+  | "STALE";
+export type MatchLevel = "FULL" | "PARTIAL" | "CONFLICTED" | "INCOMPLETE";
+export type RecommendationStatus =
+  | "INCOMPLETE"
+  | "FULL_MATCH"
+  | "PARTIAL_MATCH"
+  | "NO_FULL_MATCH";
+export type ScoringProfile = "MVP_NO_CONDITIONS";
 
 export type CreateRoomInput = {
   title: string;
@@ -141,6 +154,95 @@ export type RoomDetailsResponse = {
   decision: null;
 };
 
+export type ScoreResultMetadata = {
+  scoringProfile: ScoringProfile;
+  weights: {
+    time: number;
+    travelBurden: number;
+    budget: number;
+    preference: number;
+  };
+};
+
+export type ScoreResultCandidate = {
+  candidateId: string;
+  rank: number;
+  overallScore: number;
+  eligible: boolean;
+  matchLevel: MatchLevel;
+  hardConflictCount: number;
+  coverage: {
+    submittedResponses: number;
+    expectedResponses: number;
+  };
+  participantBreakdown: Array<{
+    participantId: string;
+    score: number;
+    components: {
+      time: number;
+      travelBurden: number;
+      budget: number;
+      preference: number;
+    };
+    hardConflicts: string[];
+    blockingIssues: string[];
+    reasons: string[];
+  }>;
+  reasons: string[];
+  conflicts: Array<{ participantId: string; code: string }>;
+  blockingIssues: string[];
+  explanationFlags: string[];
+};
+
+export type CalculationPayload = {
+  id: string;
+  roomId: string;
+  status: ScoreResultStatus;
+  policyVersion: string;
+  scoringProfile: ScoringProfile;
+  inputSnapshotHash: string;
+  participantCount: number;
+  candidateCount: number;
+  metadata: ScoreResultMetadata;
+  coverage: {
+    respondedParticipants: number;
+    totalParticipants: number;
+    submittedResponses: number;
+    expectedResponses: number;
+  };
+  recommendationStatus: RecommendationStatus | null;
+  recommendationWarnings: string[];
+  ranking: string[];
+  candidates: ScoreResultCandidate[];
+  createdAt: string;
+  completedAt: string | null;
+  error?: {
+    code: string;
+    message: string;
+    retryable: boolean;
+    details: Record<string, unknown>;
+  };
+};
+
+export type StartCalculationResponse = {
+  requestId: string;
+  calculation: Pick<
+    CalculationPayload,
+    "id" | "roomId" | "status" | "policyVersion" | "scoringProfile" | "createdAt"
+  >;
+  pollUrl: string;
+};
+
+export type CalculationResponse = {
+  requestId: string;
+  calculation: CalculationPayload;
+};
+
+export type LatestScoreResultResponse = {
+  requestId: string;
+  scoreResult: CalculationPayload;
+};
+
 export type RoomApiErrorPayload = {
   error: {
     code: string;
@@ -256,6 +358,50 @@ export function joinRoom(
 export function getRoom(roomId: string, token: string) {
   return request<RoomDetailsResponse>(
     `/api/v1/rooms/${encodeURIComponent(roomId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+}
+
+export function startCalculation(
+  roomId: string,
+  token: string,
+  clientRequestId: string,
+) {
+  return request<StartCalculationResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/calculations`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ clientRequestId }),
+    },
+  );
+}
+
+export function getCalculation(
+  roomId: string,
+  calculationId: string,
+  token: string,
+) {
+  return request<CalculationResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/calculations/${encodeURIComponent(calculationId)}`,
+    {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+}
+
+export function getLatestScoreResult(roomId: string, token: string) {
+  return request<LatestScoreResultResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/score-results/latest`,
     {
       headers: {
         Authorization: `Bearer ${token}`,
