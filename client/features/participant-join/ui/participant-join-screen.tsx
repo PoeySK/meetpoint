@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import {
+  getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
   joinRoom,
   RoomApiError,
@@ -87,6 +88,10 @@ export default function ParticipantJoinScreen({
         window.sessionStorage.setItem(
           getRoomTokenStorageKey(response.room.id),
           response.access.participantToken,
+        );
+        window.sessionStorage.setItem(
+          getRoomParticipantStorageKey(response.room.id),
+          response.participant.id,
         );
       } catch {
         setFormError(

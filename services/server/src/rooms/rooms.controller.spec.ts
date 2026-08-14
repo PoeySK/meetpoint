@@ -9,6 +9,13 @@ import {
   ParticipantRole,
   ParticipantStatus,
 } from '../participants/entities/participant.entity';
+import { Candidate, CandidateStatus } from './entities/candidate.entity';
+import {
+  AvailabilityStatus,
+  ParticipantResponse,
+  ParticipantResponseStatus,
+  TravelBurden,
+} from './entities/participant-response.entity';
 import { Room, RoomStatus } from './entities/room.entity';
 import { RoomsController } from './rooms.controller';
 import { RoomsService } from './rooms.service';
@@ -23,11 +30,15 @@ type CreateRoomPayload = {
 
 type RoomStore = Map<string, Room>;
 type ParticipantStore = Map<string, Participant>;
+type CandidateStore = Map<string, Candidate>;
+type ParticipantResponseStore = Map<string, ParticipantResponse>;
 
 type MockDatabase = {
   dataSource: DataSource;
   rooms: RoomStore;
   participants: ParticipantStore;
+  candidates: CandidateStore;
+  responses: ParticipantResponseStore;
   roomRepository: {
     create: jest.Mock;
     save: jest.Mock;
@@ -36,13 +47,29 @@ type MockDatabase = {
     create: jest.Mock;
     save: jest.Mock;
   };
+  candidateRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+  };
+  responseRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+  };
   failParticipantSave: boolean;
+  failCandidateSave: boolean;
+  failResponseSave: boolean;
 };
 
 function createMockDatabase(): MockDatabase {
   const rooms: RoomStore = new Map();
   const participants: ParticipantStore = new Map();
-  const state = { failParticipantSave: false };
+  const candidates: CandidateStore = new Map();
+  const responses: ParticipantResponseStore = new Map();
+  const state = {
+    failParticipantSave: false,
+    failCandidateSave: false,
+    failResponseSave: false,
+  };
 
   const roomRepository = {
     create: jest.fn((attributes: Partial<Room>) => ({
@@ -120,10 +147,92 @@ function createMockDatabase(): MockDatabase {
     }),
   };
 
-  const manager = {
-    getRepository: jest.fn((entity: typeof Room | typeof Participant) =>
-      entity === Room ? roomRepository : participantRepository
+  const candidateRepository = {
+    create: jest.fn((attributes: Partial<Candidate>) => ({
+      ...attributes,
+      createdAt: attributes.createdAt ?? new Date(),
+      updatedAt: attributes.updatedAt ?? new Date(),
+    })),
+    save: jest.fn(async (candidate: Candidate) => {
+      if (state.failCandidateSave) {
+        throw new Error('candidate save failed');
+      }
+
+      candidates.set(candidate.id, candidate);
+      return candidate;
+    }),
+    find: jest.fn(async (options: { where?: Partial<Candidate> }) => {
+      const where = options.where ?? {};
+
+      return [...candidates.values()]
+        .filter((candidate) =>
+          Object.entries(where).every(
+            ([key, value]) => candidate[key as keyof Candidate] === value
+          )
+        )
+        .sort(
+          (left, right) =>
+            left.displayOrder - right.displayOrder ||
+            left.createdAt.getTime() - right.createdAt.getTime()
+        );
+    }),
+    findOne: jest.fn(async (options: { where?: Partial<Candidate> }) => {
+      const where = options.where ?? {};
+
+      return (
+        [...candidates.values()].find((candidate) =>
+          Object.entries(where).every(
+            ([key, value]) => candidate[key as keyof Candidate] === value
+          )
+        ) ?? null
+      );
+    }),
+  };
+
+  const responseRepository = {
+    create: jest.fn((attributes: Partial<ParticipantResponse>) => ({
+      ...attributes,
+      submittedAt: attributes.submittedAt ?? new Date(),
+      updatedAt: attributes.updatedAt ?? new Date(),
+    })),
+    save: jest.fn(async (response: ParticipantResponse) => {
+      if (state.failResponseSave) {
+        throw new Error('response save failed');
+      }
+
+      response.updatedAt = new Date();
+      responses.set(response.id, response);
+      return response;
+    }),
+    findOne: jest.fn(
+      async (options: { where?: Partial<ParticipantResponse> }) => {
+        const where = options.where ?? {};
+
+        return (
+          [...responses.values()].find((response) =>
+            Object.entries(where).every(
+              ([key, value]) =>
+                response[key as keyof ParticipantResponse] === value
+            )
+          ) ?? null
+        );
+      }
     ),
+  };
+
+  const manager = {
+    getRepository: jest.fn((entity: unknown) => {
+      if (entity === Room) {
+        return roomRepository;
+      }
+      if (entity === Participant) {
+        return participantRepository;
+      }
+      if (entity === Candidate) {
+        return candidateRepository;
+      }
+      return responseRepository;
+    }),
   } as unknown as EntityManager;
 
   const dataSource = {
@@ -133,6 +242,8 @@ function createMockDatabase(): MockDatabase {
       ) => {
         const roomsBeforeTransaction = new Map(rooms);
         const participantsBeforeTransaction = new Map(participants);
+        const candidatesBeforeTransaction = new Map(candidates);
+        const responsesBeforeTransaction = new Map(responses);
 
         try {
           return await callback(manager);
@@ -147,26 +258,61 @@ function createMockDatabase(): MockDatabase {
             participants.set(id, participant);
           }
 
+          candidates.clear();
+          for (const [id, candidate] of candidatesBeforeTransaction) {
+            candidates.set(id, candidate);
+          }
+
+          responses.clear();
+          for (const [id, response] of responsesBeforeTransaction) {
+            responses.set(id, response);
+          }
+
           throw error;
         }
       }
     ),
-    getRepository: jest.fn((entity: typeof Room | typeof Participant) =>
-      entity === Room ? roomRepository : participantRepository
-    ),
+    getRepository: jest.fn((entity: unknown) => {
+      if (entity === Room) {
+        return roomRepository;
+      }
+      if (entity === Participant) {
+        return participantRepository;
+      }
+      if (entity === Candidate) {
+        return candidateRepository;
+      }
+      return responseRepository;
+    }),
   } as unknown as DataSource;
 
   return {
     dataSource,
     rooms,
     participants,
+    candidates,
+    responses,
     roomRepository,
     participantRepository,
+    candidateRepository,
+    responseRepository,
     get failParticipantSave() {
       return state.failParticipantSave;
     },
     set failParticipantSave(value: boolean) {
       state.failParticipantSave = value;
+    },
+    get failCandidateSave() {
+      return state.failCandidateSave;
+    },
+    set failCandidateSave(value: boolean) {
+      state.failCandidateSave = value;
+    },
+    get failResponseSave() {
+      return state.failResponseSave;
+    },
+    set failResponseSave(value: boolean) {
+      state.failResponseSave = value;
     },
   } as MockDatabase;
 }
@@ -178,6 +324,25 @@ function validPayload(overrides: CreateRoomPayload = {}) {
     host: {
       displayName: overrides.host?.displayName ?? 'Host test',
     },
+  };
+}
+
+function validCandidatePayload(overrides: Record<string, unknown> = {}) {
+  return {
+    displayOrder: 1,
+    time: {
+      startsAt: '2026-09-01T10:00:00.000Z',
+      endsAt: '2026-09-01T12:00:00.000Z',
+      timezone: 'Asia/Seoul',
+    },
+    place: {
+      name: 'MeetPoint Cafe',
+      address: 'Seoul Jung-gu 1',
+      area: 'Jung-gu',
+    },
+    estimatedCostPerPersonKrw: 15000,
+    tags: ['QUIET', 'COFFEE'],
+    ...overrides,
   };
 }
 
@@ -218,6 +383,8 @@ describe('RoomsController', () => {
   afterEach(async () => {
     database.rooms.clear();
     database.participants.clear();
+    database.candidates.clear();
+    database.responses.clear();
     await app.close();
   });
 
@@ -420,27 +587,24 @@ describe('RoomsController', () => {
     RoomStatus.CALCULATED,
     RoomStatus.CONFIRMED,
     RoomStatus.CLOSED,
-  ])(
-    'rejects Participant entry when the Room is %s',
-    async (status) => {
-      const created = await request(app.getHttpServer())
-        .post('/api/v1/rooms')
-        .send(validPayload())
-        .expect(201);
-      const room = database.rooms.get(created.body.room.id);
+  ])('rejects Participant entry when the Room is %s', async (status) => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const room = database.rooms.get(created.body.room.id);
 
-      expect(room).toBeDefined();
-      room!.status = status;
+    expect(room).toBeDefined();
+    room!.status = status;
 
-      const response = await request(app.getHttpServer())
-        .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
-        .send({ displayName: 'Member test' })
-        .expect(409);
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Member test' })
+      .expect(409);
 
-      expectRoomError(response, 'ROOM_STATE_CONFLICT');
-      expect(database.participants.size).toBe(1);
-    }
-  );
+    expectRoomError(response, 'ROOM_STATE_CONFLICT');
+    expect(database.participants.size).toBe(1);
+  });
 
   it('returns TOKEN_EXPIRED when a MEMBER token has expired', async () => {
     const created = await request(app.getHttpServer())
@@ -594,5 +758,400 @@ describe('RoomsController', () => {
     expect(database.participantRepository.save).toHaveBeenCalled();
     expect(database.rooms.size).toBe(0);
     expect(database.participants.size).toBe(0);
+  });
+
+  it('allows the HOST to create a Candidate and returns it from Room details', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const candidatePayload = validCandidatePayload();
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(candidatePayload)
+      .expect(201);
+
+    expect(response.body.candidate).toMatchObject({
+      roomId: created.body.room.id,
+      displayOrder: 1,
+      status: CandidateStatus.ACTIVE,
+      time: candidatePayload.time,
+      place: candidatePayload.place,
+      estimatedCostPerPersonKrw: 15000,
+      tags: ['QUIET', 'COFFEE'],
+      version: 1,
+      archivedAt: null,
+    });
+    expect(database.candidates.size).toBe(1);
+    expect(database.rooms.get(created.body.room.id)?.status).toBe(
+      RoomStatus.OPEN
+    );
+
+    const room = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+
+    expect(room.body.candidates).toHaveLength(1);
+    expect(room.body.candidates[0].id).toBe(response.body.candidate.id);
+  });
+
+  it('rejects Candidate creation for a MEMBER token', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Member test' })
+      .expect(201);
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validCandidatePayload())
+      .expect(403);
+
+    expectRoomError(response, 'HOST_ONLY');
+    expect(database.candidates.size).toBe(0);
+  });
+
+  it.each([
+    ['missing displayOrder', { displayOrder: undefined }],
+    [
+      'invalid time range',
+      {
+        time: {
+          startsAt: '2026-09-01T12:00:00.000Z',
+          endsAt: '2026-09-01T10:00:00.000Z',
+          timezone: 'Asia/Seoul',
+        },
+      },
+    ],
+    [
+      'invalid timezone',
+      {
+        time: {
+          startsAt: '2026-09-01T10:00:00.000Z',
+          endsAt: '2026-09-01T12:00:00.000Z',
+          timezone: 'Not/A/Timezone',
+        },
+      },
+    ],
+    ['place name missing', { place: { address: 'Seoul', area: 'Jung-gu' } }],
+    ['cost is not an integer', { estimatedCostPerPersonKrw: 1.5 }],
+    ['too many tags', { tags: Array.from({ length: 11 }, () => 'TAG') }],
+  ])(
+    'returns 400 for invalid Candidate input: %s',
+    async (_caseName, overrides) => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201);
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .send(validCandidatePayload(overrides))
+        .expect(400);
+
+      expectRoomError(response, 'VALIDATION_ERROR');
+      expect(database.candidates.size).toBe(0);
+    }
+  );
+
+  it('rejects duplicate Candidates and more than five active Candidates', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(validCandidatePayload())
+      .expect(201);
+
+    const duplicate = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(
+        validCandidatePayload({
+          displayOrder: 6,
+        })
+      )
+      .expect(409);
+
+    expectRoomError(duplicate, 'ROOM_STATE_CONFLICT');
+
+    for (let index = 2; index <= 5; index += 1) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .send(
+          validCandidatePayload({
+            displayOrder: index,
+            time: {
+              startsAt: `2026-09-${String(index).padStart(2, '0')}T10:00:00.000Z`,
+              endsAt: `2026-09-${String(index).padStart(2, '0')}T12:00:00.000Z`,
+              timezone: 'Asia/Seoul',
+            },
+            place: {
+              name: `MeetPoint Cafe ${index}`,
+              address: `Seoul Jung-gu ${index}`,
+              area: 'Jung-gu',
+            },
+          })
+        )
+        .expect(201);
+    }
+
+    const overflow = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(
+        validCandidatePayload({
+          displayOrder: 6,
+          time: {
+            startsAt: '2026-10-01T10:00:00.000Z',
+            endsAt: '2026-10-01T12:00:00.000Z',
+            timezone: 'Asia/Seoul',
+          },
+          place: {
+            name: 'Another Cafe',
+            address: 'Seoul Mapo-gu 1',
+            area: 'Mapo-gu',
+          },
+        })
+      )
+      .expect(422);
+
+    expectRoomError(overflow, 'CANDIDATE_LIMIT_EXCEEDED');
+    expect(database.candidates.size).toBe(5);
+  });
+
+  it.each([RoomStatus.CONFIRMED, RoomStatus.CLOSED])(
+    'rejects Candidate creation when the Room is %s',
+    async (status) => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201);
+      database.rooms.get(created.body.room.id)!.status = status;
+
+      const response = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .send(validCandidatePayload())
+        .expect(409);
+
+      expectRoomError(response, 'ROOM_STATE_CONFLICT');
+      expect(database.candidates.size).toBe(0);
+    }
+  );
+
+  it('reopens a CALCULATED Room when the HOST adds a Candidate', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    database.rooms.get(created.body.room.id)!.status = RoomStatus.CALCULATED;
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(validCandidatePayload())
+      .expect(201);
+
+    expect(database.rooms.get(created.body.room.id)?.status).toBe(
+      RoomStatus.OPEN
+    );
+  });
+
+  it('rolls back the Room status when Candidate persistence fails', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    database.failCandidateSave = true;
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(validCandidatePayload())
+      .expect(500);
+
+    expectRoomError(response, 'INTERNAL_ERROR');
+    expect(database.rooms.get(created.body.room.id)?.status).toBe(
+      RoomStatus.DRAFT
+    );
+    expect(database.candidates.size).toBe(0);
+  });
+
+  it('creates and updates one ParticipantResponse per participant and Candidate', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Member test' })
+      .expect(201);
+    const candidate = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(validCandidatePayload())
+      .expect(201);
+    database.rooms.get(created.body.room.id)!.status = RoomStatus.CALCULATED;
+
+    const first = await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send({
+        availabilityStatus: AvailabilityStatus.AVAILABLE,
+        travelBurden: TravelBurden.EASY,
+        note: 'Near the station',
+      })
+      .expect(200);
+
+    expect(first.body.response).toMatchObject({
+      participantId: joined.body.participant.id,
+      candidateId: candidate.body.candidate.id,
+      availabilityStatus: AvailabilityStatus.AVAILABLE,
+      travelBurden: TravelBurden.EASY,
+      note: 'Near the station',
+      status: ParticipantResponseStatus.SUBMITTED,
+    });
+    expect(first.body.participantStatus).toBe(ParticipantStatus.JOINED);
+    expect(first.body.scoreResultStatus).toBe('STALE');
+    expect(database.rooms.get(created.body.room.id)?.status).toBe(
+      RoomStatus.OPEN
+    );
+    expect(database.responses.size).toBe(1);
+
+    const second = await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send({
+        availabilityStatus: AvailabilityStatus.MAYBE,
+        travelBurden: TravelBurden.HARD,
+        note: 'Updated note',
+      })
+      .expect(200);
+
+    expect(second.body.response.id).toBe(first.body.response.id);
+    expect(second.body.response).toMatchObject({
+      availabilityStatus: AvailabilityStatus.MAYBE,
+      travelBurden: TravelBurden.HARD,
+      note: 'Updated note',
+    });
+    expect(database.responses.size).toBe(1);
+  });
+
+  it('enforces ParticipantResponse token, input, candidate, and Room state rules', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Member test' })
+      .expect(201);
+    const candidate = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(validCandidatePayload())
+      .expect(201);
+    const path = `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`;
+    const validResponse = {
+      availabilityStatus: AvailabilityStatus.AVAILABLE,
+      travelBurden: TravelBurden.NORMAL,
+    };
+
+    const wrongParticipant = await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${created.body.hostParticipant?.id ?? created.body.room.hostParticipantId}/responses/${candidate.body.candidate.id}`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validResponse)
+      .expect(403);
+    expectRoomError(wrongParticipant, 'FORBIDDEN');
+
+    const invalid = await request(app.getHttpServer())
+      .put(path)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send({ availabilityStatus: 'UNKNOWN', travelBurden: 'EASY' })
+      .expect(400);
+    expectRoomError(invalid, 'VALIDATION_ERROR');
+
+    const longNote = await request(app.getHttpServer())
+      .put(path)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send({
+        ...validResponse,
+        note: 'n'.repeat(301),
+      })
+      .expect(400);
+    expectRoomError(longNote, 'VALIDATION_ERROR');
+
+    const archivedCandidate = database.candidates.get(
+      candidate.body.candidate.id
+    );
+    expect(archivedCandidate).toBeDefined();
+    archivedCandidate!.status = CandidateStatus.ARCHIVED;
+
+    const archived = await request(app.getHttpServer())
+      .put(path)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validResponse)
+      .expect(409);
+    expectRoomError(archived, 'ROOM_STATE_CONFLICT');
+
+    archivedCandidate!.status = CandidateStatus.ACTIVE;
+    database.rooms.get(created.body.room.id)!.status = RoomStatus.CONFIRMED;
+
+    const confirmed = await request(app.getHttpServer())
+      .put(path)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validResponse)
+      .expect(409);
+    expectRoomError(confirmed, 'ROOM_STATE_CONFLICT');
+  });
+
+  it('rolls back a ParticipantResponse when persistence fails', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Member test' })
+      .expect(201);
+    const candidate = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(validCandidatePayload())
+      .expect(201);
+    database.failResponseSave = true;
+
+    const response = await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send({
+        availabilityStatus: AvailabilityStatus.UNAVAILABLE,
+        travelBurden: TravelBurden.HARD,
+      })
+      .expect(500);
+
+    expectRoomError(response, 'INTERNAL_ERROR');
+    expect(database.responses.size).toBe(0);
   });
 });

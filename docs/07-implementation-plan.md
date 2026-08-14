@@ -44,7 +44,7 @@
    - Room에는 방 코드, 호스트 Participant 참조, 방 상태, nullable 최신 계산·결정 참조를 저장한다.
    - 최소 Participant에는 ID, Room 소속, 표시 이름, `HOST` 역할, `JOINED` 상태, 토큰 해시·만료·폐기 시각을 저장한다.
    - Room과 Participant는 논리적으로 양방향 관계지만 DB 외래 키는 `Participant.roomId`에만 설정한다. `Room.hostParticipantId`는 서비스에서 Participant 존재 여부, 같은 Room 소속 여부, `HOST` 역할을 검증한다.
-   - `Candidate`, `ParticipantResponse`, `ScoreResult`, `Decision`은 다음 단계에서 추가한다.
+   - `Candidate`와 `ParticipantResponse`는 2일차 첫 vertical slice에서 추가하고, `ScoreResult`와 `Decision`은 Solver 연동 단계에서 추가한다.
 
 4. **방 생성 및 조회**
    - 애플리케이션에서 Room ID와 Participant ID를 먼저 생성한다.
@@ -87,7 +87,7 @@
 
 2. **후보 등록·수정·보관**
    - 호스트가 시간·장소·1인 예상 비용·태그를 입력한다.
-   - 후보 2~5개 규칙과 `ARCHIVED` 논리 삭제를 적용한다.
+   - 후보 등록과 활성 후보 최대 5개 규칙을 우선 적용하고, 수정·`ARCHIVED` 논리 삭제는 후속 단계로 둔다.
    - 시간·장소를 하나의 Candidate 안에서 분리된 필드로 반환한다.
    - 후보가 바뀌면 최신 계산을 `STALE`로 바꾼다.
 
@@ -99,7 +99,7 @@
 4. **후보별 응답 저장**
    - 후보마다 `AVAILABLE`, `MAYBE`, `UNAVAILABLE`과 `EASY`, `NORMAL`, `HARD` 이동 부담을 저장한다.
    - 모든 활성 후보에 이동 부담을 필수로 입력하게 한다.
-   - 응답 수정 시 최신 계산을 `STALE`로 바꾸고, 후보별 응답 수와 기대 응답 수를 반환한다.
+   - 응답 수정 시 최신 계산 상태를 `STALE`로 반환한다. 현재는 조건 저장 API가 없으므로 참여자 상태는 `JOINED`로 유지한다.
 
 5. **결과 화면에 사용할 API**
    - 최신 계산 결과 조회 API의 응답 모양을 먼저 고정한다.

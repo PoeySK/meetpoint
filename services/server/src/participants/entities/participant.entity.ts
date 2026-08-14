@@ -3,11 +3,13 @@ import {
   Entity,
   JoinColumn,
   ManyToOne,
+  OneToMany,
   PrimaryColumn,
   CreateDateColumn,
   UpdateDateColumn,
 } from 'typeorm';
 import { Room } from '../../rooms/entities/room.entity';
+import { ParticipantResponse } from '../../rooms/entities/participant-response.entity';
 
 export enum ParticipantRole {
   HOST = 'HOST',
@@ -61,4 +63,10 @@ export class Participant {
 
   @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt!: Date;
+
+  @OneToMany(
+    () => ParticipantResponse,
+    (participantResponse) => participantResponse.participant
+  )
+  responses!: ParticipantResponse[];
 }

@@ -12,6 +12,9 @@ export type ParticipantStatus =
   | "RESPONDED"
   | "LEFT"
   | "REMOVED";
+export type CandidateStatus = "ACTIVE" | "ARCHIVED";
+export type AvailabilityStatus = "AVAILABLE" | "MAYBE" | "UNAVAILABLE";
+export type TravelBurden = "EASY" | "NORMAL" | "HARD";
 
 export type CreateRoomInput = {
   title: string;
@@ -46,6 +49,65 @@ export type PublicParticipant = {
   status: ParticipantStatus;
 };
 
+export type Candidate = {
+  id: string;
+  roomId: string;
+  displayOrder: number;
+  status: CandidateStatus;
+  time: {
+    startsAt: string;
+    endsAt: string;
+    timezone: string;
+  };
+  place: {
+    name: string;
+    address: string;
+    area: string;
+  };
+  estimatedCostPerPersonKrw: number;
+  tags: string[];
+  version: number;
+  archivedAt: string | null;
+};
+
+export type CreateCandidateInput = {
+  displayOrder: number;
+  time: Candidate["time"];
+  place: Candidate["place"];
+  estimatedCostPerPersonKrw: number;
+  tags: string[];
+};
+
+export type CreatedCandidateResponse = {
+  requestId: string;
+  candidate: Candidate;
+};
+
+export type UpsertParticipantResponseInput = {
+  availabilityStatus: AvailabilityStatus;
+  travelBurden: TravelBurden;
+  note?: string | null;
+};
+
+export type ParticipantResponsePayload = {
+  id: string;
+  participantId: string;
+  candidateId: string;
+  availabilityStatus: AvailabilityStatus;
+  travelBurden: TravelBurden;
+  note: string | null;
+  status: "SUBMITTED";
+  submittedAt: string;
+  updatedAt: string;
+};
+
+export type UpsertedParticipantResponse = {
+  requestId: string;
+  response: ParticipantResponsePayload;
+  participantStatus: ParticipantStatus;
+  scoreResultStatus: "STALE";
+};
+
 export type CreatedRoomResponse = {
   requestId: string;
   room: RoomPayload;
@@ -74,7 +136,7 @@ export type RoomDetailsResponse = {
   room: RoomPayload;
   hostParticipant: PublicParticipant;
   participants: PublicParticipant[];
-  candidates: [];
+  candidates: Candidate[];
   latestScoreResult: null;
   decision: null;
 };
@@ -107,6 +169,7 @@ const API_BASE_URL = (
 ).replace(/\/$/, "");
 
 const ROOM_TOKEN_STORAGE_PREFIX = "meetpoint:room-token:";
+const ROOM_PARTICIPANT_STORAGE_PREFIX = "meetpoint:room-participant:";
 
 function getRoomError(payload: unknown) {
   if (typeof payload !== "object" || payload === null) {
@@ -201,6 +264,48 @@ export function getRoom(roomId: string, token: string) {
   );
 }
 
+export function createCandidate(
+  roomId: string,
+  token: string,
+  input: CreateCandidateInput,
+) {
+  return request<CreatedCandidateResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/candidates`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
+export function upsertParticipantResponse(
+  roomId: string,
+  participantId: string,
+  candidateId: string,
+  token: string,
+  input: UpsertParticipantResponseInput,
+) {
+  return request<UpsertedParticipantResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/participants/${encodeURIComponent(participantId)}/responses/${encodeURIComponent(candidateId)}`,
+    {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(input),
+    },
+  );
+}
+
 export function getRoomTokenStorageKey(roomId: string) {
   return `${ROOM_TOKEN_STORAGE_PREFIX}${roomId}`;
+}
+
+export function getRoomParticipantStorageKey(roomId: string) {
+  return `${ROOM_PARTICIPANT_STORAGE_PREFIX}${roomId}`;
 }
