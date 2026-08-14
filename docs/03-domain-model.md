@@ -6,7 +6,7 @@
 - **확정**: Solver는 아래 도메인 객체를 데이터베이스에서 읽지 않는다. 서버가 한 번의 계산에 필요한 스냅샷을 만들어 Solver 입력으로 전달한다.
 - **확정**: 후보 시간과 후보 장소는 서로 다른 값 객체지만, MVP의 비교 단위인 `Candidate` 안에서 한 쌍으로 관리한다.
 - **확정**: Room 생성 시 HOST Participant를 함께 영속화하고, 방 코드 입장 시 MEMBER Participant를 생성한다. Room과 HOST Participant 생성은 하나의 트랜잭션으로 처리한다.
-- **확정**: 이번 단계의 Participant 영속화 범위는 ID, Room 소속, 표시 이름, 역할, 상태, 토큰 해시, 토큰 만료 시각, 토큰 폐기 시각이다. 참여자 조건과 후보별 응답 입력은 다음 단계에서 구현한다.
+- **확정**: 이번 단계의 영속화 범위는 Room·HOST/MEMBER Participant와 Candidate·ParticipantResponse다. 참여자 조건과 계산·결정 객체는 다음 단계에서 구현한다.
 - **확정**: Room과 Participant는 논리적으로 양방향 관계를 갖지만, 이번 MVP의 DB 외래 키는 `Participant.roomId → Room.id`에만 둔다. `Room.hostParticipantId`의 유효성은 NestJS 서비스에서 검증한다.
 - **미결정**: 실제 ORM 엔티티명, 테이블 분할, ID 생성 방식(UUID·문자열 등)은 구현 단계에서 정한다. 문서의 ID는 API 예시용 문자열이다.
 
@@ -111,7 +111,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - `tokenExpiresAt`
 - `tokenRevokedAt` (초기값 `null`)
 
-참여자 조건·응답 수정은 다음 단계에서 구현한다. 방 조회에서는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보만 반환한다.
+참여자 조건 수정은 다음 단계에서 구현한다. 후보별 응답은 현재 단계에서 별도 `ParticipantResponse`로 저장·수정하며, 방 조회에서는 현재 방에 속한 HOST·MEMBER Participant와 활성 Candidate의 공개 정보만 반환한다.
 
 ### 주요 필드
 
@@ -166,6 +166,8 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 - `JOINED`: 방에 입장했지만 조건 또는 후보 응답이 완료되지 않았다.
 - `RESPONDED`: 조건이 저장되고 모든 활성 후보에 응답했다.
+
+현재 단계에는 `ParticipantCondition` 저장 API가 없으므로 후보 응답을 저장해도 참여자 상태는 `JOINED`로 유지한다. 조건 저장과 전체 응답 충족을 함께 지원하는 단계에서 `RESPONDED` 전환을 적용한다.
 
 `LEFT`와 `REMOVED`는 MVP 외부 API와 계산 입력에 포함하지 않는다. 추후 참여자 이탈·강제 제거를 지원할 때 상태값, 계산 제외 시점, 토큰 폐기 API를 함께 별도 결정한다.
 

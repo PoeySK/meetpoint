@@ -21,6 +21,7 @@ const ERROR_MESSAGES = {
     '방을 찾을 수 없거나 유효하지 않은 방 코드입니다.',
   RESOURCE_NOT_FOUND: '요청한 Room 리소스를 찾을 수 없습니다.',
   ROOM_STATE_CONFLICT: '현재 Room 상태에서는 요청을 처리할 수 없습니다.',
+  CANDIDATE_LIMIT_EXCEEDED: '활성 후보는 최대 5개까지 등록할 수 있습니다.',
   INTERNAL_ERROR: '서버 내부 오류가 발생했습니다.',
 } as const;
 

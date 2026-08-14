@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   createRoom,
+  getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
   RoomApiError,
 } from "@/lib/rooms";
@@ -92,6 +93,10 @@ export default function Home() {
         window.sessionStorage.setItem(
           getRoomTokenStorageKey(response.room.id),
           response.access.hostToken,
+        );
+        window.sessionStorage.setItem(
+          getRoomParticipantStorageKey(response.room.id),
+          response.hostParticipant.id,
         );
       } catch {
         setFormError(

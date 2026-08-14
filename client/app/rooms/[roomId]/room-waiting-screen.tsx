@@ -2,8 +2,11 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
+import { CandidateManagementPanel } from "@/features/candidate-management/ui/candidate-management-panel";
+import { ParticipantResponsePanel } from "@/features/participant-response/ui/participant-response-panel";
 import {
   getRoom,
+  getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
   RoomApiError,
   type RoomDetailsResponse,
@@ -212,6 +215,8 @@ function RoomSummary({ room }: { room: RoomDetailsResponse }) {
 
 export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
   const [room, setRoom] = useState<RoomDetailsResponse | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [participantId, setParticipantId] = useState<string | null>(null);
   const [error, setError] = useState<RoomLoadError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -219,10 +224,16 @@ export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
     setIsLoading(true);
     setError(null);
     setRoom(null);
+    setAccessToken(null);
+    setParticipantId(null);
 
     let token: string | null = null;
+    let storedParticipantId: string | null = null;
     try {
       token = window.sessionStorage.getItem(getRoomTokenStorageKey(roomId));
+      storedParticipantId = window.sessionStorage.getItem(
+        getRoomParticipantStorageKey(roomId),
+      );
     } catch {
       setError({
         title: "브라우저 저장소에 접근할 수 없습니다.",
@@ -244,6 +255,8 @@ export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
     try {
       const response = await getRoom(roomId, token);
       setRoom(response);
+      setAccessToken(token);
+      setParticipantId(storedParticipantId);
     } catch (requestError) {
       setError(describeRoomError(requestError));
     } finally {
@@ -276,6 +289,40 @@ export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
         {!isLoading && !error && room && (
           <div className="space-y-5">
             <RoomSummary room={room} />
+            {accessToken && participantId ? (
+              <>
+                <CandidateManagementPanel
+                  onCandidateCreated={(candidate) =>
+                    setRoom((currentRoom) =>
+                      currentRoom
+                        ? {
+                            ...currentRoom,
+                            candidates: [...currentRoom.candidates, candidate].sort(
+                              (left, right) =>
+                                left.displayOrder - right.displayOrder,
+                            ),
+                          }
+                        : currentRoom,
+                    )
+                  }
+                  participantId={participantId}
+                  room={room}
+                  roomId={roomId}
+                  token={accessToken}
+                />
+                <ParticipantResponsePanel
+                  candidates={room.candidates}
+                  participantId={participantId}
+                  roomId={roomId}
+                  token={accessToken}
+                />
+              </>
+            ) : (
+              <section className="rounded-2xl border border-amber-100 bg-amber-50 p-5 text-sm leading-6 text-amber-800">
+                이 브라우저에서 참여자 정보를 찾을 수 없어 후보 등록과 응답을 사용할 수
+                없습니다. Room code로 다시 입장하면 계속할 수 있습니다.
+              </section>
+            )}
           </div>
         )}
       </div>

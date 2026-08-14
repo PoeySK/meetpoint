@@ -25,11 +25,12 @@
 
 ### 이번 단계의 Room API 범위
 
-- Room과 HOST·MEMBER Participant를 영속화한다. MEMBER는 방 코드 입장 API로 생성한다.
-- 참여자 조건·응답 수정과 후보 API는 다음 단계에서 구현한다.
+- Room과 HOST·MEMBER Participant를 영속화하고, HOST의 Candidate 등록과 참여자의 Candidate별 `ParticipantResponse` 제출·수정을 제공한다. MEMBER는 방 코드 입장 API로 생성한다.
+- 참여자 개인 조건, Candidate 수정·보관, ScoreResult·Decision API는 다음 단계에서 구현한다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
 - Room 조회의 `participants`에는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보를 반환한다.
-- 아직 구현하지 않은 후보·계산·결정 데이터는 각각 `[]`, `null`, `null`로 반환한다.
+- Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
+- 현재 ParticipantCondition API가 없으므로 Candidate 응답 저장 후에도 `participantStatus`는 `JOINED`로 반환한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 
 ## 공통 오류 응답
@@ -262,7 +263,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 #### 주요 실패 상태와 유효성 검사
 
 - `401 INVALID_TOKEN`, `403 HOST_ONLY`
-- `409 ROOM_STATE_CONFLICT`: 확정·종결 방에서 후보 변경
+- `409 ROOM_STATE_CONFLICT`: 확정·종결 방에서 후보 변경 또는 같은 시간 구간·장소 조합 중복
 - `422 CANDIDATE_LIMIT_EXCEEDED`: 활성 후보가 이미 5개
 - 시간의 `endsAt`은 `startsAt`보다 늦어야 한다.
 - 장소명·주소는 1~120자, 비용은 0 이상 2,000,000 이하의 정수, 태그는 최대 10개다.
@@ -435,7 +436,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `400 VALIDATION_ERROR`: 상태가 세 값 중 하나가 아니거나 `travelBurden`이 `EASY`, `NORMAL`, `HARD` 중 하나가 아님
 - `travelBurden`은 모든 활성 후보에 필수다.
 - `note`는 선택 입력이며 0~300자다. Solver는 이 값을 점수·순위·충돌 판정에 사용하지 않는다.
-- `AVAILABLE` 응답은 후보 시간이 조건의 가능한 시간 구간과 겹쳐야 한다. 겹치지 않으면 서버는 응답을 거부하고 `TIME_CONDITION_CONFLICT`를 반환한다.
+- `AVAILABLE` 응답과 ParticipantCondition의 시간 구간 비교는 조건 저장 API가 구현되는 단계에서 적용한다. 현재 단계에서는 enum과 응답 필드 형식만 검증한다.
 
 ### 9. 후보 점수 계산 요청
 

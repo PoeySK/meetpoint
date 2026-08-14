@@ -7,6 +7,7 @@ import {
   UpdateDateColumn,
 } from 'typeorm';
 import { Participant } from '../../participants/entities/participant.entity';
+import { Candidate } from './candidate.entity';
 
 export enum RoomStatus {
   DRAFT = 'DRAFT',
@@ -58,4 +59,7 @@ export class Room {
   // Participant.roomId가 소유한다.
   @OneToMany(() => Participant, (participant) => participant.room)
   participants!: Participant[];
+
+  @OneToMany(() => Candidate, (candidate) => candidate.room)
+  candidates!: Candidate[];
 }
