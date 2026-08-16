@@ -3,6 +3,8 @@ import {
   Controller,
   Get,
   Headers,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
@@ -12,6 +14,7 @@ import type { CreateCandidateDto } from './dto/create-candidate.dto';
 import type { CreateRoomDto } from './dto/create-room.dto';
 import type { JoinParticipantDto } from './dto/join-participant.dto';
 import type { UpsertParticipantResponseDto } from './dto/upsert-participant-response.dto';
+import type { StartCalculationDto } from './dto/start-calculation.dto';
 import { RoomsErrorFilter } from './rooms-error.filter';
 import { RoomsService } from './rooms.service';
 
@@ -69,6 +72,44 @@ export class RoomsController {
     @Headers('authorization') authorization?: string
   ) {
     return this.roomsService.getRoom(
+      roomId,
+      this.extractBearerToken(authorization)
+    );
+  }
+
+  @Post(':roomId/calculations')
+  @HttpCode(HttpStatus.ACCEPTED)
+  startCalculation(
+    @Param('roomId') roomId: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: StartCalculationDto
+  ) {
+    return this.roomsService.startCalculation(
+      roomId,
+      this.extractBearerToken(authorization),
+      body
+    );
+  }
+
+  @Get(':roomId/calculations/:calculationId')
+  getCalculation(
+    @Param('roomId') roomId: string,
+    @Param('calculationId') calculationId: string,
+    @Headers('authorization') authorization?: string
+  ) {
+    return this.roomsService.getCalculation(
+      roomId,
+      calculationId,
+      this.extractBearerToken(authorization)
+    );
+  }
+
+  @Get(':roomId/score-results/latest')
+  getLatestScoreResult(
+    @Param('roomId') roomId: string,
+    @Headers('authorization') authorization?: string
+  ) {
+    return this.roomsService.getLatestScoreResult(
       roomId,
       this.extractBearerToken(authorization)
     );

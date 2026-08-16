@@ -115,12 +115,12 @@ export default function ParticipantJoinScreen({
           <Link className="text-lg font-bold tracking-tight" href="/">
             MeetPoint
           </Link>
-          <span className="text-xs font-medium text-slate-400">JOIN ROOM</span>
+          <span className="text-xs font-medium text-slate-400">방 입장</span>
         </div>
 
         <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8">
           <div className="mb-8 space-y-2">
-            <p className="text-sm font-semibold text-emerald-700">Participant</p>
+            <p className="text-sm font-semibold text-emerald-700">참여자</p>
             <h1 className="text-3xl font-semibold tracking-tight">
               초대받은 방에 입장하기
             </h1>

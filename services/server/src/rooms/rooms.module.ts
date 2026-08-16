@@ -4,6 +4,7 @@ import { Participant } from '../participants/entities/participant.entity';
 import { Candidate } from './entities/candidate.entity';
 import { ParticipantResponse } from './entities/participant-response.entity';
 import { Room } from './entities/room.entity';
+import { ScoreResult } from './entities/score-result.entity';
 import { RoomsController } from './rooms.controller';
 import { RoomsService } from './rooms.service';
 
@@ -14,6 +15,7 @@ import { RoomsService } from './rooms.service';
       Participant,
       Candidate,
       ParticipantResponse,
+      ScoreResult,
     ]),
   ],
   controllers: [RoomsController],

@@ -19,6 +19,7 @@
 - 후보 하나는 시간과 장소를 한 쌍으로 가짐
 - 개인 조건과 후보별 응답을 별도로 저장
 - MVP 점수 정책 `mvp-1`: 시간 40, 이동 25, 예산 20, 선호 15
+- 현재 첫 계산 vertical slice의 프로필은 `MVP_NO_CONDITIONS`다. Participant condition은 추가·저장하지 않으며, 실제 입력은 `availabilityStatus`와 `travelBurden`이다. 예산 20과 선호 15는 제한 없음의 내부 기본값이고, `CONDITION_INCOMPLETE`·예산 충돌·선호 충돌은 발생시키지 않는다.
 - 미응답은 0점·확정 차단, 완전 일치 후보 없음은 정상 결과
 - 실제 지도 API 없이 참가자 자기 기입 이동 부담 사용
 - Client는 NestJS API만 호출하고 Solver·PostgreSQL을 직접 호출하지 않음
@@ -130,7 +131,7 @@
    - 미응답이 없는 계산에서 최고 후보의 점수가 60.0 미만이면 `recommendationWarnings: ["LOW_SCORE"]`를 반환하고 자동 확정하지 않는다.
 
 3. **계산 결과 저장·조회**
-   - 계산 요청 시 `REQUESTED/RUNNING`, 완료 시 `COMPLETED`, 실패 시 `FAILED`를 저장한다.
+   - 계산 요청 시 `REQUESTED/RUNNING`, 완료 시 `COMPLETED`, 실패 시 `FAILED`를 저장한다. 프로토타입은 NestJS 프로세스 내부 비동기로 실행하며 Queue/Redis를 추가하지 않으므로 프로세스 재시작 시 실행 중 계산이 중단될 수 있다.
    - 응답·후보·조건 변경 후 이전 결과가 `STALE`인지 확인한다.
    - Solver timeout과 구조화된 입력 오류를 서로 다른 API 오류로 표시한다.
 

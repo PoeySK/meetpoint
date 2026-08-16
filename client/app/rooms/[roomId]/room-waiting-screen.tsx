@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { CandidateManagementPanel } from "@/features/candidate-management/ui/candidate-management-panel";
+import { CalculationResultPanel } from "@/features/calculation/ui/calculation-result-panel";
 import { ParticipantResponsePanel } from "@/features/participant-response/ui/participant-response-panel";
 import {
   getRoom,
@@ -136,17 +137,16 @@ function RoomSummary({ room }: { room: RoomDetailsResponse }) {
               {statusLabels[room.room.status]}
             </span>
             <div>
-              <p className="text-sm font-semibold text-emerald-700">Room waiting</p>
+              <p className="text-sm font-semibold text-emerald-700">방 대기</p>
               <h1 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
                 {room.room.title}
               </h1>
             </div>
-            <p className="text-sm text-slate-500">{room.room.timezone}</p>
           </div>
 
           <div className="rounded-2xl bg-slate-950 p-4 text-white sm:min-w-44 sm:text-right">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">
-              Room code
+              방 코드
             </p>
             <p className="mt-1 text-3xl font-bold tracking-[0.18em]">
               {room.room.roomCode}
@@ -173,7 +173,7 @@ function RoomSummary({ room }: { room: RoomDetailsResponse }) {
           <p className="mt-2 font-semibold text-slate-950">
             {room.hostParticipant.displayName}
           </p>
-          <p className="mt-1 text-xs text-emerald-700">HOST</p>
+          <p className="mt-1 text-xs text-emerald-700">호스트</p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-5">
           <p className="text-sm text-slate-500">참여자</p>
@@ -279,7 +279,7 @@ export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
           <Link className="text-lg font-bold tracking-tight" href="/">
             MeetPoint
           </Link>
-          <span className="text-xs font-medium text-slate-400">ROOM WAITING</span>
+          <span className="text-xs font-medium text-slate-400">방 대기</span>
         </div>
 
         {isLoading && <LoadingView />}
@@ -316,11 +316,17 @@ export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
                   roomId={roomId}
                   token={accessToken}
                 />
+                <CalculationResultPanel
+                  participantId={participantId}
+                  room={room}
+                  roomId={roomId}
+                  token={accessToken}
+                />
               </>
             ) : (
               <section className="rounded-2xl border border-amber-100 bg-amber-50 p-5 text-sm leading-6 text-amber-800">
                 이 브라우저에서 참여자 정보를 찾을 수 없어 후보 등록과 응답을 사용할 수
-                없습니다. Room code로 다시 입장하면 계속할 수 있습니다.
+                없습니다. 방 코드로 다시 입장하면 계속할 수 있습니다.
               </section>
             )}
           </div>

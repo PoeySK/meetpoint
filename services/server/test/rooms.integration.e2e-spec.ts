@@ -17,6 +17,7 @@ import {
   TravelBurden,
 } from '../src/rooms/entities/participant-response.entity';
 import { Room } from '../src/rooms/entities/room.entity';
+import { ScoreResult } from '../src/rooms/entities/score-result.entity';
 import { RoomsModule } from '../src/rooms/rooms.module';
 
 const databaseUrl =
@@ -28,7 +29,13 @@ const databaseUrl =
     TypeOrmModule.forRoot({
       type: 'postgres',
       url: databaseUrl,
-      entities: [Room, Participant, Candidate, ParticipantResponse],
+      entities: [
+        Room,
+        Participant,
+        Candidate,
+        ParticipantResponse,
+        ScoreResult,
+      ],
       synchronize: false,
       migrationsRun: false,
     }),

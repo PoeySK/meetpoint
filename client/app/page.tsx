@@ -8,37 +8,22 @@ import {
   createRoom,
   getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
+  MEETPOINT_TIMEZONE,
   RoomApiError,
 } from "@/lib/rooms";
 
 type FieldErrors = {
   title?: string;
-  timezone?: string;
   displayName?: string;
 };
 
-const DEFAULT_TIMEZONE = "Asia/Seoul";
-
-function isValidTimezone(timezone: string) {
-  try {
-    new Intl.DateTimeFormat("en-US", { timeZone: timezone }).format();
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-function validateForm(title: string, timezone: string, displayName: string) {
+function validateForm(title: string, displayName: string) {
   const errors: FieldErrors = {};
 
   if (!title.trim()) {
     errors.title = "모임 제목을 입력해 주세요.";
   } else if (title.trim().length > 80) {
     errors.title = "모임 제목은 80자 이하로 입력해 주세요.";
-  }
-
-  if (!timezone.trim() || !isValidTimezone(timezone.trim())) {
-    errors.timezone = "올바른 IANA 시간대를 입력해 주세요. 예: Asia/Seoul";
   }
 
   if (!displayName.trim()) {
@@ -53,7 +38,6 @@ function validateForm(title: string, timezone: string, displayName: string) {
 export default function Home() {
   const router = useRouter();
   const [title, setTitle] = useState("");
-  const [timezone, setTimezone] = useState(DEFAULT_TIMEZONE);
   const [displayName, setDisplayName] = useState("");
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
@@ -63,13 +47,8 @@ export default function Home() {
     event.preventDefault();
 
     const normalizedTitle = title.trim();
-    const normalizedTimezone = timezone.trim();
     const normalizedDisplayName = displayName.trim();
-    const errors = validateForm(
-      normalizedTitle,
-      normalizedTimezone,
-      normalizedDisplayName,
-    );
+    const errors = validateForm(normalizedTitle, normalizedDisplayName);
 
     setFieldErrors(errors);
     setFormError("");
@@ -83,7 +62,7 @@ export default function Home() {
     try {
       const response = await createRoom({
         title: normalizedTitle,
-        timezone: normalizedTimezone,
+        timezone: MEETPOINT_TIMEZONE,
         host: {
           displayName: normalizedDisplayName,
         },
@@ -157,10 +136,10 @@ export default function Home() {
 
         <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8">
           <div className="mb-8 space-y-2">
-            <p className="text-sm font-semibold text-emerald-700">새 Room</p>
+            <p className="text-sm font-semibold text-emerald-700">새 방</p>
             <h2 className="text-2xl font-semibold tracking-tight">모임 정보 입력</h2>
             <p className="text-sm leading-6 text-slate-500">
-              방을 만든 사람은 자동으로 HOST가 됩니다.
+              방을 만든 사람은 자동으로 호스트가 됩니다.
             </p>
           </div>
 
@@ -186,30 +165,9 @@ export default function Home() {
               )}
             </div>
 
-            <div className="space-y-2">
-              <label
-                className="text-sm font-semibold text-slate-800"
-                htmlFor="timezone"
-              >
-                시간대
-              </label>
-              <input
-                aria-describedby={
-                  fieldErrors.timezone ? "timezone-error" : undefined
-                }
-                aria-invalid={Boolean(fieldErrors.timezone)}
-                className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                id="timezone"
-                onChange={(event) => setTimezone(event.target.value)}
-                placeholder="Asia/Seoul"
-                value={timezone}
-              />
-              {fieldErrors.timezone && (
-                <p className="text-sm text-rose-600" id="timezone-error">
-                  {fieldErrors.timezone}
-                </p>
-              )}
-            </div>
+            <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+              모든 시간은 한국 시간으로 입력하고 표시합니다.
+            </p>
 
             <div className="space-y-2">
               <label

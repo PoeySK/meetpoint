@@ -25,13 +25,34 @@
 }
 ```
 
+## Current calculation profile: `MVP_NO_CONDITIONS`
+
+The first calculation vertical slice intentionally does not add or persist
+`Participant.condition`. NestJS sends only active candidates and stored
+Participant responses to Rust Solver.
+
+- Actual participant inputs: `availabilityStatus`, `travelBurden`
+- Fixed weights: `time=40`, `travelBurden=25`, `budget=20`, `preference=15`
+- `budget=20` means no budget constraint was supplied; it is not user data.
+- `preference=15` means preference matching is not evaluated; it is not user data.
+- `CONDITION_INCOMPLETE`, budget conflicts, and preference conflicts do not occur
+  in this profile.
+- Solver and persisted result metadata expose `scoringProfile: MVP_NO_CONDITIONS`
+  so a future condition-aware profile can be added without
+  changing this result's meaning.
+
+> 아래에서 `ParticipantCondition`, 예산 상한, 선호 태그를 사용하는 규칙은
+> condition-aware profile을 위한 향후 설계 참고다. 현재 `MVP_NO_CONDITIONS`
+> 계산에서는 사용하지 않으며, `availabilityStatus`와 `travelBurden`만
+> 응답 입력으로 사용하고 예산·선호 점수는 고정 기본값을 적용한다.
+
 후보 하나에 대해 참가자별 0~100 점수를 만들고, 모든 활성 참가자의 평균을 후보 총점으로 만든다. 호스트도 다른 참가자와 같은 가중치를 받는다. 특정 사람이 “더 중요한 사람”이라는 설정은 MVP에 없다.
 
 ### 계산 순서
 
-1. 후보의 시간·장소·비용·태그와 참가자의 개인 조건·후보별 응답을 정규화한다.
-2. 참가자별로 시간, 이동, 예산, 선호 점수를 계산한다.
-3. 필수 조건 위반과 미응답을 구조화된 충돌로 기록한다.
+1. 후보의 시간·장소와 참가자의 후보별 응답을 정규화한다.
+2. 참가자별로 시간·이동 점수를 계산하고 예산·선호 고정 기본값을 적용한다.
+3. 현재 입력의 하드 충돌과 미응답을 구조화된 결과로 기록한다.
 4. 참가자별 점수의 평균을 후보 총점으로 계산한다. 미응답도 분모에 포함한다.
 5. 후보의 `eligible`, `coverage`, `recommendationStatus`를 결정한다.
 6. 결정적 정렬 규칙으로 순위를 만든다.
@@ -69,7 +90,7 @@ MVP에는 지도·실제 이동시간·좌표 기반 거리 API가 없다. 장�
 - `ParticipantResponse.note`는 참가자에게 다시 보여주는 설명용 값이며 계산 입력에는 포함하지 않는다.
 - 숫자 이동시간이나 실제 거리로 환산하지 않는다. 따라서 결과 문장도 “예상 이동 25분”이 아니라 “참여자 평가: 이동 부담 EASY”라고 표시한다.
 
-## 4. 예산 조건 반영
+## 4. 예산 조건 반영 (향후 condition-aware profile)
 
 후보의 `estimatedCostPerPersonKrw = C`와 참가자의 `maxBudgetKrw = B`를 비교한다.
 
@@ -90,7 +111,7 @@ budgetScore = 20 × (2 - 28,000 / 25,000)
 
 이 경우 점수는 17.6점이지만 `BUDGET_LIMIT_EXCEEDED`가 있으므로 후보 `eligible`은 false다.
 
-## 5. 개인 선호도 반영
+## 5. 개인 선호도 반영 (향후 condition-aware profile)
 
 후보의 `tags`와 개인 조건의 세 종류 태그를 비교한다. 선호 점수는 총 15점이다.
 
@@ -186,8 +207,10 @@ overallScore = round_half_up((S_1 + S_2 + ... + S_P) / P, 1)
 3. 참가자별 점수 중 최솟값(`minimumParticipantScore`)이 높은 후보를 먼저 둔다. 한 사람의 큰 손해를 줄이기 위한 기준이다.
 4. 하드 충돌 수가 적은 후보를 먼저 둔다.
 5. `Candidate.displayOrder`가 작은 후보를 먼저 둔다.
+6. `candidateId`를 오름차순으로 비교한다. `displayOrder`까지 같은 경우에도
+   입력 순서에 따라 결과가 달라지지 않도록 하는 최종 기준이다.
 
-표시 점수가 소수 첫째 자리에서 같고 1~4번 기준으로만 순서가 갈리면 UI에는 `동점 그룹`을 함께 표시한다. `displayOrder`는 결과를 재현하기 위한 마지막 tie-breaker이며, 투표 수를 의미하지 않는다.
+표시 점수가 소수 첫째 자리에서 같고 위 기준으로 순서가 갈리면 UI에는 `동점 그룹`을 함께 표시한다. `displayOrder`와 `candidateId`는 결과를 재현하기 위한 기준이며, 투표 수를 의미하지 않는다.
 
 ## 10. 점수만으로 설명하기 어려운 경우
 
