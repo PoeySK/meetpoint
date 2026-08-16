@@ -313,6 +313,7 @@ export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
                 <ParticipantResponsePanel
                   candidates={room.candidates}
                   participantId={participantId}
+                  responses={room.myResponses}
                   roomId={roomId}
                   token={accessToken}
                 />
