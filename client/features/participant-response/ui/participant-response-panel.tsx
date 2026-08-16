@@ -3,6 +3,7 @@
 import { useState } from "react";
 import {
   RoomApiError,
+  MEETPOINT_TIMEZONE,
   type AvailabilityStatus,
   type Candidate,
   type TravelBurden,
@@ -79,9 +80,11 @@ function formatCandidateTime(candidate: Candidate) {
   return `${startsAt.toLocaleString("ko-KR", {
     dateStyle: "medium",
     timeStyle: "short",
+    timeZone: MEETPOINT_TIMEZONE,
   })} ~ ${endsAt.toLocaleTimeString("ko-KR", {
     hour: "2-digit",
     minute: "2-digit",
+    timeZone: MEETPOINT_TIMEZONE,
   })}`;
 }
 
@@ -171,7 +174,7 @@ export function ParticipantResponsePanel({
                     </span>
                   </div>
                   <p className="text-sm text-slate-600">
-                    {formatCandidateTime(candidate)} ({candidate.time.timezone})
+                    {formatCandidateTime(candidate)}
                   </p>
                   <p className="text-sm text-slate-600">
                     {candidate.place.address} · {candidate.place.area}

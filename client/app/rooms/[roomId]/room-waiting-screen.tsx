@@ -142,7 +142,6 @@ function RoomSummary({ room }: { room: RoomDetailsResponse }) {
                 {room.room.title}
               </h1>
             </div>
-            <p className="text-sm text-slate-500">{room.room.timezone}</p>
           </div>
 
           <div className="rounded-2xl bg-slate-950 p-4 text-white sm:min-w-44 sm:text-right">

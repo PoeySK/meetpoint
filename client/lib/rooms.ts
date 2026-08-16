@@ -29,6 +29,8 @@ export type RecommendationStatus =
   | "NO_FULL_MATCH";
 export type ScoringProfile = "MVP_NO_CONDITIONS";
 
+export const MEETPOINT_TIMEZONE = "Asia/Seoul";
+
 export type CreateRoomInput = {
   title: string;
   timezone: string;
