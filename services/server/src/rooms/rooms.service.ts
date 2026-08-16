@@ -132,6 +132,7 @@ export interface RoomDetailsResponse {
   hostParticipant: PublicParticipant;
   participants: PublicParticipant[];
   candidates: CandidatePayload[];
+  myResponses: ParticipantResponsePayload[];
   latestScoreResult: null;
   decision: null;
 }
@@ -774,8 +775,10 @@ export class RoomsService {
     roomId: string,
     accessToken?: string
   ): Promise<RoomDetailsResponse> {
-    const { room } = await this.getAuthorizedParticipant(roomId, accessToken);
+    const { room, participant: currentParticipant } =
+      await this.getAuthorizedParticipant(roomId, accessToken);
     const participantRepository = this.dataSource.getRepository(Participant);
+    const responseRepository = this.dataSource.getRepository(ParticipantResponse);
 
     const participants = await participantRepository.find({
       where: { roomId: room.id },
@@ -784,6 +787,29 @@ export class RoomsService {
     const candidates = await this.dataSource.getRepository(Candidate).find({
       where: { roomId: room.id, status: CandidateStatus.ACTIVE },
       order: { displayOrder: 'ASC', createdAt: 'ASC', id: 'ASC' },
+    });
+    const activeCandidateIds = new Set(
+      candidates.map((candidate) => candidate.id)
+    );
+    const currentParticipantResponses = await responseRepository.find({
+      where: {
+        roomId: room.id,
+        participantId: currentParticipant.id,
+      },
+    });
+    const responseByCandidateId = new Map(
+      currentParticipantResponses
+        .filter(
+          (response) =>
+            response.roomId === room.id &&
+            response.participantId === currentParticipant.id &&
+            activeCandidateIds.has(response.candidateId)
+        )
+        .map((response) => [response.candidateId, response])
+    );
+    const myResponses = candidates.flatMap((candidate) => {
+      const response = responseByCandidateId.get(candidate.id);
+      return response ? [this.toParticipantResponsePayload(response)] : [];
     });
     const hostParticipant = participants.find(
       (participant) => participant.id === room.hostParticipantId
@@ -806,6 +832,7 @@ export class RoomsService {
       candidates: candidates.map((candidate) =>
         this.toCandidatePayload(candidate)
       ),
+      myResponses,
       latestScoreResult: null,
       decision: null,
     };

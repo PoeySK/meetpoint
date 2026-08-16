@@ -207,6 +207,65 @@ function createSeed() {
 }
 
 function solverResponseFromSnapshot(snapshot: any) {
+  const expectedResponses =
+    snapshot.participants.length * snapshot.candidates.length;
+  const respondedParticipants = snapshot.participants.filter(
+    (participant: any) => participant.responses.length > 0
+  ).length;
+  const candidateResults = snapshot.candidates.map(
+    (candidate: any, index: number) => {
+      const participantResponses = snapshot.participants.map(
+        (participant: any) =>
+          participant.responses.find(
+            (response: any) => response.candidateId === candidate.candidateId
+          )
+      );
+      const submittedResponses = participantResponses.filter(Boolean).length;
+      const hasMissingResponse = submittedResponses < snapshot.participants.length;
+
+      return {
+        candidateId: candidate.candidateId,
+        rank: index + 1,
+        overallScore: hasMissingResponse ? 0 : 100,
+        eligible: !hasMissingResponse,
+        matchLevel: hasMissingResponse ? 'INCOMPLETE' : 'FULL',
+        hardConflictCount: 0,
+        coverage: {
+          submittedResponses,
+          expectedResponses: snapshot.participants.length,
+        },
+        participantBreakdown: snapshot.participants.map(
+          (participant: any, participantIndex: number) => {
+            const hasResponse = Boolean(participantResponses[participantIndex]);
+
+            return {
+              participantId: participant.participantId,
+              score: hasResponse ? 100 : 0,
+              components: hasResponse
+                ? { time: 40, travelBurden: 25, budget: 20, preference: 15 }
+                : { time: 0, travelBurden: 0, budget: 0, preference: 0 },
+              hardConflicts: [],
+              blockingIssues: hasResponse ? [] : ['MISSING_RESPONSE'],
+              reasons: hasResponse
+                ? []
+                : ['response: MISSING'],
+            };
+          }
+        ),
+        reasons: [
+          hasMissingResponse
+            ? `${submittedResponses}/${snapshot.participants.length} responses submitted`
+            : `${submittedResponses} responses submitted`,
+        ],
+        conflicts: [],
+        blockingIssues: hasMissingResponse ? ['MISSING_RESPONSE'] : [],
+        explanationFlags: hasMissingResponse
+          ? ['MISSING_RESPONSE']
+          : ['SELF_REPORTED_TRAVEL_BURDEN'],
+      };
+    }
+  );
+
   return {
     requestId: snapshot.requestId,
     policyVersion: snapshot.policyVersion,
@@ -216,36 +275,24 @@ function solverResponseFromSnapshot(snapshot: any) {
       scoringProfile: 'MVP_NO_CONDITIONS',
       weights: { time: 40, travelBurden: 25, budget: 20, preference: 15 },
     },
-    recommendationStatus: 'FULL_MATCH',
+    recommendationStatus: candidateResults.some(
+      (candidate: any) => candidate.matchLevel === 'INCOMPLETE'
+    )
+      ? 'INCOMPLETE'
+      : 'FULL_MATCH',
     recommendationWarnings: [],
     coverage: {
-      respondedParticipants: 3,
-      totalParticipants: 3,
-      submittedResponses: 6,
-      expectedResponses: 6,
+      respondedParticipants,
+      totalParticipants: snapshot.participants.length,
+      submittedResponses: candidateResults.reduce(
+        (total: number, candidate: any) =>
+          total + candidate.coverage.submittedResponses,
+        0
+      ),
+      expectedResponses,
     },
     ranking: snapshot.candidates.map((candidate: any) => candidate.candidateId),
-    candidates: snapshot.candidates.map((candidate: any, index: number) => ({
-      candidateId: candidate.candidateId,
-      rank: index + 1,
-      overallScore: 100,
-      eligible: true,
-      matchLevel: 'FULL',
-      hardConflictCount: 0,
-      coverage: { submittedResponses: 3, expectedResponses: 3 },
-      participantBreakdown: snapshot.participants.map((participant: any) => ({
-        participantId: participant.participantId,
-        score: 100,
-        components: { time: 40, travelBurden: 25, budget: 20, preference: 15 },
-        hardConflicts: [],
-        blockingIssues: [],
-        reasons: [],
-      })),
-      reasons: [],
-      conflicts: [],
-      blockingIssues: [],
-      explanationFlags: ['SELF_REPORTED_TRAVEL_BURDEN'],
-    })),
+    candidates: candidateResults,
   };
 }
 
@@ -346,6 +393,74 @@ describe('RoomsService calculation flow', () => {
       travelBurden: 25,
       budget: 20,
       preference: 15,
+    });
+  });
+
+  it('keeps a missing response absent from the calculation snapshot', async () => {
+    const seed = createSeed();
+    seed.store.responses.delete('participant-member-1-candidate-2');
+    let solverInput: any;
+    globalThis.fetch = jest.fn(async (_input, init) => {
+      solverInput = JSON.parse(String(init?.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => solverResponseFromSnapshot(solverInput),
+      } as Response;
+    });
+    const service = new RoomsService(createCalculationDataSource(seed.store));
+
+    const started = await service.startCalculation(seed.roomId, seed.hostToken, {
+      clientRequestId: 'client-missing-response',
+    });
+    const completed = await waitForStatus(
+      seed.store,
+      started.calculation.id,
+      ScoreResultStatus.COMPLETED
+    );
+
+    const memberSnapshot = solverInput.participants.find(
+      (participant: any) => participant.participantId === 'participant-member-1'
+    );
+    const missingCandidateResult = completed.candidates.find(
+      (candidate: any) => candidate.candidateId === 'candidate-2'
+    );
+    if (!missingCandidateResult) {
+      throw new Error('Missing candidate result');
+    }
+    const missingParticipantResult =
+      missingCandidateResult.participantBreakdown.find(
+        (participant) => participant.participantId === 'participant-member-1'
+      );
+    if (!missingParticipantResult) {
+      throw new Error('Missing participant result');
+    }
+
+    expect(memberSnapshot.responses).toEqual([
+      expect.objectContaining({ candidateId: 'candidate-1' }),
+    ]);
+    expect(memberSnapshot.responses).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          candidateId: 'candidate-2',
+          availabilityStatus: AvailabilityStatus.AVAILABLE,
+        }),
+      ])
+    );
+    expect(completed.coverage).toMatchObject({
+      submittedResponses: 5,
+      expectedResponses: 6,
+    });
+    expect(missingCandidateResult).toMatchObject({
+      matchLevel: 'INCOMPLETE',
+      eligible: false,
+      coverage: { submittedResponses: 2, expectedResponses: 3 },
+      blockingIssues: ['MISSING_RESPONSE'],
+    });
+    expect(missingParticipantResult).toMatchObject({
+      score: 0,
+      components: { time: 0, travelBurden: 0, budget: 0, preference: 0 },
+      blockingIssues: ['MISSING_RESPONSE'],
     });
   });
 

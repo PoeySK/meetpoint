@@ -30,6 +30,7 @@
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
 - Room 조회의 `participants`에는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보를 반환한다.
 - Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
+- Room 조회의 `myResponses`에는 Authorization 토큰으로 확인한 현재 참여자가 현재 방의 활성 Candidate에 저장한 응답만 `candidates` 순서로 반환한다. 저장된 응답이 없으면 빈 배열을 반환하며, 다른 참여자의 응답과 `ARCHIVED` Candidate의 과거 응답은 반환하지 않는다.
 - 현재 ParticipantCondition API가 없으므로 Candidate 응답 저장 후에도 `participantStatus`는 `JOINED`로 반환한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 
@@ -155,6 +156,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
     }
   ],
   "candidates": [],
+  "myResponses": [],
   "latestScoreResult": null,
   "decision": null
 }
@@ -165,6 +167,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `401 MISSING_TOKEN`, `INVALID_TOKEN` 또는 `TOKEN_EXPIRED`
 - `404 RESOURCE_NOT_FOUND`: 토큰의 방 범위와 일치하지 않는 방 ID도 상세 없이 404로 처리
 - 조회 응답에는 다른 방의 참여자·후보·계산 결과를 포함하지 않는다.
+- `myResponses`는 요청 본문의 참여자 ID가 아니라 Bearer 토큰의 참여자 범위로 결정한다. Room과 Participant의 소속이 일치하는지 서버가 확인한다.
 
 ### 3. 참여자 입장
 

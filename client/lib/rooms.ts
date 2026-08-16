@@ -152,6 +152,7 @@ export type RoomDetailsResponse = {
   hostParticipant: PublicParticipant;
   participants: PublicParticipant[];
   candidates: Candidate[];
+  myResponses: ParticipantResponsePayload[];
   latestScoreResult: null;
   decision: null;
 };
