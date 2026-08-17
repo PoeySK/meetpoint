@@ -10,6 +10,7 @@ import {
   ParticipantStatus,
 } from '../participants/entities/participant.entity';
 import { Candidate, CandidateStatus } from './entities/candidate.entity';
+import { Decision } from './entities/decision.entity';
 import {
   AvailabilityStatus,
   ParticipantResponse,
@@ -17,6 +18,7 @@ import {
   TravelBurden,
 } from './entities/participant-response.entity';
 import { Room, RoomStatus } from './entities/room.entity';
+import { DecisionService } from './decision.service';
 import { RoomsController } from './rooms.controller';
 import { RoomsService } from './rooms.service';
 
@@ -32,6 +34,7 @@ type RoomStore = Map<string, Room>;
 type ParticipantStore = Map<string, Participant>;
 type CandidateStore = Map<string, Candidate>;
 type ParticipantResponseStore = Map<string, ParticipantResponse>;
+type DecisionStore = Map<string, Decision>;
 
 type MockDatabase = {
   dataSource: DataSource;
@@ -39,6 +42,7 @@ type MockDatabase = {
   participants: ParticipantStore;
   candidates: CandidateStore;
   responses: ParticipantResponseStore;
+  decisions: DecisionStore;
   roomRepository: {
     create: jest.Mock;
     save: jest.Mock;
@@ -55,6 +59,10 @@ type MockDatabase = {
     create: jest.Mock;
     save: jest.Mock;
   };
+  decisionRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+  };
   failParticipantSave: boolean;
   failCandidateSave: boolean;
   failResponseSave: boolean;
@@ -65,6 +73,7 @@ function createMockDatabase(): MockDatabase {
   const participants: ParticipantStore = new Map();
   const candidates: CandidateStore = new Map();
   const responses: ParticipantResponseStore = new Map();
+  const decisions: DecisionStore = new Map();
   const state = {
     failParticipantSave: false,
     failCandidateSave: false,
@@ -204,18 +213,15 @@ function createMockDatabase(): MockDatabase {
       responses.set(response.id, response);
       return response;
     }),
-    find: jest.fn(
-      async (options: { where?: Partial<ParticipantResponse> }) => {
-        const where = options.where ?? {};
+    find: jest.fn(async (options: { where?: Partial<ParticipantResponse> }) => {
+      const where = options.where ?? {};
 
-        return [...responses.values()].filter((response) =>
-          Object.entries(where).every(
-            ([key, value]) =>
-              response[key as keyof ParticipantResponse] === value
-          )
-        );
-      }
-    ),
+      return [...responses.values()].filter((response) =>
+        Object.entries(where).every(
+          ([key, value]) => response[key as keyof ParticipantResponse] === value
+        )
+      );
+    }),
     findOne: jest.fn(
       async (options: { where?: Partial<ParticipantResponse> }) => {
         const where = options.where ?? {};
@@ -232,6 +238,35 @@ function createMockDatabase(): MockDatabase {
     ),
   };
 
+  const decisionRepository = {
+    create: jest.fn((attributes: Partial<Decision>) => ({
+      ...attributes,
+      createdAt: attributes.createdAt ?? new Date(),
+      updatedAt: attributes.updatedAt ?? new Date(),
+    })),
+    save: jest.fn(async (decision: Decision) => {
+      decisions.set(decision.id, decision);
+      return decision;
+    }),
+    findOneBy: jest.fn(async (criteria: Partial<Decision>) => {
+      return (
+        [...decisions.values()].find((decision) =>
+          Object.entries(criteria).every(
+            ([key, value]) => decision[key as keyof Decision] === value
+          )
+        ) ?? null
+      );
+    }),
+    find: jest.fn(async (options: { where?: Partial<Decision> }) => {
+      const where = options.where ?? {};
+      return [...decisions.values()].filter((decision) =>
+        Object.entries(where).every(
+          ([key, value]) => decision[key as keyof Decision] === value
+        )
+      );
+    }),
+  };
+
   const manager = {
     getRepository: jest.fn((entity: unknown) => {
       if (entity === Room) {
@@ -242,6 +277,9 @@ function createMockDatabase(): MockDatabase {
       }
       if (entity === Candidate) {
         return candidateRepository;
+      }
+      if (entity === Decision) {
+        return decisionRepository;
       }
       return responseRepository;
     }),
@@ -256,6 +294,7 @@ function createMockDatabase(): MockDatabase {
         const participantsBeforeTransaction = new Map(participants);
         const candidatesBeforeTransaction = new Map(candidates);
         const responsesBeforeTransaction = new Map(responses);
+        const decisionsBeforeTransaction = new Map(decisions);
 
         try {
           return await callback(manager);
@@ -280,6 +319,11 @@ function createMockDatabase(): MockDatabase {
             responses.set(id, response);
           }
 
+          decisions.clear();
+          for (const [id, decision] of decisionsBeforeTransaction) {
+            decisions.set(id, decision);
+          }
+
           throw error;
         }
       }
@@ -294,6 +338,9 @@ function createMockDatabase(): MockDatabase {
       if (entity === Candidate) {
         return candidateRepository;
       }
+      if (entity === Decision) {
+        return decisionRepository;
+      }
       return responseRepository;
     }),
   } as unknown as DataSource;
@@ -304,10 +351,12 @@ function createMockDatabase(): MockDatabase {
     participants,
     candidates,
     responses,
+    decisions,
     roomRepository,
     participantRepository,
     candidateRepository,
     responseRepository,
+    decisionRepository,
     get failParticipantSave() {
       return state.failParticipantSave;
     },
@@ -380,6 +429,7 @@ describe('RoomsController', () => {
       controllers: [RoomsController],
       providers: [
         RoomsService,
+        DecisionService,
         {
           provide: getDataSourceToken(),
           useValue: database.dataSource,
@@ -397,6 +447,7 @@ describe('RoomsController', () => {
     database.participants.clear();
     database.candidates.clear();
     database.responses.clear();
+    database.decisions.clear();
     await app.close();
   });
 

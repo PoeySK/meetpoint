@@ -1,4 +1,4 @@
-import RoomWaitingScreen from "./room-waiting-screen";
+import RoomWaitingScreen from "@/pages/room/ui/room-waiting-screen";
 
 type RoomPageProps = {
   params: Promise<{

@@ -45,7 +45,7 @@
    - Room에는 방 코드, 호스트 Participant 참조, 방 상태, nullable 최신 계산·결정 참조를 저장한다.
    - 최소 Participant에는 ID, Room 소속, 표시 이름, `HOST` 역할, `JOINED` 상태, 토큰 해시·만료·폐기 시각을 저장한다.
    - Room과 Participant는 논리적으로 양방향 관계지만 DB 외래 키는 `Participant.roomId`에만 설정한다. `Room.hostParticipantId`는 서비스에서 Participant 존재 여부, 같은 Room 소속 여부, `HOST` 역할을 검증한다.
-   - `Candidate`와 `ParticipantResponse`는 2일차 첫 vertical slice에서 추가하고, `ScoreResult`와 `Decision`은 Solver 연동 단계에서 추가한다.
+   - `Candidate`와 `ParticipantResponse`는 2일차 첫 vertical slice에서 추가했고, `ScoreResult`와 `Decision`은 3일차 Solver 연동·결정 단계에서 추가했다.
 
 4. **방 생성 및 조회**
    - 애플리케이션에서 Room ID와 Participant ID를 먼저 생성한다.
@@ -157,6 +157,8 @@
 - 응답이 완전하지 않으면 결과는 볼 수 있어도 확정 API가 거부된다.
 - 완전 일치 후보가 없을 때 호스트가 충돌을 확인하고 후보를 확정할 수 있다.
 - 확정 결과를 호스트와 참여자가 다시 조회할 수 있다.
+
+현재 3일차 Decision vertical slice가 완료되었다. Decision migration과 이력 상태(`CONFIRMED`·`REOPENED`·`SUPERSEDED`), HOST 확정·재검토 API, Room Participant 조회 API, 최신 계산·coverage·이슈 검증, Client 후보 선택 UI를 구현했다. 다음 범위는 Candidate 수정·보관 lifecycle과 ParticipantCondition이다.
 
 ## 2~3일 프로토타입에서 하지 않을 일
 

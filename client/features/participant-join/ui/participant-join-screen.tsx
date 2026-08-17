@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { joinRoom } from "@/entities/room/api/room-api";
+import { RoomApiError } from "@/shared/api/http-client";
 import {
   getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
-  joinRoom,
-  RoomApiError,
-} from "@/lib/rooms";
+} from "@/shared/lib/room-session";
 
 type ParticipantJoinScreenProps = {
   initialRoomCode?: string;

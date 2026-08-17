@@ -1,4 +1,4 @@
-import ParticipantJoinScreen from "@/features/participant-join/ui/participant-join-screen";
+import ParticipantJoinPage from "@/pages/participant-join/ui/participant-join-page";
 
 type JoinPageProps = {
   params: Promise<{
@@ -9,5 +9,5 @@ type JoinPageProps = {
 export default async function JoinRoomPage({ params }: JoinPageProps) {
   const { roomCode } = await params;
 
-  return <ParticipantJoinScreen initialRoomCode={roomCode} />;
+  return <ParticipantJoinPage initialRoomCode={roomCode} />;
 }

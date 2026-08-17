@@ -11,6 +11,7 @@ import {
   Candidate,
   CandidateStatus,
 } from '../src/rooms/entities/candidate.entity';
+import { Decision } from '../src/rooms/entities/decision.entity';
 import {
   AvailabilityStatus,
   ParticipantResponse,
@@ -33,6 +34,7 @@ const databaseUrl =
         Room,
         Participant,
         Candidate,
+        Decision,
         ParticipantResponse,
         ScoreResult,
       ],
