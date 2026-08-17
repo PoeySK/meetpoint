@@ -11,17 +11,23 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import type { CreateCandidateDto } from './dto/create-candidate.dto';
+import type { CreateDecisionDto } from './dto/create-decision.dto';
 import type { CreateRoomDto } from './dto/create-room.dto';
 import type { JoinParticipantDto } from './dto/join-participant.dto';
 import type { UpsertParticipantResponseDto } from './dto/upsert-participant-response.dto';
 import type { StartCalculationDto } from './dto/start-calculation.dto';
+import type { ReopenDecisionDto } from './dto/reopen-decision.dto';
+import { DecisionService } from './decision.service';
 import { RoomsErrorFilter } from './rooms-error.filter';
 import { RoomsService } from './rooms.service';
 
 @Controller('api/v1/rooms')
 @UseFilters(RoomsErrorFilter)
 export class RoomsController {
-  constructor(private readonly roomsService: RoomsService) {}
+  constructor(
+    private readonly roomsService: RoomsService,
+    private readonly decisionService: DecisionService
+  ) {}
 
   @Post()
   createRoom(@Body() body: CreateRoomDto) {
@@ -110,6 +116,44 @@ export class RoomsController {
     @Headers('authorization') authorization?: string
   ) {
     return this.roomsService.getLatestScoreResult(
+      roomId,
+      this.extractBearerToken(authorization)
+    );
+  }
+
+  @Post(':roomId/decision')
+  createDecision(
+    @Param('roomId') roomId: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: CreateDecisionDto
+  ) {
+    return this.decisionService.createDecision(
+      roomId,
+      this.extractBearerToken(authorization),
+      body
+    );
+  }
+
+  @Post(':roomId/decision/reopen')
+  @HttpCode(HttpStatus.OK)
+  reopenDecision(
+    @Param('roomId') roomId: string,
+    @Headers('authorization') authorization: string | undefined,
+    @Body() body: ReopenDecisionDto
+  ) {
+    return this.decisionService.reopenDecision(
+      roomId,
+      this.extractBearerToken(authorization),
+      body
+    );
+  }
+
+  @Get(':roomId/decision')
+  getDecision(
+    @Param('roomId') roomId: string,
+    @Headers('authorization') authorization?: string
+  ) {
+    return this.decisionService.getDecision(
       roomId,
       this.extractBearerToken(authorization)
     );

@@ -26,13 +26,15 @@
 ### 이번 단계의 Room API 범위
 
 - Room과 HOST·MEMBER Participant를 영속화하고, HOST의 Candidate 등록과 참여자의 Candidate별 `ParticipantResponse` 제출·수정을 제공한다. MEMBER는 방 코드 입장 API로 생성한다.
-- 현재 계산 vertical slice에서는 ScoreResult 계산 시작·polling·최신 결과 조회 API를 제공한다. 참여자 개인 조건, Candidate 수정·보관, Decision API는 다음 단계에서 구현한다.
+- 현재 계산·결정 vertical slice에서는 ScoreResult 계산 시작·polling·최신 결과 조회와 HOST의 Decision 확정·재검토, 모든 참여자의 Decision 조회 API를 제공한다. 참여자 개인 조건과 Candidate 수정·보관 API는 다음 범위로 남긴다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
 - Room 조회의 `participants`에는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보를 반환한다.
 - Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
 - Room 조회의 `myResponses`에는 Authorization 토큰으로 확인한 현재 참여자가 현재 방의 활성 Candidate에 저장한 응답만 `candidates` 순서로 반환한다. 저장된 응답이 없으면 빈 배열을 반환하며, 다른 참여자의 응답과 `ARCHIVED` Candidate의 과거 응답은 반환하지 않는다.
 - 현재 ParticipantCondition API가 없으므로 Candidate 응답 저장 후에도 `participantStatus`는 `JOINED`로 반환한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
+- Decision 확정은 최신 `COMPLETED` ScoreResult만 사용하며, `STALE`·`FAILED` 결과와 100% 미만 응답 coverage는 거부한다. 서버는 점수·순위를 다시 계산하지 않고 snapshot의 ID·상태·응답 존재만 재검증한다.
+- `POST /decision`과 `POST /decision/reopen`은 HOST만 수행할 수 있고, `GET /decision`은 유효한 Room Participant가 읽을 수 있다. 결정이 없을 때의 `404 DECISION_NOT_FOUND`는 정상적인 미확정 상태다.
 
 ## 공통 오류 응답
 
@@ -627,6 +629,10 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `422 BUSINESS_RULE_VIOLATION`: 응답 커버리지가 100%가 아님
 - 선택 후보의 `matchLevel`이 `FULL`이 아니거나 계산 결과의 `recommendationWarnings`에 `LOW_SCORE`가 있으면 `acknowledgeIssues`가 `true`여야 하며, `decisionNote`는 1~300자여야 한다.
 - 선택 후보는 계산 결과의 활성 후보여야 한다.
+- Server는 짧은 transaction 안에서 Room row lock 후 최신 ScoreResult의 Room 소속·`COMPLETED` 상태·Room의 `latestScoreResultId`, 활성 Participant/Candidate 수, 선택 후보 projection을 다시 확인한다.
+- `coverage`가 활성 Participant × 활성 Candidate 전체 응답과 일치하지 않거나 실제 `SUBMITTED` 응답이 하나라도 빠지면 `422 BUSINESS_RULE_VIOLATION`으로 거부한다. 누락 응답을 `AVAILABLE` 또는 `NORMAL`로 채우지 않는다.
+- `decisionNote`는 trim해서 저장한다. 선택 후보에 이슈가 없으면 생략할 수 있고, 이슈가 있는 경우에만 1~300자의 메모를 요구한다.
+- 현재 확정 Decision이 있으면 먼저 재검토 API를 호출해야 한다. 재검토 후 새 확정이 저장되면 이전 Decision은 `SUPERSEDED`로 보존된다.
 
 ### 13. 확정 결과 재검토 열기
 
@@ -671,6 +677,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `401 INVALID_TOKEN`, `403 HOST_ONLY`, `404 RESOURCE_NOT_FOUND`
 - `409 ROOM_STATE_CONFLICT`: 현재 확정 결정이 없거나 이미 재검토 중
 - 사유는 1~300자이며, 재검토만으로 기존 결정의 이력이 삭제되지 않는다.
+- 재검토는 Room이 `CONFIRMED`이고 현재 Decision이 `CONFIRMED`일 때만 허용한다. 성공하면 Room은 `OPEN`이 되고 기존 `currentDecisionId`는 같은 `REOPENED` Decision을 계속 가리킨다.
+- 재검토 후 Room의 `currentDecisionId`는 기존 `REOPENED` Decision을 계속 가리키므로 GET 조회에서 기존 후보·점수·사유를 확인할 수 있다. 후보·응답이 실제로 변경되기 전에는 ScoreResult를 자동으로 덮어쓰지 않는다.
 
 ### 14. 최종 결과 조회
 
@@ -722,6 +730,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - 현재 결정이 없으면 `404 DECISION_NOT_FOUND`
 - `REOPENED` 상태이면 확정 결과 대신 재검토 중이라는 상태와 마지막 결정 이력을 반환한다.
 - 참여자는 읽기만 할 수 있고 결과를 수정할 수 없다.
+- 조회 projection의 `candidate`는 Decision과 같은 Room의 Candidate에서 조합하며, 후보가 이후 `ARCHIVED`가 되어도 과거 후보 payload를 반환한다. `overallScore`는 Decision에 저장하지 않고 참조한 ScoreResult의 선택 후보 projection에서 읽는다.
 
 ---
 

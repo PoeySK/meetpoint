@@ -31,6 +31,10 @@ const ERROR_MESSAGES = {
   SCORE_RESULT_NOT_FOUND: 'No calculation result exists for this Room.',
   SOLVER_ERROR: 'The Solver returned a structured calculation error.',
   SOLVER_UNAVAILABLE: 'The Solver is unavailable or timed out.',
+  DECISION_NOT_FOUND: 'No decision exists for this Room.',
+  STALE_RESULT: 'The calculation result is no longer the latest valid result.',
+  BUSINESS_RULE_VIOLATION:
+    'The request does not satisfy the Room decision rules.',
 } as const;
 
 type RoomErrorCode = keyof typeof ERROR_MESSAGES;

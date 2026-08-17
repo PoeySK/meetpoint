@@ -464,6 +464,44 @@ describe('RoomsService calculation flow', () => {
     });
   });
 
+  it('marks the previous completed result stale when an OPEN room is edited after reopen', async () => {
+    const seed = createSeed();
+    globalThis.fetch = jest.fn(async (_input, init) => {
+      const snapshot = JSON.parse(String(init?.body));
+      return {
+        ok: true,
+        status: 200,
+        json: async () => solverResponseFromSnapshot(snapshot),
+      } as Response;
+    });
+    const service = new RoomsService(createCalculationDataSource(seed.store));
+
+    const started = await service.startCalculation(seed.roomId, seed.hostToken, {
+      clientRequestId: 'client-reopen-edit',
+    });
+    const completed = await waitForStatus(
+      seed.store,
+      started.calculation.id,
+      ScoreResultStatus.COMPLETED
+    );
+    seed.store.rooms.get(seed.roomId)!.status = RoomStatus.OPEN;
+
+    await service.upsertParticipantResponse(
+      seed.roomId,
+      'participant-host',
+      'candidate-1',
+      seed.hostToken,
+      {
+        availabilityStatus: AvailabilityStatus.MAYBE,
+        travelBurden: TravelBurden.NORMAL,
+        note: null,
+      }
+    );
+
+    expect(completed.status).toBe(ScoreResultStatus.STALE);
+    expect(seed.store.rooms.get(seed.roomId)?.status).toBe(RoomStatus.OPEN);
+  });
+
   it.each([
     [
       'no active participants',

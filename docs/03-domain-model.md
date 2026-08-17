@@ -6,7 +6,7 @@
 - **확정**: Solver는 아래 도메인 객체를 데이터베이스에서 읽지 않는다. 서버가 한 번의 계산에 필요한 스냅샷을 만들어 Solver 입력으로 전달한다.
 - **확정**: 후보 시간과 후보 장소는 서로 다른 값 객체지만, MVP의 비교 단위인 `Candidate` 안에서 한 쌍으로 관리한다.
 - **확정**: Room 생성 시 HOST Participant를 함께 영속화하고, 방 코드 입장 시 MEMBER Participant를 생성한다. Room과 HOST Participant 생성은 하나의 트랜잭션으로 처리한다.
-- **확정**: 이번 단계의 영속화 범위는 Room·HOST/MEMBER Participant와 Candidate·ParticipantResponse다. 참여자 조건과 계산·결정 객체는 다음 단계에서 구현한다.
+- **확정**: 현재 vertical slice의 영속화 범위는 Room·HOST/MEMBER Participant, Candidate·ParticipantResponse, ScoreResult와 Decision이다. ParticipantCondition은 아직 구현하지 않는다.
 - **확정**: Room과 Participant는 논리적으로 양방향 관계를 갖지만, 이번 MVP의 DB 외래 키는 `Participant.roomId → Room.id`에만 둔다. `Room.hostParticipantId`의 유효성은 NestJS 서비스에서 검증한다.
 - **미결정**: 실제 ORM 엔티티명, 테이블 분할, ID 생성 방식(UUID·문자열 등)은 구현 단계에서 정한다. 문서의 ID는 API 예시용 문자열이다.
 
@@ -371,7 +371,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 ### 관계
 
-결정은 하나의 활성 후보와 하나의 완료된 계산 결과를 참조한다. `candidateId`와 `scoreResultId`는 같은 계산 스냅샷에 존재해야 한다. 한 방에 시간 순서상 여러 결정이 있을 수 있지만 `CONFIRMED`인 결정은 하나만 둔다.
+결정은 확정 당시 활성 후보였던 후보와 하나의 완료된 계산 결과를 참조한다. `candidateId`와 `scoreResultId`는 같은 계산 스냅샷에 존재해야 한다. 한 방에 시간 순서상 여러 결정이 있을 수 있지만 `CONFIRMED`인 결정은 하나만 둔다. 후보가 이후 `ARCHIVED`가 되어도 과거 Decision과 조회 projection을 위해 행을 보존한다.
 
 ### 생성 및 변경 시점
 
@@ -379,6 +379,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - 후보가 완전 일치가 아니거나 전체 점수 경고가 있으면 이슈 인지 여부와 메모리를 함께 저장한다.
 - 확정 후 바꾸려면 기존 결정을 `REOPENED`로 전환하고 재계산한다.
 - 새 결정을 확정하면 이전 결정은 `SUPERSEDED`가 된다. 과거 결정의 후보·점수·근거는 읽기 전용 이력으로 남긴다.
+- `decisionNote`는 이슈가 있는 후보에서 필수이고 그 외 후보에서는 선택이다. 서버는 trim 후 저장하며 API 응답에는 내부 `createdAt`·`updatedAt`을 노출하지 않는다.
 
 ## 객체 간 핵심 구분
 

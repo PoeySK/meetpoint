@@ -8,6 +8,7 @@ import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
 import { Participant } from '../src/participants/entities/participant.entity';
 import { Candidate } from '../src/rooms/entities/candidate.entity';
+import { Decision } from '../src/rooms/entities/decision.entity';
 import { ParticipantResponse } from '../src/rooms/entities/participant-response.entity';
 import { Room } from '../src/rooms/entities/room.entity';
 import { ScoreResult } from '../src/rooms/entities/score-result.entity';
@@ -28,6 +29,7 @@ const databaseUrl =
         Room,
         Participant,
         Candidate,
+        Decision,
         ParticipantResponse,
         ScoreResult,
       ],
@@ -219,6 +221,47 @@ describeCalculation(
         id: started.body.calculation.id,
         status: 'COMPLETED',
         scoringProfile: 'MVP_NO_CONDITIONS',
+      });
+
+      const selectedCandidateId =
+        completed.body.calculation.candidates[0].candidateId;
+      const confirmed = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/decision`)
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .send({
+          candidateId: selectedCandidateId,
+          scoreResultId: started.body.calculation.id,
+          acknowledgeIssues: false,
+        })
+        .expect(201);
+      expect(confirmed.body).toMatchObject({
+        decision: {
+          candidateId: selectedCandidateId,
+          scoreResultId: started.body.calculation.id,
+          status: 'CONFIRMED',
+        },
+        roomStatus: 'CONFIRMED',
+      });
+
+      const decision = await request(app.getHttpServer())
+        .get(`/api/v1/rooms/${roomId}/decision`)
+        .set('Authorization', `Bearer ${members[0].token}`)
+        .expect(200);
+      expect(decision.body.decision).toMatchObject({
+        id: confirmed.body.decision.id,
+        status: 'CONFIRMED',
+        candidate: { id: selectedCandidateId },
+      });
+
+      const reopened = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/decision/reopen`)
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .send({ reason: '통합 테스트에서 재검토' })
+        .expect(200);
+      expect(reopened.body).toMatchObject({
+        decision: { id: confirmed.body.decision.id, status: 'REOPENED' },
+        roomStatus: 'OPEN',
+        nextStep: 'CANDIDATE_OR_RESPONSE_CHANGE_THEN_RECALCULATE',
       });
     });
   }
