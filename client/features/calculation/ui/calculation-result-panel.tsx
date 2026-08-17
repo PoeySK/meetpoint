@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  getCalculation,
-  startCalculation,
-} from "@/entities/calculation/api/calculation-api";
+import { useEffect, useRef, useState } from "react";
+import { startCalculation } from "@/entities/calculation/api/calculation-api";
 import type { CalculationPayload } from "@/entities/calculation/model/types";
+import type { DecisionPayload } from "@/entities/decision/model/types";
 import type { RoomDetailsResponse } from "@/entities/room/model/types";
 import { RoomApiError } from "@/shared/api/http-client";
 import { createClientRequestId } from "@/shared/lib/client-request-id";
@@ -23,6 +21,8 @@ type CalculationResultPanelProps = {
   participantId: string;
   room: RoomDetailsResponse;
   onRoomReload: () => Promise<void>;
+  latestScoreResult: CalculationPayload | null;
+  decision: DecisionPayload | null;
 };
 
 function describeCalculationError(error: unknown) {
@@ -58,26 +58,27 @@ export function CalculationResultPanel({
   participantId,
   room,
   onRoomReload,
+  latestScoreResult,
+  decision: loadedDecision,
 }: CalculationResultPanelProps) {
-  const [calculationId, setCalculationId] = useState<string | null>(
-    room.room.latestScoreResultId,
-  );
-  const [calculation, setCalculation] = useState<CalculationPayload | null>(null);
-  const [isLoadingResult, setIsLoadingResult] = useState(
-    Boolean(room.room.latestScoreResultId),
-  );
   const [isStarting, setIsStarting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedCandidateId, setSelectedCandidateId] = useState<string | null>(
     null,
   );
+  const calculation = latestScoreResult;
+  const isLoadingResult =
+    isStarting || (room.room.status === "CALCULATING" && !calculation);
+  const calculationVersion = calculation
+    ? `${calculation.id}:${calculation.status}`
+    : null;
+  const previousCalculationVersion = useRef(calculationVersion);
   const isHost = participantId === room.room.hostParticipantId;
-  const roomIsCalculating = room.room.status === "CALCULATING";
 
   const {
     decision,
-      decisionError,
-      decisionNotice,
+    decisionError,
+    decisionNotice,
     acknowledgeIssues,
     setAcknowledgeIssues,
     decisionNote,
@@ -90,10 +91,11 @@ export function CalculationResultPanel({
     handleReopen,
     resetDecisionDraft,
     selectedCandidate,
-      selectedCandidateHasIssues,
-      coverageIsComplete,
+    selectedCandidateHasIssues,
+    coverageIsComplete,
   } = useDecisionConfirmation({
     calculation,
+    decision: loadedDecision,
     onRoomReload,
     room,
     roomId,
@@ -102,69 +104,27 @@ export function CalculationResultPanel({
   });
 
   useEffect(() => {
-    if (calculationId === null) {
-      return;
+    if (previousCalculationVersion.current !== calculationVersion) {
+      setSelectedCandidateId(null);
+      resetDecisionDraft();
     }
-    const activeCalculationId = calculationId;
-    let isActive = true;
-    let timerId: number | undefined;
-
-    async function poll() {
-      try {
-        const response = await getCalculation(roomId, activeCalculationId, token);
-        if (!isActive) {
-          return;
-        }
-        setCalculation(response.calculation);
-        setError(null);
-        setIsLoadingResult(false);
-        if (
-          response.calculation.status === "COMPLETED" &&
-          roomIsCalculating
-        ) {
-          await onRoomReload();
-          return;
-        }
-        if (isRunning(response.calculation.status)) {
-          timerId = window.setTimeout(() => void poll(), 1000);
-        }
-      } catch (requestError) {
-        if (!isActive) {
-          return;
-        }
-        setError(describeCalculationError(requestError));
-        setIsLoadingResult(false);
-      }
-    }
-
-    void poll();
-
-    return () => {
-      isActive = false;
-      if (timerId !== undefined) {
-        window.clearTimeout(timerId);
-      }
-    };
-  }, [calculationId, onRoomReload, room, roomId, roomIsCalculating, token]);
+    previousCalculationVersion.current = calculationVersion;
+  }, [calculationVersion, resetDecisionDraft]);
 
   async function handleStart() {
     setIsStarting(true);
     setError(null);
-    setCalculationId(null);
-    setCalculation(null);
     setSelectedCandidateId(null);
     resetDecisionDraft();
-    setIsLoadingResult(true);
 
     try {
-      const response = await startCalculation(
+      await startCalculation(
         roomId,
         token,
         createClientRequestId(),
       );
-      setCalculationId(response.calculation.id);
+      await onRoomReload();
     } catch (requestError) {
-      setIsLoadingResult(false);
       setError(describeCalculationError(requestError));
     } finally {
       setIsStarting(false);
@@ -255,7 +215,7 @@ export function CalculationResultPanel({
         </div>
       )}
 
-      {!calculationId && !isLoadingResult && !error && (
+      {!room.room.latestScoreResultId && !isLoadingResult && !error && (
         <p className="mt-5 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
           아직 계산 결과가 없습니다. 참여자가 3명 이상이고 후보가 2개 이상이면 호스트가 계산을 시작할 수 있습니다.
         </p>

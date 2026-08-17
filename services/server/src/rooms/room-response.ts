@@ -62,6 +62,7 @@ export interface RoomDetailsResponse {
   requestId: string;
   room: RoomPayload;
   hostParticipant: PublicParticipant;
+  currentParticipant: PublicParticipant;
   participants: PublicParticipant[];
   candidates: CandidatePayload[];
   myResponses: ParticipantResponsePayload[];
@@ -91,6 +92,12 @@ export interface UpsertedParticipantResponse {
   response: ParticipantResponsePayload;
   participantStatus: ParticipantStatus;
   scoreResultStatus: 'STALE';
+}
+
+export interface ParticipantLifecycleResponse {
+  requestId: string;
+  participant: PublicParticipant;
+  roomStatus: RoomStatus;
 }
 
 export interface CalculationSummary {

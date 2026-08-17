@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 import {
   ConflictException,
   ForbiddenException,
@@ -21,7 +19,12 @@ import {
 } from './entities/participant-response.entity';
 import { ScoreResult, ScoreResultStatus } from './entities/score-result.entity';
 import { Room, RoomStatus } from './entities/room.entity';
-import { RoomsService } from './rooms.service';
+import { RoomCalculationService } from './calculation/room-calculation.service';
+import type {
+  SolverResponsePayload,
+  SolverSnapshot,
+} from './calculation/solver-types';
+import { ParticipantResponseService } from './participant-response.service';
 
 type CalculationStore = {
   rooms: Map<string, Room>;
@@ -33,6 +36,13 @@ type CalculationStore = {
 
 function hashToken(token: string) {
   return createHash('sha256').update(token).digest('hex');
+}
+
+function parseSolverSnapshot(init: RequestInit | undefined): SolverSnapshot {
+  if (typeof init?.body !== 'string') {
+    throw new Error('Expected a JSON request body');
+  }
+  return JSON.parse(init.body) as SolverSnapshot;
 }
 
 function matches(
@@ -66,8 +76,11 @@ function createCalculationDataSource(store: CalculationStore) {
 
   const dataSource = {
     getRepository: repositoryFor,
-    transaction: async (callback: (manager: any) => Promise<unknown>) =>
-      callback({ getRepository: repositoryFor }),
+    transaction: async (
+      callback: (manager: {
+        getRepository: (entity: unknown) => unknown;
+      }) => Promise<unknown>
+    ) => callback({ getRepository: repositoryFor }),
   };
 
   return dataSource as unknown as DataSource;
@@ -78,7 +91,7 @@ function createRepository<T extends { id: string }>(store: Map<string, T>) {
     create(attributes: Partial<T>) {
       return { ...attributes } as T;
     },
-    async save(value: T) {
+    save(value: T) {
       const saved = value as T & { createdAt?: Date };
       if (!saved.createdAt) {
         saved.createdAt = new Date();
@@ -86,18 +99,18 @@ function createRepository<T extends { id: string }>(store: Map<string, T>) {
       store.set(value.id, value);
       return value;
     },
-    async findOne(options: { where?: Record<string, unknown> }) {
+    findOne(options: { where?: Record<string, unknown> }) {
       const where = options?.where ?? {};
       return [...store.values()].find((value) =>
         matches(value as unknown as Record<string, unknown>, where)
       );
     },
-    async findOneBy(where: Record<string, unknown>) {
+    findOneBy(where: Record<string, unknown>) {
       return [...store.values()].find((value) =>
         matches(value as unknown as Record<string, unknown>, where)
       );
     },
-    async find(options: { where?: Record<string, unknown> }) {
+    find(options: { where?: Record<string, unknown> }) {
       const where = options?.where ?? {};
       return [...store.values()].filter((value) =>
         matches(value as unknown as Record<string, unknown>, where)
@@ -206,22 +219,24 @@ function createSeed() {
   return { store, roomId, hostToken, memberToken: 'member-token-1' };
 }
 
-function solverResponseFromSnapshot(snapshot: any) {
+function solverResponseFromSnapshot(
+  snapshot: SolverSnapshot
+): SolverResponsePayload {
   const expectedResponses =
     snapshot.participants.length * snapshot.candidates.length;
   const respondedParticipants = snapshot.participants.filter(
-    (participant: any) => participant.responses.length > 0
+    (participant) => participant.responses.length > 0
   ).length;
-  const candidateResults = snapshot.candidates.map(
-    (candidate: any, index: number) => {
-      const participantResponses = snapshot.participants.map(
-        (participant: any) =>
-          participant.responses.find(
-            (response: any) => response.candidateId === candidate.candidateId
-          )
+  const candidateResults: SolverResponsePayload['candidates'] =
+    snapshot.candidates.map((candidate, index) => {
+      const participantResponses = snapshot.participants.map((participant) =>
+        participant.responses.find(
+          (response) => response.candidateId === candidate.candidateId
+        )
       );
       const submittedResponses = participantResponses.filter(Boolean).length;
-      const hasMissingResponse = submittedResponses < snapshot.participants.length;
+      const hasMissingResponse =
+        submittedResponses < snapshot.participants.length;
 
       return {
         candidateId: candidate.candidateId,
@@ -235,7 +250,7 @@ function solverResponseFromSnapshot(snapshot: any) {
           expectedResponses: snapshot.participants.length,
         },
         participantBreakdown: snapshot.participants.map(
-          (participant: any, participantIndex: number) => {
+          (participant, participantIndex) => {
             const hasResponse = Boolean(participantResponses[participantIndex]);
 
             return {
@@ -246,9 +261,7 @@ function solverResponseFromSnapshot(snapshot: any) {
                 : { time: 0, travelBurden: 0, budget: 0, preference: 0 },
               hardConflicts: [],
               blockingIssues: hasResponse ? [] : ['MISSING_RESPONSE'],
-              reasons: hasResponse
-                ? []
-                : ['response: MISSING'],
+              reasons: hasResponse ? [] : ['response: MISSING'],
             };
           }
         ),
@@ -263,8 +276,7 @@ function solverResponseFromSnapshot(snapshot: any) {
           ? ['MISSING_RESPONSE']
           : ['SELF_REPORTED_TRAVEL_BURDEN'],
       };
-    }
-  );
+    });
 
   return {
     requestId: snapshot.requestId,
@@ -276,7 +288,7 @@ function solverResponseFromSnapshot(snapshot: any) {
       weights: { time: 40, travelBurden: 25, budget: 20, preference: 15 },
     },
     recommendationStatus: candidateResults.some(
-      (candidate: any) => candidate.matchLevel === 'INCOMPLETE'
+      (candidate) => candidate.matchLevel === 'INCOMPLETE'
     )
       ? 'INCOMPLETE'
       : 'FULL_MATCH',
@@ -285,13 +297,12 @@ function solverResponseFromSnapshot(snapshot: any) {
       respondedParticipants,
       totalParticipants: snapshot.participants.length,
       submittedResponses: candidateResults.reduce(
-        (total: number, candidate: any) =>
-          total + candidate.coverage.submittedResponses,
+        (total, candidate) => total + candidate.coverage.submittedResponses,
         0
       ),
       expectedResponses,
     },
-    ranking: snapshot.candidates.map((candidate: any) => candidate.candidateId),
+    ranking: snapshot.candidates.map((candidate) => candidate.candidateId),
     candidates: candidateResults,
   };
 }
@@ -311,7 +322,7 @@ async function waitForStatus(
   throw new Error(`ScoreResult did not become ${status}`);
 }
 
-describe('RoomsService calculation flow', () => {
+describe('RoomCalculationService flow', () => {
   const originalFetch = globalThis.fetch;
 
   afterEach(() => {
@@ -321,15 +332,17 @@ describe('RoomsService calculation flow', () => {
 
   it('allows HOST calculation and rejects MEMBER calculation', async () => {
     const seed = createSeed();
-    globalThis.fetch = jest.fn(async (_input, init) => {
-      const snapshot = JSON.parse(String(init?.body));
+    globalThis.fetch = jest.fn((_input, init) => {
+      const snapshot = parseSolverSnapshot(init);
       return {
         ok: true,
         status: 200,
-        json: async () => solverResponseFromSnapshot(snapshot),
+        json: () => Promise.resolve(solverResponseFromSnapshot(snapshot)),
       } as Response;
     });
-    const service = new RoomsService(createCalculationDataSource(seed.store));
+    const service = new RoomCalculationService(
+      createCalculationDataSource(seed.store)
+    );
 
     const started = await service.startCalculation(
       seed.roomId,
@@ -357,16 +370,18 @@ describe('RoomsService calculation flow', () => {
 
   it('sends the conditionless profile and uses a completed result transition', async () => {
     const seed = createSeed();
-    let solverInput: any;
-    globalThis.fetch = jest.fn(async (_input, init) => {
-      solverInput = JSON.parse(String(init?.body));
+    let solverInput!: SolverSnapshot;
+    globalThis.fetch = jest.fn((_input, init) => {
+      solverInput = parseSolverSnapshot(init);
       return {
         ok: true,
         status: 200,
-        json: async () => solverResponseFromSnapshot(solverInput),
+        json: () => Promise.resolve(solverResponseFromSnapshot(solverInput)),
       } as Response;
     });
-    const service = new RoomsService(createCalculationDataSource(seed.store));
+    const service = new RoomCalculationService(
+      createCalculationDataSource(seed.store)
+    );
 
     const started = await service.startCalculation(
       seed.roomId,
@@ -399,20 +414,26 @@ describe('RoomsService calculation flow', () => {
   it('keeps a missing response absent from the calculation snapshot', async () => {
     const seed = createSeed();
     seed.store.responses.delete('participant-member-1-candidate-2');
-    let solverInput: any;
-    globalThis.fetch = jest.fn(async (_input, init) => {
-      solverInput = JSON.parse(String(init?.body));
+    let solverInput!: SolverSnapshot;
+    globalThis.fetch = jest.fn((_input, init) => {
+      solverInput = parseSolverSnapshot(init);
       return {
         ok: true,
         status: 200,
-        json: async () => solverResponseFromSnapshot(solverInput),
+        json: () => Promise.resolve(solverResponseFromSnapshot(solverInput)),
       } as Response;
     });
-    const service = new RoomsService(createCalculationDataSource(seed.store));
+    const service = new RoomCalculationService(
+      createCalculationDataSource(seed.store)
+    );
 
-    const started = await service.startCalculation(seed.roomId, seed.hostToken, {
-      clientRequestId: 'client-missing-response',
-    });
+    const started = await service.startCalculation(
+      seed.roomId,
+      seed.hostToken,
+      {
+        clientRequestId: 'client-missing-response',
+      }
+    );
     const completed = await waitForStatus(
       seed.store,
       started.calculation.id,
@@ -420,10 +441,10 @@ describe('RoomsService calculation flow', () => {
     );
 
     const memberSnapshot = solverInput.participants.find(
-      (participant: any) => participant.participantId === 'participant-member-1'
+      (participant) => participant.participantId === 'participant-member-1'
     );
     const missingCandidateResult = completed.candidates.find(
-      (candidate: any) => candidate.candidateId === 'candidate-2'
+      (candidate) => candidate.candidateId === 'candidate-2'
     );
     if (!missingCandidateResult) {
       throw new Error('Missing candidate result');
@@ -466,19 +487,25 @@ describe('RoomsService calculation flow', () => {
 
   it('marks the previous completed result stale when an OPEN room is edited after reopen', async () => {
     const seed = createSeed();
-    globalThis.fetch = jest.fn(async (_input, init) => {
-      const snapshot = JSON.parse(String(init?.body));
+    globalThis.fetch = jest.fn((_input, init) => {
+      const snapshot = parseSolverSnapshot(init);
       return {
         ok: true,
         status: 200,
-        json: async () => solverResponseFromSnapshot(snapshot),
+        json: () => Promise.resolve(solverResponseFromSnapshot(snapshot)),
       } as Response;
     });
-    const service = new RoomsService(createCalculationDataSource(seed.store));
+    const dataSource = createCalculationDataSource(seed.store);
+    const service = new RoomCalculationService(dataSource);
+    const responseService = new ParticipantResponseService(dataSource);
 
-    const started = await service.startCalculation(seed.roomId, seed.hostToken, {
-      clientRequestId: 'client-reopen-edit',
-    });
+    const started = await service.startCalculation(
+      seed.roomId,
+      seed.hostToken,
+      {
+        clientRequestId: 'client-reopen-edit',
+      }
+    );
     const completed = await waitForStatus(
       seed.store,
       started.calculation.id,
@@ -486,7 +513,7 @@ describe('RoomsService calculation flow', () => {
     );
     seed.store.rooms.get(seed.roomId)!.status = RoomStatus.OPEN;
 
-    await service.upsertParticipantResponse(
+    await responseService.upsertParticipantResponse(
       seed.roomId,
       'participant-host',
       'candidate-1',
@@ -507,7 +534,10 @@ describe('RoomsService calculation flow', () => {
       'no active participants',
       (seed: CalculationStore) => {
         for (const participant of seed.participants.values()) {
-          participant.status = ParticipantStatus.LEFT;
+          if (participant.role === ParticipantRole.MEMBER) {
+            participant.status = ParticipantStatus.LEFT;
+            participant.tokenRevokedAt = new Date();
+          }
         }
       },
       'PARTICIPANT_COUNT_OUT_OF_RANGE',
@@ -519,35 +549,36 @@ describe('RoomsService calculation flow', () => {
       },
       'NO_ACTIVE_CANDIDATES',
     ],
-  ])(
-    'rejects calculation when there are %s',
-    async (_label, prepare, code) => {
-      const seed = createSeed();
-      prepare(seed.store);
-      const service = new RoomsService(createCalculationDataSource(seed.store));
+  ])('rejects calculation when there are %s', async (_label, prepare, code) => {
+    const seed = createSeed();
+    prepare(seed.store);
+    const service = new RoomCalculationService(
+      createCalculationDataSource(seed.store)
+    );
 
-      let thrown: unknown;
-      try {
-        await service.startCalculation(seed.roomId, seed.hostToken, {
-          clientRequestId: `client-empty-${_label}`,
-        });
-      } catch (error) {
-        thrown = error;
-      }
-
-      expect(thrown).toBeInstanceOf(UnprocessableEntityException);
-      expect((thrown as UnprocessableEntityException).getResponse()).toMatchObject({
-        message: code,
+    let thrown: unknown;
+    try {
+      await service.startCalculation(seed.roomId, seed.hostToken, {
+        clientRequestId: `client-empty-${_label}`,
       });
-      expect(seed.store.scoreResults.size).toBe(0);
-      expect(seed.store.rooms.get(seed.roomId)?.status).toBe(RoomStatus.OPEN);
-      expect(
-        [...seed.store.scoreResults.values()].some(
-          (result) => result.error?.code === code
-        )
-      ).toBe(false);
+    } catch (error) {
+      thrown = error;
     }
-  );
+
+    expect(thrown).toBeInstanceOf(UnprocessableEntityException);
+    expect(
+      (thrown as UnprocessableEntityException).getResponse()
+    ).toMatchObject({
+      message: code,
+    });
+    expect(seed.store.scoreResults.size).toBe(0);
+    expect(seed.store.rooms.get(seed.roomId)?.status).toBe(RoomStatus.OPEN);
+    expect(
+      [...seed.store.scoreResults.values()].some(
+        (result) => result.error?.code === code
+      )
+    ).toBe(false);
+  });
 
   it('rejects a different request while calculation is running', async () => {
     const seed = createSeed();
@@ -559,18 +590,22 @@ describe('RoomsService calculation flow', () => {
             resolve({
               ok: true,
               status: 200,
-              json: async () =>
-                solverResponseFromSnapshot({
-                  requestId: 'req_unused',
-                  policyVersion: 'mvp-1',
-                  scoringProfile: 'MVP_NO_CONDITIONS',
-                  candidates: [],
-                  participants: [],
-                }),
+              json: () =>
+                Promise.resolve(
+                  solverResponseFromSnapshot({
+                    requestId: 'req_unused',
+                    policyVersion: 'mvp-1',
+                    scoringProfile: 'MVP_NO_CONDITIONS',
+                    candidates: [],
+                    participants: [],
+                  })
+                ),
             });
         })
     ) as unknown as typeof fetch;
-    const service = new RoomsService(createCalculationDataSource(seed.store));
+    const service = new RoomCalculationService(
+      createCalculationDataSource(seed.store)
+    );
 
     const started = await service.startCalculation(
       seed.roomId,
@@ -610,11 +645,12 @@ describe('RoomsService calculation flow', () => {
     ],
     [
       'invalid response',
-      async () => ({
-        ok: true,
-        status: 200,
-        json: async () => ({ status: 'COMPLETED' }),
-      }),
+      () =>
+        Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve({ status: 'COMPLETED' }),
+        }),
       'SOLVER_ERROR',
     ],
   ])(
@@ -624,7 +660,9 @@ describe('RoomsService calculation flow', () => {
       globalThis.fetch = jest.fn(() =>
         fetchResult()
       ) as unknown as typeof fetch;
-      const service = new RoomsService(createCalculationDataSource(seed.store));
+      const service = new RoomCalculationService(
+        createCalculationDataSource(seed.store)
+      );
 
       const started = await service.startCalculation(
         seed.roomId,
@@ -646,21 +684,27 @@ describe('RoomsService calculation flow', () => {
 
   it('fails and recovers when Solver returns an invalid enum field', async () => {
     const seed = createSeed();
-    globalThis.fetch = jest.fn(async (_input, init) => {
-      const snapshot = JSON.parse(String(init?.body));
-      const response = solverResponseFromSnapshot(snapshot) as any;
+    globalThis.fetch = jest.fn((_input, init) => {
+      const snapshot = parseSolverSnapshot(init);
+      const response = solverResponseFromSnapshot(snapshot);
       response.candidates[0].matchLevel = 'UNKNOWN';
       return {
         ok: true,
         status: 200,
-        json: async () => response,
+        json: () => Promise.resolve(response),
       } as Response;
     });
-    const service = new RoomsService(createCalculationDataSource(seed.store));
+    const service = new RoomCalculationService(
+      createCalculationDataSource(seed.store)
+    );
 
-    const started = await service.startCalculation(seed.roomId, seed.hostToken, {
-      clientRequestId: 'client-invalid-enum',
-    });
+    const started = await service.startCalculation(
+      seed.roomId,
+      seed.hostToken,
+      {
+        clientRequestId: 'client-invalid-enum',
+      }
+    );
     const failed = await waitForStatus(
       seed.store,
       started.calculation.id,
@@ -673,21 +717,27 @@ describe('RoomsService calculation flow', () => {
 
   it('fails and recovers when Solver returns an unknown candidate id', async () => {
     const seed = createSeed();
-    globalThis.fetch = jest.fn(async (_input, init) => {
-      const snapshot = JSON.parse(String(init?.body));
-      const response = solverResponseFromSnapshot(snapshot) as any;
+    globalThis.fetch = jest.fn((_input, init) => {
+      const snapshot = parseSolverSnapshot(init);
+      const response = solverResponseFromSnapshot(snapshot);
       response.candidates[0].candidateId = 'unknown-candidate';
       return {
         ok: true,
         status: 200,
-        json: async () => response,
+        json: () => Promise.resolve(response),
       } as Response;
     });
-    const service = new RoomsService(createCalculationDataSource(seed.store));
+    const service = new RoomCalculationService(
+      createCalculationDataSource(seed.store)
+    );
 
-    const started = await service.startCalculation(seed.roomId, seed.hostToken, {
-      clientRequestId: 'client-invalid-candidate-id',
-    });
+    const started = await service.startCalculation(
+      seed.roomId,
+      seed.hostToken,
+      {
+        clientRequestId: 'client-invalid-candidate-id',
+      }
+    );
     const failed = await waitForStatus(
       seed.store,
       started.calculation.id,

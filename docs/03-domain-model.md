@@ -106,7 +106,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - `roomId`
 - `displayName`
 - `role` (`HOST` 또는 `MEMBER`)
-- `status` (`JOINED`)
+- `status` (`JOINED`, `RESPONDED`, `LEFT`, `REMOVED`)
 - `tokenHash`
 - `tokenExpiresAt`
 - `tokenRevokedAt` (초기값 `null`)
@@ -169,7 +169,9 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 현재 단계에는 `ParticipantCondition` 저장 API가 없으므로 후보 응답을 저장해도 참여자 상태는 `JOINED`로 유지한다. 조건 저장과 전체 응답 충족을 함께 지원하는 단계에서 `RESPONDED` 전환을 적용한다.
 
-`LEFT`와 `REMOVED`는 MVP 외부 API와 계산 입력에 포함하지 않는다. 추후 참여자 이탈·강제 제거를 지원할 때 상태값, 계산 제외 시점, 토큰 폐기 API를 함께 별도 결정한다.
+`LEFT`는 MEMBER가 스스로 방을 나간 상태이고, `REMOVED`는 HOST가 MEMBER를 강제 제거한 상태다. 두 상태는 현재 활성 Participant, 새 계산 snapshot, coverage와 Decision 확정 검증에서 제외한다. Participant와 연결된 Response, 과거 ScoreResult·Decision은 물리 삭제하지 않는다.
+
+`LEFT`·`REMOVED`로 바뀐 Participant의 `tokenRevokedAt`을 설정하고, 기존 Room-scoped token 검증으로 방 범위 API 접근을 차단한다. 같은 Participant ID로 복구하지 않으며, 방 코드 재입장은 새로운 Participant를 만든다.
 
 `HOST` 역할의 참여자도 상태와 조건 구조는 동일하다. `INVITED`는 링크를 보냈지만 아직 `Participant` 레코드가 만들어지지 않은 사람을 UI에서 표현하는 파생 상태로 사용하며, 입장 전에는 별도 참여자 객체를 만들지 않는다.
 
@@ -184,7 +186,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - 방 생성 때 호스트 참여자를 생성한다.
 - 초대 링크 또는 코드로 입장할 때 멤버 참여자를 생성한다.
 - 참여자가 조건을 제출하거나 수정할 때 `condition`과 제출 시각을 갱신한다.
-- MVP에서는 참여자 이탈·강제 제거 상태를 변경하는 외부 API를 제공하지 않는다.
+- Participant 이탈·강제 제거 mutation은 `ParticipantLifecycleService`가 소유하며, Room row lock을 포함한 짧은 transaction에서 상태 변경, token 폐기, 최신 완료 ScoreResult의 `STALE` 처리를 함께 수행한다. leave/kick 요청은 별도 입력 DTO 없이 Bearer token과 경로의 대상 ID를 사용한다.
 
 ## Candidate
 
@@ -398,4 +400,4 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - **확정**: 후보 시간과 장소를 각각 값 객체로 저장하되, MVP의 후보 비교 단위는 둘을 묶은 `Candidate`다.
 - **확정**: Room 자체 만료와 시간에 따른 자동 `CLOSED` 전환은 이번 MVP에서 구현하지 않는다. 24시간 만료 대상은 방 범위 접근 토큰이다.
 - **확정**: Room과 Participant의 관계는 논리적으로 양방향이지만 DB 외래 키는 `Participant.roomId`에만 설정한다. `Room.hostParticipantId`는 서비스 검증으로 보장하며, 순환 FK는 추후 검토한다.
-- **미결정**: 방 데이터 삭제·보존 기간, 응답 변경 이력의 보존 수준, 참여자 이탈·제거의 공개 API 여부는 추후 정한다.
+- **미결정**: 방 데이터 삭제·보존 기간과 응답 변경 이력의 보존 수준은 추후 정한다. HOST 승계와 계정 기반 영구 차단은 MVP 범위 밖이다.

@@ -1,5 +1,3 @@
-/* eslint-disable */
-
 import {
   BadRequestException,
   ConflictException,
@@ -52,10 +50,7 @@ function matches(
 
 function cloneStoreMap<T>(store: Map<string, T>) {
   return new Map(
-    [...store.entries()].map(([id, value]) => [
-      id,
-      structuredClone(value),
-    ])
+    [...store.entries()].map(([id, value]) => [id, structuredClone(value)])
   );
 }
 
@@ -70,7 +65,7 @@ function createRepository<T extends { id: string }>(
     create(attributes: Partial<T>) {
       return options.createValue(attributes);
     },
-    async save(value: T) {
+    save(value: T) {
       options.beforeSave?.();
       const record = value as T & { createdAt?: Date; updatedAt?: Date };
       if (!record.createdAt) {
@@ -82,18 +77,18 @@ function createRepository<T extends { id: string }>(
       store.set(value.id, value);
       return value;
     },
-    async findOne(optionsInput: { where?: Record<string, unknown> }) {
+    findOne(optionsInput: { where?: Record<string, unknown> }) {
       const where = optionsInput?.where ?? {};
       return [...store.values()].find((value) =>
         matches(value as unknown as Record<string, unknown>, where)
       );
     },
-    async findOneBy(where: Record<string, unknown>) {
+    findOneBy(where: Record<string, unknown>) {
       return [...store.values()].find((value) =>
         matches(value as unknown as Record<string, unknown>, where)
       );
     },
-    async find(optionsInput: { where?: Record<string, unknown> }) {
+    find(optionsInput: { where?: Record<string, unknown> }) {
       const where = optionsInput?.where ?? {};
       return [...store.values()].filter((value) =>
         matches(value as unknown as Record<string, unknown>, where)
@@ -152,7 +147,11 @@ function createDecisionDataSource(store: DecisionStore) {
 
   const dataSource = {
     getRepository: repositoryFor,
-    transaction: async (callback: (manager: any) => Promise<unknown>) => {
+    transaction: async (
+      callback: (manager: {
+        getRepository: (entity: unknown) => unknown;
+      }) => Promise<unknown>
+    ) => {
       const snapshots = {
         rooms: cloneStoreMap(store.rooms),
         participants: cloneStoreMap(store.participants),
@@ -347,7 +346,7 @@ function createSeed(): {
 
 async function expectCode(
   action: () => Promise<unknown>,
-  exception: new (...args: any[]) => Error,
+  exception: new (...args: never[]) => Error,
   code: string
 ) {
   let thrown: unknown;
@@ -357,7 +356,9 @@ async function expectCode(
     thrown = error;
   }
   expect(thrown).toBeInstanceOf(exception);
-  expect((thrown as { getResponse: () => unknown }).getResponse()).toMatchObject({
+  expect(
+    (thrown as { getResponse: () => unknown }).getResponse()
+  ).toMatchObject({
     message: code,
   });
 }
@@ -383,7 +384,9 @@ describe('DecisionService vertical slice', () => {
       decisionNote: null,
       replacedDecisionId: null,
     });
-    expect(seed.store.rooms.get(seed.roomId)?.status).toBe(RoomStatus.CONFIRMED);
+    expect(seed.store.rooms.get(seed.roomId)?.status).toBe(
+      RoomStatus.CONFIRMED
+    );
     expect(seed.store.rooms.get(seed.roomId)?.currentDecisionId).toBe(
       response.decision.id
     );
@@ -413,40 +416,60 @@ describe('DecisionService vertical slice', () => {
     const otherRoom = 'other-room';
     Object.assign(seed.store.rooms.get(seed.roomId), { id: otherRoom });
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: seed.candidateIds[0],
-        scoreResultId: seed.scoreResultId,
-        acknowledgeIssues: false,
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[0],
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+        }),
       NotFoundException,
       'RESOURCE_NOT_FOUND'
     );
   });
 
   it.each([
-    ['room state', (seed: ReturnType<typeof createSeed>) => {
-      seed.store.rooms.get(seed.roomId)!.status = RoomStatus.OPEN;
-    }, 'ROOM_STATE_CONFLICT'],
-    ['old latest result', (seed: ReturnType<typeof createSeed>) => {
-      seed.store.rooms.get(seed.roomId)!.latestScoreResultId = 'other-score';
-    }, 'STALE_RESULT'],
-    ['failed result', (seed: ReturnType<typeof createSeed>) => {
-      seed.store.scoreResults.get(seed.scoreResultId)!.status = ScoreResultStatus.FAILED;
-    }, 'STALE_RESULT'],
-    ['stale result', (seed: ReturnType<typeof createSeed>) => {
-      seed.store.scoreResults.get(seed.scoreResultId)!.status = ScoreResultStatus.STALE;
-    }, 'STALE_RESULT'],
+    [
+      'room state',
+      (seed: ReturnType<typeof createSeed>) => {
+        seed.store.rooms.get(seed.roomId)!.status = RoomStatus.OPEN;
+      },
+      'ROOM_STATE_CONFLICT',
+    ],
+    [
+      'old latest result',
+      (seed: ReturnType<typeof createSeed>) => {
+        seed.store.rooms.get(seed.roomId)!.latestScoreResultId = 'other-score';
+      },
+      'STALE_RESULT',
+    ],
+    [
+      'failed result',
+      (seed: ReturnType<typeof createSeed>) => {
+        seed.store.scoreResults.get(seed.scoreResultId)!.status =
+          ScoreResultStatus.FAILED;
+      },
+      'STALE_RESULT',
+    ],
+    [
+      'stale result',
+      (seed: ReturnType<typeof createSeed>) => {
+        seed.store.scoreResults.get(seed.scoreResultId)!.status =
+          ScoreResultStatus.STALE;
+      },
+      'STALE_RESULT',
+    ],
   ])('rejects confirmation for %s', async (_label, prepare, code) => {
     const seed = createSeed();
     prepare(seed);
     const service = createDecisionService(seed.store);
 
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: seed.candidateIds[0],
-        scoreResultId: seed.scoreResultId,
-        acknowledgeIssues: false,
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[0],
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+        }),
       code === 'ROOM_STATE_CONFLICT' ? ConflictException : ConflictException,
       code
     );
@@ -455,15 +478,18 @@ describe('DecisionService vertical slice', () => {
   it('rejects incomplete coverage and missing active responses without filling them', async () => {
     const seed = createSeed();
     seed.store.responses.delete('participant-member-2-candidate-2');
-    seed.store.scoreResults.get(seed.scoreResultId)!.coverage.submittedResponses = 5;
+    seed.store.scoreResults.get(
+      seed.scoreResultId
+    )!.coverage.submittedResponses = 5;
     const service = createDecisionService(seed.store);
 
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: seed.candidateIds[0],
-        scoreResultId: seed.scoreResultId,
-        acknowledgeIssues: false,
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[0],
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+        }),
       UnprocessableEntityException,
       'BUSINESS_RULE_VIOLATION'
     );
@@ -539,11 +565,12 @@ describe('DecisionService vertical slice', () => {
       const service = createDecisionService(seed.store);
 
       await expectCode(
-        () => service.createDecision(seed.roomId, seed.hostToken, {
-          candidateId: seed.candidateIds[0],
-          scoreResultId: seed.scoreResultId,
-          acknowledgeIssues: false,
-        }),
+        () =>
+          service.createDecision(seed.roomId, seed.hostToken, {
+            candidateId: seed.candidateIds[0],
+            scoreResultId: seed.scoreResultId,
+            acknowledgeIssues: false,
+          }),
         exception,
         code
       );
@@ -561,11 +588,12 @@ describe('DecisionService vertical slice', () => {
     seed.store.candidates.set(foreignCandidate.id, foreignCandidate);
 
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: foreignCandidate.id,
-        scoreResultId: seed.scoreResultId,
-        acknowledgeIssues: false,
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: foreignCandidate.id,
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+        }),
       NotFoundException,
       'RESOURCE_NOT_FOUND'
     );
@@ -578,11 +606,12 @@ describe('DecisionService vertical slice', () => {
     seed.store.scoreResults.set(foreignScore.id, foreignScore);
     seed.store.rooms.get(seed.roomId)!.latestScoreResultId = foreignScore.id;
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: seed.candidateIds[0],
-        scoreResultId: foreignScore.id,
-        acknowledgeIssues: false,
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[0],
+          scoreResultId: foreignScore.id,
+          acknowledgeIssues: false,
+        }),
       NotFoundException,
       'RESOURCE_NOT_FOUND'
     );
@@ -594,11 +623,12 @@ describe('DecisionService vertical slice', () => {
       acknowledgeIssues: false,
     });
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: seed.candidateIds[1],
-        scoreResultId: seed.scoreResultId,
-        acknowledgeIssues: false,
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[1],
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+        }),
       ConflictException,
       'ROOM_STATE_CONFLICT'
     );
@@ -612,21 +642,26 @@ describe('DecisionService vertical slice', () => {
     const service = createDecisionService(seed.store);
 
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: seed.candidateIds[0],
-        scoreResultId: seed.scoreResultId,
-        acknowledgeIssues: false,
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[0],
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+        }),
       UnprocessableEntityException,
       'BUSINESS_RULE_VIOLATION'
     );
 
-    const confirmed = await service.createDecision(seed.roomId, seed.hostToken, {
-      candidateId: seed.candidateIds[0],
-      scoreResultId: seed.scoreResultId,
-      acknowledgeIssues: true,
-      decisionNote: '  이슈를 확인하고 확정합니다.  ',
-    });
+    const confirmed = await service.createDecision(
+      seed.roomId,
+      seed.hostToken,
+      {
+        candidateId: seed.candidateIds[0],
+        scoreResultId: seed.scoreResultId,
+        acknowledgeIssues: true,
+        decisionNote: '  이슈를 확인하고 확정합니다.  ',
+      }
+    );
     expect(confirmed.decision.decisionNote).toBe('이슈를 확인하고 확정합니다.');
   });
 
@@ -635,12 +670,13 @@ describe('DecisionService vertical slice', () => {
     const service = createDecisionService(seed.store);
 
     await expectCode(
-      () => service.createDecision(seed.roomId, seed.hostToken, {
-        candidateId: seed.candidateIds[0],
-        scoreResultId: seed.scoreResultId,
-        acknowledgeIssues: false,
-        decisionNote: 'x'.repeat(301),
-      }),
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[0],
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+          decisionNote: 'x'.repeat(301),
+        }),
       BadRequestException,
       'VALIDATION_ERROR'
     );
@@ -673,7 +709,8 @@ describe('DecisionService vertical slice', () => {
       scoreResultId: seed.scoreResultId,
       acknowledgeIssues: false,
     });
-    seed.store.candidates.get(seed.candidateIds[0])!.status = CandidateStatus.ARCHIVED;
+    seed.store.candidates.get(seed.candidateIds[0])!.status =
+      CandidateStatus.ARCHIVED;
 
     const response = await service.getDecision(seed.roomId, seed.memberToken);
     expect(response.decision).toMatchObject({
@@ -719,7 +756,9 @@ describe('DecisionService vertical slice', () => {
     });
 
     const nextScoreId = 'score-2';
-    const nextScore = structuredClone(seed.store.scoreResults.get(seed.scoreResultId)!);
+    const nextScore = structuredClone(
+      seed.store.scoreResults.get(seed.scoreResultId)!
+    );
     nextScore.id = nextScoreId;
     seed.store.scoreResults.set(nextScoreId, nextScore);
     seed.store.rooms.get(seed.roomId)!.latestScoreResultId = nextScoreId;
@@ -744,9 +783,13 @@ describe('DecisionService vertical slice', () => {
     const noDecisionService = createDecisionService(noDecision.store);
     await expectCode(
       () =>
-        noDecisionService.reopenDecision(noDecision.roomId, noDecision.hostToken, {
-          reason: '재검토 사유',
-        }),
+        noDecisionService.reopenDecision(
+          noDecision.roomId,
+          noDecision.hostToken,
+          {
+            reason: '재검토 사유',
+          }
+        ),
       ConflictException,
       'ROOM_STATE_CONFLICT'
     );
@@ -759,7 +802,10 @@ describe('DecisionService vertical slice', () => {
       acknowledgeIssues: false,
     });
     await expectCode(
-      () => service.reopenDecision(seed.roomId, seed.memberToken, { reason: '사유' }),
+      () =>
+        service.reopenDecision(seed.roomId, seed.memberToken, {
+          reason: '사유',
+        }),
       ForbiddenException,
       'HOST_ONLY'
     );
@@ -767,7 +813,10 @@ describe('DecisionService vertical slice', () => {
       reason: '첫 번째 재검토',
     });
     await expectCode(
-      () => service.reopenDecision(seed.roomId, seed.hostToken, { reason: '두 번째 재검토' }),
+      () =>
+        service.reopenDecision(seed.roomId, seed.hostToken, {
+          reason: '두 번째 재검토',
+        }),
       ConflictException,
       'ROOM_STATE_CONFLICT'
     );
@@ -786,9 +835,13 @@ describe('DecisionService vertical slice', () => {
     inconsistent.store.rooms.get(inconsistent.roomId)!.status = RoomStatus.OPEN;
     await expectCode(
       () =>
-        inconsistentService.reopenDecision(inconsistent.roomId, inconsistent.hostToken, {
-          reason: '상태 불일치 재검토',
-        }),
+        inconsistentService.reopenDecision(
+          inconsistent.roomId,
+          inconsistent.hostToken,
+          {
+            reason: '상태 불일치 재검토',
+          }
+        ),
       ConflictException,
       'ROOM_STATE_CONFLICT'
     );
@@ -827,16 +880,20 @@ describe('DecisionService vertical slice', () => {
     decisionFailure.store.failDecisionSave = true;
     const decisionService = createDecisionService(decisionFailure.store);
     await expect(
-      decisionService.createDecision(decisionFailure.roomId, decisionFailure.hostToken, {
-        candidateId: decisionFailure.candidateIds[0],
-        scoreResultId: decisionFailure.scoreResultId,
-        acknowledgeIssues: false,
-      })
+      decisionService.createDecision(
+        decisionFailure.roomId,
+        decisionFailure.hostToken,
+        {
+          candidateId: decisionFailure.candidateIds[0],
+          scoreResultId: decisionFailure.scoreResultId,
+          acknowledgeIssues: false,
+        }
+      )
     ).rejects.toThrow('decision save failed');
     expect(decisionFailure.store.decisions.size).toBe(0);
-    expect(decisionFailure.store.rooms.get(decisionFailure.roomId)?.status).toBe(
-      RoomStatus.CALCULATED
-    );
+    expect(
+      decisionFailure.store.rooms.get(decisionFailure.roomId)?.status
+    ).toBe(RoomStatus.CALCULATED);
 
     const roomFailure = createSeed();
     roomFailure.store.failRoomSave = true;

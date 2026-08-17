@@ -1,11 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  createDecision,
-  getDecision,
-  reopenDecision,
-} from "@/entities/decision/api/decision-api";
+import { useCallback, useState } from "react";
+import { createDecision, reopenDecision } from "@/entities/decision/api/decision-api";
 import type { DecisionPayload } from "@/entities/decision/model/types";
 import type { CalculationPayload } from "@/entities/calculation/model/types";
 import type { RoomDetailsResponse } from "@/entities/room/model/types";
@@ -16,6 +12,7 @@ type UseDecisionConfirmationOptions = {
   token: string;
   room: RoomDetailsResponse;
   calculation: CalculationPayload | null;
+  decision: DecisionPayload | null;
   selectedCandidateId: string | null;
   onRoomReload: () => Promise<void>;
 };
@@ -47,10 +44,11 @@ export function useDecisionConfirmation({
   token,
   room,
   calculation,
+  decision: loadedDecision,
   selectedCandidateId,
   onRoomReload,
 }: UseDecisionConfirmationOptions) {
-  const [decision, setDecision] = useState<DecisionPayload | null>(null);
+  const decision = loadedDecision;
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [decisionNotice, setDecisionNotice] = useState<string | null>(null);
   const [acknowledgeIssues, setAcknowledgeIssues] = useState(false);
@@ -59,45 +57,12 @@ export function useDecisionConfirmation({
   const [reopenReason, setReopenReason] = useState("");
   const [isReopening, setIsReopening] = useState(false);
 
-  useEffect(() => {
-    let isActive = true;
-
-    async function loadDecision() {
-      try {
-        const response = await getDecision(roomId, token);
-        if (isActive) {
-          setDecision(response.decision);
-          setDecisionError(null);
-        }
-      } catch (requestError) {
-        if (!isActive) {
-          return;
-        }
-        if (
-          requestError instanceof RoomApiError &&
-          requestError.code === "DECISION_NOT_FOUND"
-        ) {
-          setDecision(null);
-          setDecisionError(null);
-          return;
-        }
-        setDecisionError(describeDecisionError(requestError));
-      }
-    }
-
-    void loadDecision();
-
-    return () => {
-      isActive = false;
-    };
-  }, [room.room.currentDecisionId, roomId, token]);
-
-  function resetDecisionDraft() {
+  const resetDecisionDraft = useCallback(() => {
     setAcknowledgeIssues(false);
     setDecisionNote("");
     setDecisionError(null);
     setDecisionNotice(null);
-  }
+  }, []);
 
   const selectedCandidate =
     calculation?.status === "COMPLETED"
@@ -186,19 +151,9 @@ export function useDecisionConfirmation({
     setDecisionError(null);
     setDecisionNotice(null);
     try {
-      const response = await reopenDecision(roomId, token, {
+      await reopenDecision(roomId, token, {
         reason: normalizedReason,
       });
-      setDecision((current) =>
-        current
-          ? {
-              ...current,
-              status: response.decision.status,
-              reopenedAt: response.decision.reopenedAt,
-              reopenReason: response.decision.reopenReason,
-            }
-          : current,
-      );
       setReopenReason("");
       setDecisionNotice(
         "재검토를 시작했습니다. 후보 또는 응답을 변경한 뒤 다시 계산해 주세요.",

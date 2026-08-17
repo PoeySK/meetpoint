@@ -20,9 +20,9 @@ async function bootstrap() {
     configService.get<string>('SERVER_PORT') ??
       configService.get<string>('PORT') ??
       '3001',
-    10,
+    10
   );
 
   await app.listen(port);
 }
-bootstrap();
+void bootstrap();
