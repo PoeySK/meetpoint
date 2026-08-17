@@ -1,13 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { getRoom } from "@/entities/room/api/room-api";
 import type { RoomDetailsResponse } from "@/entities/room/model/types";
 import { RoomApiError } from "@/shared/api/http-client";
+import { getRoomTokenStorageKey } from "@/shared/lib/room-session";
 import {
-  getRoomParticipantStorageKey,
-  getRoomTokenStorageKey,
-} from "@/shared/lib/room-session";
+  loadRoomSessionData,
+  type RoomSessionData,
+} from "@/pages/room/model/room-session-data";
+
+const ROOM_REFRESH_INTERVAL_MS = 5_000;
 
 export type RoomLoadError = {
   title: string;
@@ -51,25 +54,35 @@ function describeRoomError(error: unknown): RoomLoadError {
 
 export function useRoomSession(roomId: string) {
   const [room, setRoom] = useState<RoomDetailsResponse | null>(null);
+  const [latestScoreResult, setLatestScoreResult] = useState<
+    RoomSessionData["latestScoreResult"]
+  >(null);
+  const [decision, setDecision] = useState<RoomSessionData["decision"]>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [participantId, setParticipantId] = useState<string | null>(null);
   const [error, setError] = useState<RoomLoadError | null>(null);
+  const [refreshError, setRefreshError] = useState<RoomLoadError | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const sessionSnapshotRef = useRef<{
+    room: RoomDetailsResponse;
+    data: RoomSessionData;
+  } | null>(null);
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
 
   const loadRoom = useCallback(async () => {
     setIsLoading(true);
     setError(null);
+    setRefreshError(null);
     setRoom(null);
+    setLatestScoreResult(null);
+    setDecision(null);
     setAccessToken(null);
     setParticipantId(null);
+    sessionSnapshotRef.current = null;
 
     let token: string | null = null;
-    let storedParticipantId: string | null = null;
     try {
       token = window.sessionStorage.getItem(getRoomTokenStorageKey(roomId));
-      storedParticipantId = window.sessionStorage.getItem(
-        getRoomParticipantStorageKey(roomId),
-      );
     } catch {
       setError({
         title: "브라우저 저장소에 접근할 수 없습니다.",
@@ -90,9 +103,13 @@ export function useRoomSession(roomId: string) {
 
     try {
       const response = await getRoom(roomId, token);
+      const data = await loadRoomSessionData(response, token, null, null);
+      sessionSnapshotRef.current = { room: response, data };
       setRoom(response);
+      setLatestScoreResult(data.latestScoreResult);
+      setDecision(data.decision);
       setAccessToken(token);
-      setParticipantId(storedParticipantId);
+      setParticipantId(response.currentParticipant.id);
     } catch (requestError) {
       setError(describeRoomError(requestError));
     } finally {
@@ -100,17 +117,43 @@ export function useRoomSession(roomId: string) {
     }
   }, [roomId]);
 
-  const refreshRoom = useCallback(async () => {
+  const refreshRoom = useCallback((): Promise<void> => {
     if (!accessToken) {
-      return;
+      return Promise.resolve();
     }
 
-    try {
-      const response = await getRoom(roomId, accessToken);
-      setRoom(response);
-    } catch (requestError) {
-      setError(describeRoomError(requestError));
+    if (refreshPromiseRef.current) {
+      return refreshPromiseRef.current;
     }
+
+    const request = (async () => {
+      try {
+        const response = await getRoom(roomId, accessToken);
+        const previousSnapshot = sessionSnapshotRef.current;
+        const data = await loadRoomSessionData(
+          response,
+          accessToken,
+          previousSnapshot?.room ?? null,
+          previousSnapshot?.data ?? null,
+        );
+        sessionSnapshotRef.current = { room: response, data };
+        setRoom(response);
+        setLatestScoreResult(data.latestScoreResult);
+        setDecision(data.decision);
+        setRefreshError(null);
+      } catch (requestError) {
+        setRefreshError(describeRoomError(requestError));
+      }
+    })();
+
+    refreshPromiseRef.current = request;
+    void request.finally(() => {
+      if (refreshPromiseRef.current === request) {
+        refreshPromiseRef.current = null;
+      }
+    });
+
+    return request;
   }, [accessToken, roomId]);
 
   useEffect(() => {
@@ -121,12 +164,38 @@ export function useRoomSession(roomId: string) {
     return () => window.clearTimeout(timerId);
   }, [loadRoom]);
 
+  useEffect(() => {
+    if (!accessToken) {
+      return;
+    }
+
+    function refreshWhenVisible() {
+      if (document.visibilityState === "visible") {
+        void refreshRoom();
+      }
+    }
+
+    const intervalId = window.setInterval(
+      refreshWhenVisible,
+      ROOM_REFRESH_INTERVAL_MS,
+    );
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+
+    return () => {
+      window.clearInterval(intervalId);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, [accessToken, refreshRoom]);
+
   return {
     accessToken,
+    decision,
     error,
     isLoading,
     loadRoom,
+    latestScoreResult,
     participantId,
+    refreshError,
     refreshRoom,
     room,
   };

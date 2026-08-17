@@ -51,7 +51,7 @@ NestJS Server ───────── OpenAI API
 - 폼의 즉시 입력 오류 표시와 API 응답 상태 표시
 - 서버에서 받은 점수, breakdown, 충돌, 커버리지를 시각화
 - 호스트 토큰 또는 참여자 토큰을 방별 `sessionStorage`에 보관하고 `Authorization` 헤더에 전달
-- 계산 중에는 계산 상태를 조회하고, 완료 후 결과를 다시 요청
+- Room·계산·Decision 상태는 중앙 Room session에서 REST polling과 브라우저 재활성화 재조회로 갱신
 
 Client는 `overallScore`를 다시 계산하거나 후보 순위를 자체적으로 바꾸지 않는다. 화면에서 소수점 형식을 꾸미는 것과 Solver가 결정한 값을 변경하는 것은 구분한다.
 
@@ -63,6 +63,8 @@ Client는 `overallScore`를 다시 계산하거나 후보 순위를 자체적으
 - Solver 호출, 타임아웃·재시도, 결과 저장, 최신 결과의 `STALE` 관리
 - 최종 Decision의 호스트 권한 검사와 확정 이력 보존
 - 추후 OpenAI 호출과 외부 응답의 구조화
+
+NestJS 내부 서비스도 기능 단위로 책임을 나눈다. `RoomService`는 방 생성·입장을, `RoomQueryService`는 Room 조회 projection을, `CandidateService`는 후보 등록을, `ParticipantResponseService`는 참가자 응답 저장을, `RoomCalculationService`는 계산 접수·조회·Solver 완료 전이를, `ParticipantLifecycleService`는 MEMBER leave·HOST kick의 Participant 상태·token 폐기·최신 ScoreResult 무효화를 담당한다. `DecisionService`는 Decision 확정·재검토·조회와 그 transaction을 담당한다. HTTP 진입점도 `RoomsController`, `CandidateController`, `ParticipantResponseController`, `CalculationController`, `DecisionController`, `ParticipantLifecycleController`로 나누며, 각 Controller는 경로·헤더·본문을 해당 서비스로 전달하는 얇은 어댑터로 유지한다.
 
 브라우저가 직접 Solver를 호출하지 않으므로 계산 입력에 방 토큰이나 내부 서비스 주소가 노출되지 않는다.
 
@@ -101,6 +103,7 @@ Client는 `overallScore`를 다시 계산하거나 후보 순위를 자체적으
 - 계산 접수: 입력 스냅샷 식별자와 `ScoreResult(REQUESTED)` 생성
 - 계산 완료: Solver 결과 검증·ScoreResult 저장·Room 최신 결과 갱신
 - 결정 확정: 최신 계산 검증·Decision 생성·Room `CONFIRMED` 전환
+- Participant leave/kick: Room row lock·Participant 상태·token 폐기·최신 완료 ScoreResult `STALE`·필요한 Room `OPEN` 전환
 
 Solver 호출 자체는 DB 트랜잭션을 오래 잠그지 않는다. 서버는 먼저 계산 상태와 스냅샷을 저장하고, Solver가 반환한 뒤 별도 짧은 트랜잭션으로 결과를 확정한다.
 

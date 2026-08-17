@@ -3,35 +3,28 @@ import {
   Controller,
   Get,
   Headers,
-  HttpCode,
-  HttpStatus,
   Param,
   Post,
-  Put,
   UseFilters,
 } from '@nestjs/common';
-import type { CreateCandidateDto } from './dto/create-candidate.dto';
-import type { CreateDecisionDto } from './dto/create-decision.dto';
 import type { CreateRoomDto } from './dto/create-room.dto';
 import type { JoinParticipantDto } from './dto/join-participant.dto';
-import type { UpsertParticipantResponseDto } from './dto/upsert-participant-response.dto';
-import type { StartCalculationDto } from './dto/start-calculation.dto';
-import type { ReopenDecisionDto } from './dto/reopen-decision.dto';
-import { DecisionService } from './decision.service';
+import { extractBearerToken } from './room-access';
 import { RoomsErrorFilter } from './rooms-error.filter';
-import { RoomsService } from './rooms.service';
+import { RoomQueryService } from './room-query.service';
+import { RoomService } from './room.service';
 
 @Controller('api/v1/rooms')
 @UseFilters(RoomsErrorFilter)
 export class RoomsController {
   constructor(
-    private readonly roomsService: RoomsService,
-    private readonly decisionService: DecisionService
+    private readonly roomService: RoomService,
+    private readonly roomQueryService: RoomQueryService
   ) {}
 
   @Post()
   createRoom(@Body() body: CreateRoomDto) {
-    return this.roomsService.createRoom(body);
+    return this.roomService.createRoom(body);
   }
 
   @Post(':roomCode/participants')
@@ -39,37 +32,7 @@ export class RoomsController {
     @Param('roomCode') roomCode: string,
     @Body() body: JoinParticipantDto
   ) {
-    return this.roomsService.joinParticipant(roomCode, body);
-  }
-
-  @Post(':roomId/candidates')
-  createCandidate(
-    @Param('roomId') roomId: string,
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: CreateCandidateDto
-  ) {
-    return this.roomsService.createCandidate(
-      roomId,
-      this.extractBearerToken(authorization),
-      body
-    );
-  }
-
-  @Put(':roomId/participants/:participantId/responses/:candidateId')
-  upsertParticipantResponse(
-    @Param('roomId') roomId: string,
-    @Param('participantId') participantId: string,
-    @Param('candidateId') candidateId: string,
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: UpsertParticipantResponseDto
-  ) {
-    return this.roomsService.upsertParticipantResponse(
-      roomId,
-      participantId,
-      candidateId,
-      this.extractBearerToken(authorization),
-      body
-    );
+    return this.roomService.joinParticipant(roomCode, body);
   }
 
   @Get(':roomId')
@@ -77,97 +40,9 @@ export class RoomsController {
     @Param('roomId') roomId: string,
     @Headers('authorization') authorization?: string
   ) {
-    return this.roomsService.getRoom(
+    return this.roomQueryService.getRoom(
       roomId,
-      this.extractBearerToken(authorization)
+      extractBearerToken(authorization)
     );
-  }
-
-  @Post(':roomId/calculations')
-  @HttpCode(HttpStatus.ACCEPTED)
-  startCalculation(
-    @Param('roomId') roomId: string,
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: StartCalculationDto
-  ) {
-    return this.roomsService.startCalculation(
-      roomId,
-      this.extractBearerToken(authorization),
-      body
-    );
-  }
-
-  @Get(':roomId/calculations/:calculationId')
-  getCalculation(
-    @Param('roomId') roomId: string,
-    @Param('calculationId') calculationId: string,
-    @Headers('authorization') authorization?: string
-  ) {
-    return this.roomsService.getCalculation(
-      roomId,
-      calculationId,
-      this.extractBearerToken(authorization)
-    );
-  }
-
-  @Get(':roomId/score-results/latest')
-  getLatestScoreResult(
-    @Param('roomId') roomId: string,
-    @Headers('authorization') authorization?: string
-  ) {
-    return this.roomsService.getLatestScoreResult(
-      roomId,
-      this.extractBearerToken(authorization)
-    );
-  }
-
-  @Post(':roomId/decision')
-  createDecision(
-    @Param('roomId') roomId: string,
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: CreateDecisionDto
-  ) {
-    return this.decisionService.createDecision(
-      roomId,
-      this.extractBearerToken(authorization),
-      body
-    );
-  }
-
-  @Post(':roomId/decision/reopen')
-  @HttpCode(HttpStatus.OK)
-  reopenDecision(
-    @Param('roomId') roomId: string,
-    @Headers('authorization') authorization: string | undefined,
-    @Body() body: ReopenDecisionDto
-  ) {
-    return this.decisionService.reopenDecision(
-      roomId,
-      this.extractBearerToken(authorization),
-      body
-    );
-  }
-
-  @Get(':roomId/decision')
-  getDecision(
-    @Param('roomId') roomId: string,
-    @Headers('authorization') authorization?: string
-  ) {
-    return this.decisionService.getDecision(
-      roomId,
-      this.extractBearerToken(authorization)
-    );
-  }
-
-  private extractBearerToken(authorization?: string): string | undefined {
-    if (!authorization) {
-      return undefined;
-    }
-
-    const [scheme, token] = authorization.split(' ');
-    if (scheme?.toLowerCase() !== 'bearer' || !token) {
-      return undefined;
-    }
-    return token;
   }
 }

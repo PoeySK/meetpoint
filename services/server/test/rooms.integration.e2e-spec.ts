@@ -1,12 +1,13 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
-
 import { INestApplication, Module } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
-import { Participant } from '../src/participants/entities/participant.entity';
+import {
+  Participant,
+  ParticipantStatus,
+} from '../src/participants/entities/participant.entity';
 import {
   Candidate,
   CandidateStatus,
@@ -17,7 +18,7 @@ import {
   ParticipantResponse,
   TravelBurden,
 } from '../src/rooms/entities/participant-response.entity';
-import { Room } from '../src/rooms/entities/room.entity';
+import { Room, RoomStatus } from '../src/rooms/entities/room.entity';
 import { ScoreResult } from '../src/rooms/entities/score-result.entity';
 import { RoomsModule } from '../src/rooms/rooms.module';
 
@@ -192,5 +193,132 @@ describe('Room Candidate and ParticipantResponse integration', () => {
     expect(JSON.stringify(room.body)).not.toContain(
       joined.body.access.participantToken
     );
+  });
+
+  it('supports MEMBER leave, HOST kick, token revocation, and active roster filtering', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send({
+        title: 'Lifecycle integration room',
+        timezone: 'Asia/Seoul',
+        host: { displayName: 'Lifecycle host' },
+      })
+      .expect(201);
+    roomId = created.body.room.id;
+
+    const firstMember = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'First lifecycle member' })
+      .expect(201);
+    const secondMember = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Second lifecycle member' })
+      .expect(201);
+
+    const left = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/leave`)
+      .set(
+        'Authorization',
+        `Bearer ${firstMember.body.access.participantToken}`
+      )
+      .expect(200);
+    expect(left.body.participant).toMatchObject({
+      id: firstMember.body.participant.id,
+      status: ParticipantStatus.LEFT,
+    });
+    expect(left.body.roomStatus).toBe(RoomStatus.OPEN);
+
+    const firstPersisted = await dataSource
+      .getRepository(Participant)
+      .findOneBy({ id: firstMember.body.participant.id });
+    expect(firstPersisted).toMatchObject({
+      status: ParticipantStatus.LEFT,
+    });
+    expect(firstPersisted?.tokenRevokedAt).toEqual(expect.any(Date));
+
+    const activeRoom = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${roomId}`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+    expect(activeRoom.body.participants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: created.body.hostParticipant.id }),
+        expect.objectContaining({ id: secondMember.body.participant.id }),
+      ])
+    );
+    expect(activeRoom.body.participants).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: firstMember.body.participant.id }),
+      ])
+    );
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${roomId}`)
+      .set(
+        'Authorization',
+        `Bearer ${firstMember.body.access.participantToken}`
+      )
+      .expect(401);
+
+    const kicked = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${roomId}/participants/${secondMember.body.participant.id}/kick`
+      )
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+    expect(kicked.body.participant.status).toBe(ParticipantStatus.REMOVED);
+
+    const secondPersisted = await dataSource
+      .getRepository(Participant)
+      .findOneBy({ id: secondMember.body.participant.id });
+    expect(secondPersisted).toMatchObject({
+      status: ParticipantStatus.REMOVED,
+    });
+    expect(secondPersisted?.tokenRevokedAt).toEqual(expect.any(Date));
+
+    const rejoined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'First lifecycle member' })
+      .expect(201);
+    expect(rejoined.body.participant.id).not.toBe(
+      firstMember.body.participant.id
+    );
+    expect(rejoined.body.participant.id).not.toBe(
+      secondMember.body.participant.id
+    );
+  });
+
+  it('allows only one concurrent leave request for the same Participant', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send({
+        title: 'Concurrent lifecycle room',
+        timezone: 'Asia/Seoul',
+        host: { displayName: 'Concurrent host' },
+      })
+      .expect(201);
+    roomId = created.body.room.id;
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Concurrent member' })
+      .expect(201);
+
+    const results = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/leave`)
+        .set('Authorization', `Bearer ${joined.body.access.participantToken}`),
+      request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/leave`)
+        .set('Authorization', `Bearer ${joined.body.access.participantToken}`),
+    ]);
+
+    expect(results.filter((result) => result.status === 200)).toHaveLength(1);
+    expect(
+      results.filter((result) => [401, 409].includes(result.status))
+    ).toHaveLength(1);
+    const persisted = await dataSource
+      .getRepository(Participant)
+      .findOneBy({ id: joined.body.participant.id });
+    expect(persisted?.status).toBe(ParticipantStatus.LEFT);
   });
 });

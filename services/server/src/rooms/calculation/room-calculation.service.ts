@@ -2,9 +2,11 @@ import {
   BadRequestException,
   ConflictException,
   ForbiddenException,
+  Injectable,
   NotFoundException,
   UnprocessableEntityException,
 } from '@nestjs/common';
+import { InjectDataSource } from '@nestjs/typeorm';
 import { createHash, randomUUID } from 'node:crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import {
@@ -43,10 +45,11 @@ import {
   type SolverSnapshot,
 } from './solver-client';
 
+@Injectable()
 export class RoomCalculationService {
   private readonly solverClient = new SolverClient();
 
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(@InjectDataSource() private readonly dataSource: DataSource) {}
 
   async startCalculation(
     roomId: string,

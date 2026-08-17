@@ -10,7 +10,7 @@ import {
   ParticipantStatus,
 } from '../participants/entities/participant.entity';
 import { Candidate, CandidateStatus } from './entities/candidate.entity';
-import { Decision } from './entities/decision.entity';
+import { Decision, DecisionStatus } from './entities/decision.entity';
 import {
   AvailabilityStatus,
   ParticipantResponse,
@@ -18,9 +18,20 @@ import {
   TravelBurden,
 } from './entities/participant-response.entity';
 import { Room, RoomStatus } from './entities/room.entity';
+import { ScoreResult, ScoreResultStatus } from './entities/score-result.entity';
 import { DecisionService } from './decision.service';
+import { DecisionController } from './decision.controller';
+import { CandidateController } from './candidate.controller';
+import { CandidateService } from './candidate.service';
+import { CalculationController } from './calculation.controller';
+import { RoomCalculationService } from './calculation/room-calculation.service';
 import { RoomsController } from './rooms.controller';
-import { RoomsService } from './rooms.service';
+import { ParticipantLifecycleController } from './participant-lifecycle.controller';
+import { ParticipantLifecycleService } from './participant-lifecycle.service';
+import { ParticipantResponseController } from './participant-response.controller';
+import { ParticipantResponseService } from './participant-response.service';
+import { RoomQueryService } from './room-query.service';
+import { RoomService } from './room.service';
 
 type CreateRoomPayload = {
   title?: unknown;
@@ -35,6 +46,7 @@ type ParticipantStore = Map<string, Participant>;
 type CandidateStore = Map<string, Candidate>;
 type ParticipantResponseStore = Map<string, ParticipantResponse>;
 type DecisionStore = Map<string, Decision>;
+type ScoreResultStore = Map<string, ScoreResult>;
 
 type MockDatabase = {
   dataSource: DataSource;
@@ -43,6 +55,7 @@ type MockDatabase = {
   candidates: CandidateStore;
   responses: ParticipantResponseStore;
   decisions: DecisionStore;
+  scoreResults: ScoreResultStore;
   roomRepository: {
     create: jest.Mock;
     save: jest.Mock;
@@ -63,9 +76,15 @@ type MockDatabase = {
     create: jest.Mock;
     save: jest.Mock;
   };
+  scoreResultRepository: {
+    save: jest.Mock;
+    findOneBy: jest.Mock;
+  };
+  failRoomSave: boolean;
   failParticipantSave: boolean;
   failCandidateSave: boolean;
   failResponseSave: boolean;
+  failScoreResultSave: boolean;
 };
 
 function createMockDatabase(): MockDatabase {
@@ -74,11 +93,15 @@ function createMockDatabase(): MockDatabase {
   const candidates: CandidateStore = new Map();
   const responses: ParticipantResponseStore = new Map();
   const decisions: DecisionStore = new Map();
+  const scoreResults: ScoreResultStore = new Map();
   const state = {
+    failRoomSave: false,
     failParticipantSave: false,
     failCandidateSave: false,
     failResponseSave: false,
+    failScoreResultSave: false,
   };
+  let transactionTail = Promise.resolve();
 
   const roomRepository = {
     create: jest.fn((attributes: Partial<Room>) => ({
@@ -86,7 +109,10 @@ function createMockDatabase(): MockDatabase {
       createdAt: attributes.createdAt ?? new Date(),
       updatedAt: attributes.updatedAt ?? new Date(),
     })),
-    save: jest.fn(async (room: Room) => {
+    save: jest.fn((room: Room) => {
+      if (state.failRoomSave) {
+        throw new Error('room save failed');
+      }
       rooms.set(room.id, room);
       return room;
     }),
@@ -99,7 +125,7 @@ function createMockDatabase(): MockDatabase {
 
       return room ? { ...room } : null;
     }),
-    findOneBy: jest.fn(async (criteria: Partial<Room>) => {
+    findOneBy: jest.fn((criteria: Partial<Room>) => {
       if (criteria.id) {
         return rooms.get(criteria.id) ?? null;
       }
@@ -122,7 +148,7 @@ function createMockDatabase(): MockDatabase {
       joinedAt: attributes.joinedAt ?? new Date(),
       updatedAt: attributes.updatedAt ?? new Date(),
     })),
-    save: jest.fn(async (participant: Participant) => {
+    save: jest.fn((participant: Participant) => {
       if (state.failParticipantSave) {
         throw new Error('participant save failed');
       }
@@ -130,7 +156,7 @@ function createMockDatabase(): MockDatabase {
       participants.set(participant.id, participant);
       return participant;
     }),
-    findOneBy: jest.fn(async (criteria: Partial<Participant>) => {
+    findOneBy: jest.fn((criteria: Partial<Participant>) => {
       if (criteria.id) {
         return participants.get(criteria.id) ?? null;
       }
@@ -145,7 +171,7 @@ function createMockDatabase(): MockDatabase {
 
       return null;
     }),
-    find: jest.fn(async (options: { where?: { roomId?: string } }) => {
+    find: jest.fn((options: { where?: { roomId?: string } }) => {
       const roomId = options.where?.roomId;
 
       return [...participants.values()]
@@ -162,7 +188,7 @@ function createMockDatabase(): MockDatabase {
       createdAt: attributes.createdAt ?? new Date(),
       updatedAt: attributes.updatedAt ?? new Date(),
     })),
-    save: jest.fn(async (candidate: Candidate) => {
+    save: jest.fn((candidate: Candidate) => {
       if (state.failCandidateSave) {
         throw new Error('candidate save failed');
       }
@@ -170,7 +196,7 @@ function createMockDatabase(): MockDatabase {
       candidates.set(candidate.id, candidate);
       return candidate;
     }),
-    find: jest.fn(async (options: { where?: Partial<Candidate> }) => {
+    find: jest.fn((options: { where?: Partial<Candidate> }) => {
       const where = options.where ?? {};
 
       return [...candidates.values()]
@@ -185,7 +211,7 @@ function createMockDatabase(): MockDatabase {
             left.createdAt.getTime() - right.createdAt.getTime()
         );
     }),
-    findOne: jest.fn(async (options: { where?: Partial<Candidate> }) => {
+    findOne: jest.fn((options: { where?: Partial<Candidate> }) => {
       const where = options.where ?? {};
 
       return (
@@ -204,7 +230,7 @@ function createMockDatabase(): MockDatabase {
       submittedAt: attributes.submittedAt ?? new Date(),
       updatedAt: attributes.updatedAt ?? new Date(),
     })),
-    save: jest.fn(async (response: ParticipantResponse) => {
+    save: jest.fn((response: ParticipantResponse) => {
       if (state.failResponseSave) {
         throw new Error('response save failed');
       }
@@ -213,7 +239,7 @@ function createMockDatabase(): MockDatabase {
       responses.set(response.id, response);
       return response;
     }),
-    find: jest.fn(async (options: { where?: Partial<ParticipantResponse> }) => {
+    find: jest.fn((options: { where?: Partial<ParticipantResponse> }) => {
       const where = options.where ?? {};
 
       return [...responses.values()].filter((response) =>
@@ -222,20 +248,18 @@ function createMockDatabase(): MockDatabase {
         )
       );
     }),
-    findOne: jest.fn(
-      async (options: { where?: Partial<ParticipantResponse> }) => {
-        const where = options.where ?? {};
+    findOne: jest.fn((options: { where?: Partial<ParticipantResponse> }) => {
+      const where = options.where ?? {};
 
-        return (
-          [...responses.values()].find((response) =>
-            Object.entries(where).every(
-              ([key, value]) =>
-                response[key as keyof ParticipantResponse] === value
-            )
-          ) ?? null
-        );
-      }
-    ),
+      return (
+        [...responses.values()].find((response) =>
+          Object.entries(where).every(
+            ([key, value]) =>
+              response[key as keyof ParticipantResponse] === value
+          )
+        ) ?? null
+      );
+    }),
   };
 
   const decisionRepository = {
@@ -244,11 +268,11 @@ function createMockDatabase(): MockDatabase {
       createdAt: attributes.createdAt ?? new Date(),
       updatedAt: attributes.updatedAt ?? new Date(),
     })),
-    save: jest.fn(async (decision: Decision) => {
+    save: jest.fn((decision: Decision) => {
       decisions.set(decision.id, decision);
       return decision;
     }),
-    findOneBy: jest.fn(async (criteria: Partial<Decision>) => {
+    findOneBy: jest.fn((criteria: Partial<Decision>) => {
       return (
         [...decisions.values()].find((decision) =>
           Object.entries(criteria).every(
@@ -257,12 +281,32 @@ function createMockDatabase(): MockDatabase {
         ) ?? null
       );
     }),
-    find: jest.fn(async (options: { where?: Partial<Decision> }) => {
+    find: jest.fn((options: { where?: Partial<Decision> }) => {
       const where = options.where ?? {};
       return [...decisions.values()].filter((decision) =>
         Object.entries(where).every(
           ([key, value]) => decision[key as keyof Decision] === value
         )
+      );
+    }),
+  };
+
+  const scoreResultRepository = {
+    save: jest.fn((scoreResult: ScoreResult) => {
+      if (state.failScoreResultSave) {
+        throw new Error('score result save failed');
+      }
+
+      scoreResults.set(scoreResult.id, scoreResult);
+      return scoreResult;
+    }),
+    findOneBy: jest.fn((criteria: Partial<ScoreResult>) => {
+      return (
+        [...scoreResults.values()].find((scoreResult) =>
+          Object.entries(criteria).every(
+            ([key, value]) => scoreResult[key as keyof ScoreResult] === value
+          )
+        ) ?? null
       );
     }),
   };
@@ -281,6 +325,9 @@ function createMockDatabase(): MockDatabase {
       if (entity === Decision) {
         return decisionRepository;
       }
+      if (entity === ScoreResult) {
+        return scoreResultRepository;
+      }
       return responseRepository;
     }),
   } as unknown as EntityManager;
@@ -290,11 +337,23 @@ function createMockDatabase(): MockDatabase {
       async (
         callback: (transactionManager: EntityManager) => Promise<unknown>
       ) => {
-        const roomsBeforeTransaction = new Map(rooms);
-        const participantsBeforeTransaction = new Map(participants);
-        const candidatesBeforeTransaction = new Map(candidates);
-        const responsesBeforeTransaction = new Map(responses);
-        const decisionsBeforeTransaction = new Map(decisions);
+        const previousTransaction = transactionTail;
+        let releaseTransaction: (() => void) | undefined;
+        transactionTail = new Promise<void>((resolve) => {
+          releaseTransaction = resolve;
+        });
+        await previousTransaction;
+
+        const cloneStore = <T extends object>(store: Map<string, T>) =>
+          new Map(
+            [...store].map(([id, value]) => [id, { ...value } as T] as const)
+          );
+        const roomsBeforeTransaction = cloneStore(rooms);
+        const participantsBeforeTransaction = cloneStore(participants);
+        const candidatesBeforeTransaction = cloneStore(candidates);
+        const responsesBeforeTransaction = cloneStore(responses);
+        const decisionsBeforeTransaction = cloneStore(decisions);
+        const scoreResultsBeforeTransaction = cloneStore(scoreResults);
 
         try {
           return await callback(manager);
@@ -324,7 +383,14 @@ function createMockDatabase(): MockDatabase {
             decisions.set(id, decision);
           }
 
+          scoreResults.clear();
+          for (const [id, scoreResult] of scoreResultsBeforeTransaction) {
+            scoreResults.set(id, scoreResult);
+          }
+
           throw error;
+        } finally {
+          releaseTransaction?.();
         }
       }
     ),
@@ -341,6 +407,9 @@ function createMockDatabase(): MockDatabase {
       if (entity === Decision) {
         return decisionRepository;
       }
+      if (entity === ScoreResult) {
+        return scoreResultRepository;
+      }
       return responseRepository;
     }),
   } as unknown as DataSource;
@@ -352,6 +421,8 @@ function createMockDatabase(): MockDatabase {
     candidates,
     responses,
     decisions,
+    scoreResults,
+    scoreResultRepository,
     roomRepository,
     participantRepository,
     candidateRepository,
@@ -362,6 +433,12 @@ function createMockDatabase(): MockDatabase {
     },
     set failParticipantSave(value: boolean) {
       state.failParticipantSave = value;
+    },
+    get failRoomSave() {
+      return state.failRoomSave;
+    },
+    set failRoomSave(value: boolean) {
+      state.failRoomSave = value;
     },
     get failCandidateSave() {
       return state.failCandidateSave;
@@ -374,6 +451,12 @@ function createMockDatabase(): MockDatabase {
     },
     set failResponseSave(value: boolean) {
       state.failResponseSave = value;
+    },
+    get failScoreResultSave() {
+      return state.failScoreResultSave;
+    },
+    set failScoreResultSave(value: boolean) {
+      state.failScoreResultSave = value;
     },
   } as MockDatabase;
 }
@@ -407,6 +490,14 @@ function validCandidatePayload(overrides: Record<string, unknown> = {}) {
   };
 }
 
+function completedScoreResult(id: string, roomId: string) {
+  return Object.assign(new ScoreResult(), {
+    id,
+    roomId,
+    status: ScoreResultStatus.COMPLETED,
+  });
+}
+
 function expectRoomError(response: { body: unknown }, code: string) {
   expect(response.body).toEqual({
     error: {
@@ -426,10 +517,22 @@ describe('RoomsController', () => {
     database = createMockDatabase();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
-      controllers: [RoomsController],
+      controllers: [
+        RoomsController,
+        CandidateController,
+        ParticipantResponseController,
+        CalculationController,
+        DecisionController,
+        ParticipantLifecycleController,
+      ],
       providers: [
-        RoomsService,
+        RoomService,
+        RoomQueryService,
+        CandidateService,
+        ParticipantResponseService,
+        RoomCalculationService,
         DecisionService,
+        ParticipantLifecycleService,
         {
           provide: getDataSourceToken(),
           useValue: database.dataSource,
@@ -448,6 +551,7 @@ describe('RoomsController', () => {
     database.candidates.clear();
     database.responses.clear();
     database.decisions.clear();
+    database.scoreResults.clear();
     await app.close();
   });
 
@@ -494,9 +598,16 @@ describe('RoomsController', () => {
       created.body.hostParticipant.id
     );
     expect(response.body.hostParticipant.role).toBe(ParticipantRole.HOST);
+    expect(response.body.currentParticipant).toMatchObject({
+      id: created.body.hostParticipant.id,
+      displayName: 'Host test',
+      role: ParticipantRole.HOST,
+      status: ParticipantStatus.JOINED,
+    });
     expect(response.body.participants).toHaveLength(1);
     expect(response.body.participants[0]).toMatchObject({
       id: created.body.hostParticipant.id,
+      displayName: 'Host test',
       role: ParticipantRole.HOST,
       status: ParticipantStatus.JOINED,
     });
@@ -685,11 +796,18 @@ describe('RoomsController', () => {
     );
 
     expect(roomResponse.body.hostParticipant.role).toBe(ParticipantRole.HOST);
+    expect(roomResponse.body.currentParticipant).toMatchObject({
+      id: joined.body.participant.id,
+      displayName: 'Member test',
+      role: ParticipantRole.MEMBER,
+      status: ParticipantStatus.JOINED,
+    });
     expect(roomResponse.body.participants).toHaveLength(2);
     expect(roomResponse.body.participants).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
           id: joined.body.participant.id,
+          displayName: 'Member test',
           role: ParticipantRole.MEMBER,
           status: ParticipantStatus.JOINED,
         }),
@@ -771,6 +889,398 @@ describe('RoomsController', () => {
       expect(database.participants.size).toBe(2);
     }
   );
+
+  it('allows a MEMBER to leave, revokes access, stales the latest result, and preserves history', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Leaving member' })
+      .expect(201);
+    const member = database.participants.get(joined.body.participant.id);
+    const response = Object.assign(new ParticipantResponse(), {
+      id: 'response-before-leave',
+      roomId: created.body.room.id,
+      participantId: joined.body.participant.id,
+      candidateId: 'candidate-before-leave',
+      availabilityStatus: AvailabilityStatus.AVAILABLE,
+      travelBurden: TravelBurden.EASY,
+      note: 'keep this history',
+      status: ParticipantResponseStatus.SUBMITTED,
+      submittedAt: new Date(),
+      updatedAt: new Date(),
+    });
+    const scoreResult = completedScoreResult(
+      'score-before-leave',
+      created.body.room.id
+    );
+    const decision = Object.assign(new Decision(), {
+      id: 'decision-before-leave',
+      roomId: created.body.room.id,
+      scoreResultId: scoreResult.id,
+      candidateId: 'candidate-before-leave',
+      decidedByParticipantId: created.body.hostParticipant.id,
+      status: DecisionStatus.REOPENED,
+      acknowledgeIssues: false,
+      decisionNote: null,
+      confirmedAt: new Date(),
+      replacedDecisionId: null,
+      reopenedAt: new Date(),
+      reopenReason: 'keep this decision history',
+    });
+    database.responses.set(response.id, response);
+    database.scoreResults.set(scoreResult.id, scoreResult);
+    database.decisions.set(decision.id, decision);
+    database.rooms.get(created.body.room.id)!.status = RoomStatus.CALCULATED;
+    database.rooms.get(created.body.room.id)!.latestScoreResultId =
+      scoreResult.id;
+    database.rooms.get(created.body.room.id)!.currentDecisionId = decision.id;
+
+    const leave = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/leave`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .expect(200);
+
+    expect(leave.body).toMatchObject({
+      participant: {
+        id: joined.body.participant.id,
+        status: ParticipantStatus.LEFT,
+      },
+      roomStatus: RoomStatus.OPEN,
+      requestId: expect.stringMatching(/^req_/),
+    });
+    expect(member?.status).toBe(ParticipantStatus.LEFT);
+    expect(member?.tokenRevokedAt).toEqual(expect.any(Date));
+    expect(database.responses.get(response.id)).toMatchObject({
+      participantId: joined.body.participant.id,
+      note: 'keep this history',
+    });
+    expect(database.scoreResults.get(scoreResult.id)?.status).toBe(
+      ScoreResultStatus.STALE
+    );
+    expect(database.rooms.get(created.body.room.id)?.latestScoreResultId).toBe(
+      scoreResult.id
+    );
+    expect(database.rooms.get(created.body.room.id)?.currentDecisionId).toBe(
+      decision.id
+    );
+    expect(database.decisions.get(decision.id)).toMatchObject({
+      status: DecisionStatus.REOPENED,
+      scoreResultId: scoreResult.id,
+    });
+
+    const kickLeft = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/kick`
+      )
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(409);
+    expectRoomError(kickLeft, 'ROOM_STATE_CONFLICT');
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .expect((response) => {
+        expect(response.status).toBe(401);
+        expectRoomError(response, 'TOKEN_EXPIRED');
+      });
+
+    const hostRoom = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+    expect(hostRoom.body.participants).toHaveLength(1);
+    expect(hostRoom.body.participants).not.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: joined.body.participant.id }),
+      ])
+    );
+
+    const rejoined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Leaving member' })
+      .expect(201);
+    expect(rejoined.body.participant.id).not.toBe(joined.body.participant.id);
+
+    const rejoinedRoom = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${rejoined.body.access.participantToken}`)
+      .expect(200);
+    expect(rejoinedRoom.body.myResponses).toEqual([]);
+  });
+
+  it('allows HOST to kick an active MEMBER and rejects repeat processing', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Kicked member' })
+      .expect(201);
+    const member = database.participants.get(joined.body.participant.id);
+
+    const kick = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/kick`
+      )
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+
+    expect(kick.body.participant).toMatchObject({
+      id: joined.body.participant.id,
+      status: ParticipantStatus.REMOVED,
+    });
+    expect(member?.status).toBe(ParticipantStatus.REMOVED);
+    expect(member?.tokenRevokedAt).toEqual(expect.any(Date));
+
+    const hostRoom = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+    expect(hostRoom.body.participants).toHaveLength(1);
+
+    await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .expect((response) => {
+        expect(response.status).toBe(401);
+        expectRoomError(response, 'TOKEN_EXPIRED');
+      });
+
+    const repeatedKick = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/kick`
+      )
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(409);
+    expectRoomError(repeatedKick, 'ROOM_STATE_CONFLICT');
+  });
+
+  it('does not trust a MEMBER participantId body, blocks HOST self-leave, and blocks cross-room kick', async () => {
+    const firstRoom = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload({ title: 'First room' }))
+      .expect(201);
+    const firstMember = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${firstRoom.body.room.roomCode}/participants`)
+      .send({ displayName: 'First member' })
+      .expect(201);
+    const secondRoom = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload({ title: 'Second room' }))
+      .expect(201);
+    const secondMember = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${secondRoom.body.room.roomCode}/participants`)
+      .send({ displayName: 'Second member' })
+      .expect(201);
+
+    const memberKick = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${firstRoom.body.room.id}/participants/${firstRoom.body.hostParticipant.id}/kick`
+      )
+      .set(
+        'Authorization',
+        `Bearer ${firstMember.body.access.participantToken}`
+      )
+      .expect(403);
+    expectRoomError(memberKick, 'HOST_ONLY');
+
+    const spoofedLeave = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${firstRoom.body.room.id}/leave`)
+      .set(
+        'Authorization',
+        `Bearer ${firstMember.body.access.participantToken}`
+      )
+      .send({ participantId: firstRoom.body.hostParticipant.id })
+      .expect(200);
+    expect(spoofedLeave.body.participant.id).toBe(
+      firstMember.body.participant.id
+    );
+    expect(
+      database.participants.get(firstRoom.body.hostParticipant.id)?.status
+    ).toBe(ParticipantStatus.JOINED);
+
+    const hostSelfLeave = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${firstRoom.body.room.id}/leave`)
+      .set('Authorization', `Bearer ${firstRoom.body.access.hostToken}`)
+      .expect(409);
+    expectRoomError(hostSelfLeave, 'ROOM_STATE_CONFLICT');
+
+    const hostSelfKick = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${firstRoom.body.room.id}/participants/${firstRoom.body.hostParticipant.id}/kick`
+      )
+      .set('Authorization', `Bearer ${firstRoom.body.access.hostToken}`)
+      .expect(409);
+    expectRoomError(hostSelfKick, 'ROOM_STATE_CONFLICT');
+
+    const crossRoomKick = await request(app.getHttpServer())
+      .post(
+        `/api/v1/rooms/${firstRoom.body.room.id}/participants/${secondMember.body.participant.id}/kick`
+      )
+      .set('Authorization', `Bearer ${firstRoom.body.access.hostToken}`)
+      .expect(404);
+    expectRoomError(crossRoomKick, 'RESOURCE_NOT_FOUND');
+    expect(
+      database.participants.get(secondMember.body.participant.id)?.status
+    ).toBe(ParticipantStatus.JOINED);
+  });
+
+  it.each([RoomStatus.CALCULATING, RoomStatus.CONFIRMED, RoomStatus.CLOSED])(
+    'blocks leave and kick while the Room is %s',
+    async (status) => {
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201);
+      const joined = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+        .send({ displayName: 'State member' })
+        .expect(201);
+      database.rooms.get(created.body.room.id)!.status = status;
+
+      const leave = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.id}/leave`)
+        .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+        .expect(409);
+      expectRoomError(leave, 'ROOM_STATE_CONFLICT');
+
+      const kick = await request(app.getHttpServer())
+        .post(
+          `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/kick`
+        )
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .expect(409);
+      expectRoomError(kick, 'ROOM_STATE_CONFLICT');
+      expect(
+        database.participants.get(joined.body.participant.id)?.status
+      ).toBe(ParticipantStatus.JOINED);
+    }
+  );
+
+  it.each([
+    ['participant save', 'failParticipantSave'],
+    ['score result save', 'failScoreResultSave'],
+    ['room save', 'failRoomSave'],
+  ] as const)('rolls back leave when %s fails', async (_label, failure) => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Rollback member' })
+      .expect(201);
+    const scoreResult = completedScoreResult(
+      `score-rollback-${failure}`,
+      created.body.room.id
+    );
+    database.scoreResults.set(scoreResult.id, scoreResult);
+    const room = database.rooms.get(created.body.room.id)!;
+    room.status = RoomStatus.CALCULATED;
+    room.latestScoreResultId = scoreResult.id;
+    database[failure] = true;
+
+    const response = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/leave`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .expect(500);
+    expectRoomError(response, 'INTERNAL_ERROR');
+    expect(database.participants.get(joined.body.participant.id)).toMatchObject(
+      {
+        status: ParticipantStatus.JOINED,
+        tokenRevokedAt: null,
+      }
+    );
+    expect(database.rooms.get(created.body.room.id)?.status).toBe(
+      RoomStatus.CALCULATED
+    );
+    expect(database.scoreResults.get(scoreResult.id)?.status).toBe(
+      ScoreResultStatus.COMPLETED
+    );
+  });
+
+  it('serializes concurrent leave requests so only one changes the Participant', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Concurrent member' })
+      .expect(201);
+
+    const responses = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.id}/leave`)
+        .set('Authorization', `Bearer ${joined.body.access.participantToken}`),
+      request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.id}/leave`)
+        .set('Authorization', `Bearer ${joined.body.access.participantToken}`),
+    ]);
+    const successCount = responses.filter(
+      (response) => response.status === 200
+    ).length;
+    const rejectedCount = responses.filter((response) =>
+      [401, 409].includes(response.status)
+    ).length;
+
+    expect(successCount).toBe(1);
+    expect(rejectedCount).toBe(1);
+    expect(database.participants.get(joined.body.participant.id)?.status).toBe(
+      ParticipantStatus.LEFT
+    );
+  });
+
+  it('blocks all Room-scoped APIs after a Participant token is revoked', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send(validPayload())
+      .expect(201);
+    const joined = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Revoked member' })
+      .expect(201);
+    const candidate = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(validCandidatePayload())
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/leave`)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .expect(200);
+
+    const authorization = `Bearer ${joined.body.access.participantToken}`;
+    const room = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}`)
+      .set('Authorization', authorization);
+    const response = await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`
+      )
+      .set('Authorization', authorization)
+      .send({
+        availabilityStatus: AvailabilityStatus.AVAILABLE,
+        travelBurden: TravelBurden.EASY,
+      });
+    const calculation = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.id}/calculations`)
+      .set('Authorization', authorization)
+      .send({ clientRequestId: 'revoked-calculation' });
+    const decision = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${created.body.room.id}/decision`)
+      .set('Authorization', authorization);
+
+    for (const result of [room, response, calculation, decision]) {
+      expect(result.status).toBe(401);
+      expectRoomError(result, 'TOKEN_EXPIRED');
+    }
+  });
 
   it.each([
     RoomStatus.CALCULATING,

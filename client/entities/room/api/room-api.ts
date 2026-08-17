@@ -4,6 +4,7 @@ import type {
   CreatedRoomResponse,
   JoinParticipantInput,
   JoinedParticipantResponse,
+  ParticipantLifecycleResponse,
   RoomDetailsResponse,
 } from "@/entities/room/model/types";
 
@@ -34,6 +35,34 @@ export function getRoom(roomId: string, token: string) {
   return request<RoomDetailsResponse>(
     `/api/v1/rooms/${encodeURIComponent(roomId)}`,
     {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+}
+
+export function leaveRoom(roomId: string, token: string) {
+  return request<ParticipantLifecycleResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/leave`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+}
+
+export function kickParticipant(
+  roomId: string,
+  participantId: string,
+  token: string,
+) {
+  return request<ParticipantLifecycleResponse>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/participants/${encodeURIComponent(participantId)}/kick`,
+    {
+      method: "POST",
       headers: {
         Authorization: `Bearer ${token}`,
       },

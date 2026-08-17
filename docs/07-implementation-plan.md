@@ -158,7 +158,7 @@
 - 완전 일치 후보가 없을 때 호스트가 충돌을 확인하고 후보를 확정할 수 있다.
 - 확정 결과를 호스트와 참여자가 다시 조회할 수 있다.
 
-현재 3일차 Decision vertical slice가 완료되었다. Decision migration과 이력 상태(`CONFIRMED`·`REOPENED`·`SUPERSEDED`), HOST 확정·재검토 API, Room Participant 조회 API, 최신 계산·coverage·이슈 검증, Client 후보 선택 UI를 구현했다. 다음 범위는 Candidate 수정·보관 lifecycle과 ParticipantCondition이다.
+현재 3일차 Decision vertical slice, Room 참가자 목록·중앙 polling 기반 상태 갱신, Participant lifecycle vertical slice가 완료되었다. Decision migration과 이력 상태(`CONFIRMED`·`REOPENED`·`SUPERSEDED`), HOST 확정·재검토 API, Room Participant 조회 API, 최신 계산·coverage·이슈 검증, Client 후보 선택 UI, MEMBER leave·HOST kick·token 폐기·활성 목록 반영을 구현했다. 다음 범위는 Candidate 수정·보관 lifecycle과 ParticipantCondition이다.
 
 ## 2~3일 프로토타입에서 하지 않을 일
 

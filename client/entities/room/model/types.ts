@@ -72,10 +72,17 @@ export type JoinedParticipantResponse = {
   };
 };
 
+export type ParticipantLifecycleResponse = {
+  requestId: string;
+  participant: PublicParticipant;
+  roomStatus: RoomStatus;
+};
+
 export type RoomDetailsResponse = {
   requestId: string;
   room: RoomPayload;
   hostParticipant: PublicParticipant;
+  currentParticipant: PublicParticipant;
   participants: PublicParticipant[];
   candidates: Candidate[];
   myResponses: ParticipantResponsePayload[];

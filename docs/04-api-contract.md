@@ -28,10 +28,12 @@
 - Room과 HOST·MEMBER Participant를 영속화하고, HOST의 Candidate 등록과 참여자의 Candidate별 `ParticipantResponse` 제출·수정을 제공한다. MEMBER는 방 코드 입장 API로 생성한다.
 - 현재 계산·결정 vertical slice에서는 ScoreResult 계산 시작·polling·최신 결과 조회와 HOST의 Decision 확정·재검토, 모든 참여자의 Decision 조회 API를 제공한다. 참여자 개인 조건과 Candidate 수정·보관 API는 다음 범위로 남긴다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
-- Room 조회의 `participants`에는 현재 방에 속한 HOST·MEMBER Participant의 공개 정보를 반환한다.
+- Room 조회 응답의 `currentParticipant`에는 Bearer token으로 인증·확인한 현재 Participant의 공개 정보만 반환한다.
+- Room 조회의 `participants`에는 현재 활성 상태(`JOINED` 또는 `RESPONDED`)인 HOST·MEMBER Participant의 공개 정보를 반환한다. `LEFT`·`REMOVED` Participant의 이력은 이 응답에 포함하지 않는다.
 - Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
 - Room 조회의 `myResponses`에는 Authorization 토큰으로 확인한 현재 참여자가 현재 방의 활성 Candidate에 저장한 응답만 `candidates` 순서로 반환한다. 저장된 응답이 없으면 빈 배열을 반환하며, 다른 참여자의 응답과 `ARCHIVED` Candidate의 과거 응답은 반환하지 않는다.
 - 현재 ParticipantCondition API가 없으므로 Candidate 응답 저장 후에도 `participantStatus`는 `JOINED`로 반환한다.
+- Participant lifecycle API는 MEMBER 본인의 leave와 HOST의 활성 MEMBER kick을 제공한다. 상태 변경 시 `LEFT`·`REMOVED` Participant는 활성 목록·계산 snapshot·coverage에서 제외하고 기존 Response와 계산·Decision 이력은 보존한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 - Decision 확정은 최신 `COMPLETED` ScoreResult만 사용하며, `STALE`·`FAILED` 결과와 100% 미만 응답 coverage는 거부한다. 서버는 점수·순위를 다시 계산하지 않고 snapshot의 ID·상태·응답 존재만 재검증한다.
 - `POST /decision`과 `POST /decision/reopen`은 HOST만 수행할 수 있고, `GET /decision`은 유효한 Room Participant가 읽을 수 있다. 결정이 없을 때의 `404 DECISION_NOT_FOUND`는 정상적인 미확정 상태다.
@@ -149,6 +151,12 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
     "role": "HOST",
     "status": "JOINED"
   },
+  "currentParticipant": {
+    "id": "participant_host",
+    "displayName": "민수",
+    "role": "HOST",
+    "status": "JOINED"
+  },
   "participants": [
     {
       "id": "participant_host",
@@ -169,6 +177,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `401 MISSING_TOKEN`, `INVALID_TOKEN` 또는 `TOKEN_EXPIRED`
 - `404 RESOURCE_NOT_FOUND`: 토큰의 방 범위와 일치하지 않는 방 ID도 상세 없이 404로 처리
 - 조회 응답에는 다른 방의 참여자·후보·계산 결과를 포함하지 않는다.
+- `currentParticipant`는 요청 Bearer token으로 인증한 Participant이며, Client가 sessionStorage의 participant ID를 권한·표시 근거로 사용하지 않도록 한다.
 - `myResponses`는 요청 본문의 참여자 ID가 아니라 Bearer 토큰의 참여자 범위로 결정한다. Room과 Participant의 소속이 일치하는지 서버가 확인한다.
 
 ### 3. 참여자 입장
@@ -213,7 +222,67 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - Room은 `DRAFT` 또는 `OPEN` 상태에서만 Participant 입장을 허용한다.
 - 방 코드는 대문자로 정규화하고, 오류 메시지에서 실제 방 존재 여부를 구별하지 않는다.
 
-### 4. 후보 등록
+### 4. 참여자 방 나가기
+
+`POST /api/v1/rooms/{roomId}/leave`
+
+요청 본문은 사용하지 않는다. 대상 Participant는 요청 본문이 아니라 Room-scoped Bearer token으로 식별한다.
+
+#### 응답 JSON — `200 OK`
+
+```json
+{
+  "requestId": "req_20260813_004",
+  "participant": {
+    "id": "participant_02",
+    "displayName": "지수",
+    "role": "MEMBER",
+    "status": "LEFT"
+  },
+  "roomStatus": "OPEN"
+}
+```
+
+#### 주요 실패 상태와 유효성 검사
+
+- `401 MISSING_TOKEN`, `INVALID_TOKEN`, `TOKEN_EXPIRED`: 토큰이 없거나 유효하지 않거나 폐기·만료됨
+- `409 ROOM_STATE_CONFLICT`: HOST 본인 요청, 이미 비활성 Participant, `CALCULATING`, `CONFIRMED`, `CLOSED` Room
+- 성공하면 Participant를 `LEFT`로 바꾸고 `tokenRevokedAt`을 기록한다.
+- ParticipantResponse는 삭제하지 않는다. 최신 완료 `ScoreResult`가 있으면 `STALE`로 바꾸고, Room이 `CALCULATED`라면 `OPEN`으로 전환한다.
+- 폐기된 token으로 Room 조회·응답 수정·계산·Decision 조회를 다시 수행할 수 없다.
+
+### 5. HOST의 MEMBER 강퇴
+
+`POST /api/v1/rooms/{roomId}/participants/{participantId}/kick`
+
+요청 본문은 사용하지 않는다. 요청자의 역할은 Bearer token에서 확인하고, 경로의 `participantId`는 같은 Room의 강퇴 대상인지 서버가 다시 검증한다.
+
+#### 응답 JSON — `200 OK`
+
+```json
+{
+  "requestId": "req_20260813_005",
+  "participant": {
+    "id": "participant_02",
+    "displayName": "지수",
+    "role": "MEMBER",
+    "status": "REMOVED"
+  },
+  "roomStatus": "OPEN"
+}
+```
+
+#### 주요 실패 상태와 유효성 검사
+
+- `401 MISSING_TOKEN`, `INVALID_TOKEN`, `TOKEN_EXPIRED`
+- `403 HOST_ONLY`: MEMBER token으로 강퇴를 요청하거나 실제 Room HOST가 아님
+- `404 RESOURCE_NOT_FOUND`: 대상 Participant가 없거나 다른 Room에 속함
+- `409 ROOM_STATE_CONFLICT`: HOST 자기 자신, 이미 `LEFT`·`REMOVED`인 대상, `CALCULATING`, `CONFIRMED`, `CLOSED` Room
+- 성공하면 대상 Participant를 `REMOVED`로 바꾸고 대상 token을 폐기한다.
+- ParticipantResponse와 과거 ScoreResult·Decision은 삭제하지 않는다. 최신 완료 `ScoreResult`가 있으면 `STALE`로 바꾸고, Room이 `CALCULATED`라면 `OPEN`으로 전환한다.
+- leave/kick은 Room row lock을 획득한 짧은 transaction에서 상태·token 폐기·ScoreResult·Room 변경을 함께 처리한다. 중간 저장 실패는 전체 rollback한다.
+
+### 6. 후보 등록
 
 `POST /api/v1/rooms/{roomId}/candidates`
 
@@ -274,7 +343,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - 장소명·주소는 1~120자, 비용은 0 이상 2,000,000 이하의 정수, 태그는 최대 10개다.
 - 같은 시간 구간·장소 조합은 중복할 수 없다.
 
-### 5. 후보 수정
+### 7. 후보 수정
 
 `PATCH /api/v1/rooms/{roomId}/candidates/{candidateId}`
 
@@ -315,7 +384,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `400 VALIDATION_ERROR`: 부분 요청의 시간 구간, 주소, 비용 형식 오류
 - 수정 직전에 읽은 `version`을 `If-Match-Version` 헤더로 보낼 경우 버전 불일치에는 409를 반환한다. 이 헤더를 필수로 할지는 구현 전에 정한다.
 
-### 6. 후보 삭제(보관)
+### 8. 후보 삭제(보관)
 
 `DELETE /api/v1/rooms/{roomId}/candidates/{candidateId}`
 
@@ -341,7 +410,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `409 ROOM_STATE_CONFLICT`: 확정·종결 방, 이미 보관된 후보
 - 활성 후보가 1개가 되는 삭제는 저장할 수 있지만, 다음 계산·확정은 후보 2개 이상이 될 때까지 거부한다.
 
-### 7. 참여자 개인 조건 제출·수정
+### 9. 참여자 개인 조건 제출·수정
 
 `PUT /api/v1/rooms/{roomId}/participants/{participantId}/conditions`
 
@@ -396,7 +465,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `422 CONDITION_INCOMPLETE`: 시간 구간이 겹치지 않거나 예산이 음수, 중복 태그가 있음
 - 시간 구간은 1~10개, 예산은 `null` 또는 0 이상 정수다. 이동 부담은 일반 조건에 저장하지 않고 후보별 응답의 `travelBurden`으로만 받는다.
 
-### 8. 참여자 후보별 응답 제출·수정
+### 10. 참여자 후보별 응답 제출·수정
 
 `PUT /api/v1/rooms/{roomId}/participants/{participantId}/responses/{candidateId}`
 
@@ -443,7 +512,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `note`는 선택 입력이며 0~300자다. Solver는 이 값을 점수·순위·충돌 판정에 사용하지 않는다.
 - `AVAILABLE` 응답과 ParticipantCondition의 시간 구간 비교는 조건 저장 API가 구현되는 단계에서 적용한다. 현재 단계에서는 enum과 응답 필드 형식만 검증한다.
 
-### 9. 후보 점수 계산 요청
+### 11. 후보 점수 계산 요청
 
 `POST /api/v1/rooms/{roomId}/calculations`
 
@@ -484,7 +553,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - 후보별 응답 누락은 계산을 거부하지 않고 결과의 `coverage`와 `MISSING_RESPONSE`로 표시한다.
 - `clientRequestId`가 같은 재시도 요청은 동일 계산을 재사용하도록 설계하지만, 이 키의 보존 기간은 미결정이다.
 
-### 10. 계산 결과 조회
+### 12. 계산 결과 조회
 
 `GET /api/v1/rooms/{roomId}/calculations/{calculationId}`
 
@@ -552,7 +621,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - 계산 ID가 다른 방에 속하면 상세 정보 없이 404를 반환한다.
 - `STALE` 결과도 조회는 가능하지만 확정 API는 이를 거부한다.
 
-### 11. 최신 계산 결과 조회
+### 13. 최신 계산 결과 조회
 
 `GET /api/v1/rooms/{roomId}/score-results/latest`
 
@@ -574,7 +643,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 }
 ```
 
-위 `scoreResult`는 식별·요약 필드만 보인 축약 예시다. 실제 응답은 10번 계산 결과 조회의 `coverage`, `candidates`, `participantBreakdown`, `reasons`, `conflicts`, `explanationFlags`를 모두 포함한다.
+위 `scoreResult`는 식별·요약 필드만 보인 축약 예시다. 실제 응답은 12번 계산 결과 조회의 `coverage`, `candidates`, `participantBreakdown`, `reasons`, `conflicts`, `explanationFlags`를 모두 포함한다.
 
 #### 주요 실패 상태와 유효성 검사
 
@@ -583,7 +652,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - 최신 결과가 `FAILED` 또는 `STALE`이면 상태를 그대로 반환하며 자동으로 새 계산을 만들지 않는다.
 - 최신 계산이 실패한 경우 새 계산 요청 전까지 방 상태는 `OPEN`이며, 실패 결과를 성공 결과처럼 확정에 사용할 수 없다.
 
-### 12. 최종 후보 확정
+### 14. 최종 후보 확정
 
 `POST /api/v1/rooms/{roomId}/decision`
 
@@ -634,7 +703,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `decisionNote`는 trim해서 저장한다. 선택 후보에 이슈가 없으면 생략할 수 있고, 이슈가 있는 경우에만 1~300자의 메모를 요구한다.
 - 현재 확정 Decision이 있으면 먼저 재검토 API를 호출해야 한다. 재검토 후 새 확정이 저장되면 이전 Decision은 `SUPERSEDED`로 보존된다.
 
-### 13. 확정 결과 재검토 열기
+### 15. 확정 결과 재검토 열기
 
 `POST /api/v1/rooms/{roomId}/decision/reopen`
 
@@ -680,7 +749,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - 재검토는 Room이 `CONFIRMED`이고 현재 Decision이 `CONFIRMED`일 때만 허용한다. 성공하면 Room은 `OPEN`이 되고 기존 `currentDecisionId`는 같은 `REOPENED` Decision을 계속 가리킨다.
 - 재검토 후 Room의 `currentDecisionId`는 기존 `REOPENED` Decision을 계속 가리키므로 GET 조회에서 기존 후보·점수·사유를 확인할 수 있다. 후보·응답이 실제로 변경되기 전에는 ScoreResult를 자동으로 덮어쓰지 않는다.
 
-### 14. 최종 결과 조회
+### 16. 최종 결과 조회
 
 `GET /api/v1/rooms/{roomId}/decision`
 
