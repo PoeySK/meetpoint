@@ -4,22 +4,19 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
-import {
-  Participant,
-  ParticipantStatus,
-} from '../src/participants/entities/participant.entity';
-import {
-  Candidate,
-  CandidateStatus,
-} from '../src/rooms/entities/candidate.entity';
-import { Decision } from '../src/rooms/entities/decision.entity';
+import { Participant } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant.entity';
+import { Candidate } from '../src/rooms/infrastructure/persistence/typeorm/entities/candidate.entity';
+import { Decision } from '../src/rooms/infrastructure/persistence/typeorm/entities/decision.entity';
+import { ParticipantResponse } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { Room } from '../src/rooms/infrastructure/persistence/typeorm/entities/room.entity';
+import { ScoreResult } from '../src/rooms/infrastructure/persistence/typeorm/entities/score-result.entity';
+import { ParticipantStatus } from '../src/rooms/domain/participant/participant';
+import { CandidateStatus } from '../src/rooms/domain/candidate/candidate';
 import {
   AvailabilityStatus,
-  ParticipantResponse,
   TravelBurden,
-} from '../src/rooms/entities/participant-response.entity';
-import { Room, RoomStatus } from '../src/rooms/entities/room.entity';
-import { ScoreResult } from '../src/rooms/entities/score-result.entity';
+} from '../src/rooms/domain/participant-response/participant-response';
+import { RoomStatus } from '../src/rooms/domain/room/room-status';
 import { RoomsModule } from '../src/rooms/rooms.module';
 
 const databaseUrl =
