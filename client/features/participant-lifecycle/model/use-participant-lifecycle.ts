@@ -4,7 +4,7 @@ import { useCallback, useState } from "react";
 import {
   kickParticipant,
   leaveRoom,
-} from "@/entities/room/api/room-api";
+} from "@/entities/room";
 import { RoomApiError } from "@/shared/api/http-client";
 
 type UseParticipantLifecycleOptions = {

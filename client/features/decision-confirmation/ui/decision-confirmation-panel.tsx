@@ -1,6 +1,6 @@
-import type { CalculationPayload, ScoreResultCandidate } from "@/entities/calculation/model/types";
-import type { DecisionPayload } from "@/entities/decision/model/types";
-import type { RoomStatus } from "@/entities/room/model/types";
+import type { CalculationPayload, ScoreResultCandidate } from "@/entities/calculation";
+import type { DecisionPayload } from "@/entities/decision";
+import type { RoomStatus } from "@/entities/room";
 
 type DecisionConfirmationPanelProps = {
   calculation: CalculationPayload | null;

@@ -1,11 +1,11 @@
 'use client';
 
-import { createCandidate } from '@/entities/candidate/api/candidate-api';
+import { createCandidate } from '@/entities/candidate';
 import type {
   Candidate,
   CreateCandidateInput,
-} from '@/entities/candidate/model/types';
-import type { RoomDetailsResponse } from '@/entities/room/model/types';
+} from '@/entities/candidate';
+import type { RoomDetailsResponse } from '@/entities/room';
 import {
   buildKstDateTime,
   getKstDateValue,

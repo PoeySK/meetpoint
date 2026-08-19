@@ -1,9 +1,9 @@
-import type { Candidate } from "@/entities/candidate/model/types";
+import type { Candidate } from "@/entities/candidate";
 import type {
   AvailabilityStatus,
   ParticipantResponsePayload,
   TravelBurden,
-} from "@/entities/participant-response/model/types";
+} from "@/entities/participant-response";
 import { MEETPOINT_TIMEZONE } from "@/shared/config/meetpoint";
 
 export type ResponseMessageKind = "success" | "error" | "info";

@@ -1,8 +1,8 @@
-import { getLatestScoreResult } from "@/entities/calculation/api/calculation-api";
-import type { CalculationPayload } from "@/entities/calculation/model/types";
-import { getDecision } from "@/entities/decision/api/decision-api";
-import type { DecisionPayload } from "@/entities/decision/model/types";
-import type { RoomDetailsResponse } from "@/entities/room/model/types";
+import { getLatestScoreResult } from "@/entities/calculation";
+import type { CalculationPayload } from "@/entities/calculation";
+import { getDecision } from "@/entities/decision";
+import type { DecisionPayload } from "@/entities/decision";
+import type { RoomDetailsResponse } from "@/entities/room";
 import { RoomApiError } from "@/shared/api/http-client";
 
 export type RoomSessionData = {

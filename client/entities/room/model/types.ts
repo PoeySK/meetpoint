@@ -1,5 +1,5 @@
-import type { Candidate } from "@/entities/candidate/model/types";
-import type { ParticipantResponsePayload } from "@/entities/participant-response/model/types";
+import type { Candidate } from "@/entities/candidate";
+import type { ParticipantResponsePayload } from "@/entities/participant-response";
 
 export type RoomStatus =
   | "DRAFT"

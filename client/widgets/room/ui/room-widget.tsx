@@ -3,18 +3,18 @@
 import { useCallback } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { RoomWorkspaceWidget } from "@/widgets/room-workspace/ui/room-workspace-widget";
-import { RoomParticipantsWidget } from "@/widgets/room-participants/ui/room-participants-widget";
-import { useParticipantLifecycle } from "@/features/participant-lifecycle/model/use-participant-lifecycle";
-import { ErrorView, LoadingView } from "@/pages/room/ui/room-load-state";
-import { RoomSummary } from "@/pages/room/ui/room-summary";
-import { useRoomSession } from "@/pages/room/model/use-room-session";
+import { RoomWorkspaceWidget } from "@/widgets/room-workspace";
+import { RoomParticipantsWidget } from "@/widgets/room-participants";
+import { useParticipantLifecycle } from "@/features/participant-lifecycle";
+import { ErrorView, LoadingView } from "./room-load-state";
+import { RoomSummary } from "./room-summary";
+import { useRoomSession } from "../model/use-room-session";
 import {
   getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
 } from "@/shared/lib/room-session";
 
-export default function RoomWaitingScreen({ roomId }: { roomId: string }) {
+export function RoomWidget({ roomId }: { roomId: string }) {
   const router = useRouter();
   const {
     accessToken,

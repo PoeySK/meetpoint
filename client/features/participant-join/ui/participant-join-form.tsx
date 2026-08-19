@@ -1,6 +1,6 @@
 'use client';
 
-import { joinRoom } from '@/entities/room/api/room-api';
+import { joinRoom } from '@/entities/room';
 import { RoomApiError } from '@/shared/api/http-client';
 import {
   getRoomParticipantStorageKey,
@@ -10,7 +10,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type FormEvent } from 'react';
 
-type ParticipantJoinScreenProps = {
+type ParticipantJoinFormProps = {
   initialRoomCode?: string;
 };
 
@@ -53,9 +53,9 @@ function describeJoinError(error: unknown) {
   return '방에 입장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
-export default function ParticipantJoinScreen({
+export function ParticipantJoinForm({
   initialRoomCode = '',
-}: ParticipantJoinScreenProps) {
+}: ParticipantJoinFormProps) {
   const router = useRouter();
   const [roomCode, setRoomCode] = useState(initialRoomCode.toUpperCase());
   const [displayName, setDisplayName] = useState('');

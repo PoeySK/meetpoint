@@ -3,7 +3,7 @@
 import type {
   RoomDetailsResponse,
   RoomStatus,
-} from '@/entities/room/model/types';
+} from '@/entities/room';
 import { useState } from 'react';
 
 const statusLabels: Record<RoomStatus, string> = {
