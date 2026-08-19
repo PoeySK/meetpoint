@@ -1,10 +1,10 @@
-import { CandidateManagementPanel } from "@/features/candidate-management/ui/candidate-management-panel";
-import { CalculationResultPanel } from "@/features/calculation/ui/calculation-result-panel";
-import { ParticipantResponsePanel } from "@/features/participant-response/ui/participant-response-panel";
-import type { Candidate } from "@/entities/candidate/model/types";
-import type { CalculationPayload } from "@/entities/calculation/model/types";
-import type { DecisionPayload } from "@/entities/decision/model/types";
-import type { RoomDetailsResponse } from "@/entities/room/model/types";
+import { CandidateManagementPanel } from "@/features/candidate-management";
+import { CalculationResultPanel } from "@/features/calculation";
+import { ParticipantResponsePanel } from "@/features/participant-response";
+import type { Candidate } from "@/entities/candidate";
+import type { CalculationPayload } from "@/entities/calculation";
+import type { DecisionPayload } from "@/entities/decision";
+import type { RoomDetailsResponse } from "@/entities/room";
 
 type RoomWorkspaceWidgetProps = {
   roomId: string;

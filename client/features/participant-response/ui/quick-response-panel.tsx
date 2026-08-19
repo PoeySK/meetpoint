@@ -9,7 +9,7 @@ import {
 import type {
   AvailabilityStatus,
   TravelBurden,
-} from "@/entities/participant-response/model/types";
+} from "@/entities/participant-response";
 
 type QuickResponsePanelProps = {
   isDisabled: boolean;

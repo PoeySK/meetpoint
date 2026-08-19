@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { upsertParticipantResponse } from "@/entities/participant-response/api/participant-response-api";
+import { upsertParticipantResponse } from "@/entities/participant-response";
 import type {
   AvailabilityStatus,
   ParticipantResponsePayload,
   TravelBurden,
-} from "@/entities/participant-response/model/types";
-import type { Candidate } from "@/entities/candidate/model/types";
+} from "@/entities/participant-response";
+import type { Candidate } from "@/entities/candidate";
 import { RoomApiError } from "@/shared/api/http-client";
 import {
   createInitialForms,

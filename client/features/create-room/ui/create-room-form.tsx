@@ -4,7 +4,7 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { createRoom } from "@/entities/room/api/room-api";
+import { createRoom } from "@/entities/room";
 import { RoomApiError } from "@/shared/api/http-client";
 import { MEETPOINT_TIMEZONE } from "@/shared/config/meetpoint";
 import {
@@ -35,7 +35,7 @@ function validateForm(title: string, displayName: string) {
   return errors;
 }
 
-export function RoomCreateForm() {
+export function CreateRoomForm() {
   const router = useRouter();
   const [title, setTitle] = useState("");
   const [displayName, setDisplayName] = useState("");

@@ -1,4 +1,4 @@
-import ParticipantJoinPage from "@/pages/participant-join/ui/participant-join-page";
+import { ParticipantJoinWidget } from "@/widgets/participant-join";
 
 type JoinPageProps = {
   params: Promise<{
@@ -9,5 +9,5 @@ type JoinPageProps = {
 export default async function JoinRoomPage({ params }: JoinPageProps) {
   const { roomCode } = await params;
 
-  return <ParticipantJoinPage initialRoomCode={roomCode} />;
+  return <ParticipantJoinWidget initialRoomCode={roomCode} />;
 }

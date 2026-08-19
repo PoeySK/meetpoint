@@ -1,6 +1,6 @@
 "use client";
 
-import type { Candidate } from "@/entities/candidate/model/types";
+import type { Candidate } from "@/entities/candidate";
 import {
   availabilityOptions,
   formatCandidateTime,

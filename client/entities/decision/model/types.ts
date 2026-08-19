@@ -1,4 +1,4 @@
-import type { Candidate } from "@/entities/candidate/model/types";
+import type { Candidate } from "@/entities/candidate";
 
 export type DecisionStatus = "CONFIRMED" | "REOPENED" | "SUPERSEDED";
 
