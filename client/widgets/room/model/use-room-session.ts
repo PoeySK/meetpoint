@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { getRoom } from "@/entities/room/api/room-api";
-import type { RoomDetailsResponse } from "@/entities/room/model/types";
+import { getRoom } from "@/entities/room";
+import type { RoomDetailsResponse } from "@/entities/room";
 import { RoomApiError } from "@/shared/api/http-client";
 import { getRoomTokenStorageKey } from "@/shared/lib/room-session";
 import {
   loadRoomSessionData,
   type RoomSessionData,
-} from "@/pages/room/model/room-session-data";
+} from "./room-session-data";
 
 const ROOM_REFRESH_INTERVAL_MS = 5_000;
 

@@ -1,4 +1,4 @@
-import type { RoomLoadError } from '@/pages/room/model/use-room-session';
+import type { RoomLoadError } from '../model/use-room-session';
 import Link from 'next/link';
 
 export function LoadingView() {

@@ -1,16 +1,18 @@
 'use client';
 
-import { startCalculation } from '@/entities/calculation/api/calculation-api';
-import type { CalculationPayload } from '@/entities/calculation/model/types';
-import type { DecisionPayload } from '@/entities/decision/model/types';
-import type { RoomDetailsResponse } from '@/entities/room/model/types';
+import { startCalculation } from '@/entities/calculation';
+import type { CalculationPayload } from '@/entities/calculation';
+import type { DecisionPayload } from '@/entities/decision';
+import type { RoomDetailsResponse } from '@/entities/room';
 import {
   CalculationStatus,
   CompletedResult,
   isCalculationRunning,
-} from '@/features/calculation/ui/calculation-result-view';
-import { useDecisionConfirmation } from '@/features/decision-confirmation/model/use-decision-confirmation';
-import { DecisionConfirmationPanel } from '@/features/decision-confirmation/ui/decision-confirmation-panel';
+} from './calculation-result-view';
+import {
+  DecisionConfirmationPanel,
+  useDecisionConfirmation,
+} from '@/features/decision-confirmation';
 import { RoomApiError } from '@/shared/api/http-client';
 import { createClientRequestId } from '@/shared/lib/client-request-id';
 import { useEffect, useRef, useState } from 'react';

@@ -4,7 +4,7 @@ import type {
   ParticipantStatus,
   PublicParticipant,
   RoomDetailsResponse,
-} from '@/entities/room/model/types';
+} from '@/entities/room';
 import { useState } from 'react';
 
 const roleLabels: Record<PublicParticipant['role'], string> = {

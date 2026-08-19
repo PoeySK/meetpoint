@@ -1,4 +1,4 @@
-import RoomWaitingScreen from "@/pages/room/ui/room-waiting-screen";
+import { RoomWidget } from "@/widgets/room";
 
 type RoomPageProps = {
   params: Promise<{
@@ -9,5 +9,5 @@ type RoomPageProps = {
 export default async function RoomPage({ params }: RoomPageProps) {
   const { roomId } = await params;
 
-  return <RoomWaitingScreen roomId={roomId} />;
+  return <RoomWidget roomId={roomId} />;
 }

@@ -3,8 +3,8 @@ import type {
   MatchLevel,
   RecommendationStatus,
   ScoringProfile,
-} from "@/entities/calculation/model/types";
-import type { RoomDetailsResponse } from "@/entities/room/model/types";
+} from "@/entities/calculation";
+import type { RoomDetailsResponse } from "@/entities/room";
 
 const matchLevelLabels: Record<MatchLevel, string> = {
   FULL: "완전 일치",
