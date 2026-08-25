@@ -1,10 +1,11 @@
-mod model;
-mod scoring;
-mod validation;
+mod application;
+pub mod contract;
+mod domain;
 
-pub use model::{
-    CandidatePlace, CandidateResult, CandidateTime, Conflict, Coverage, POLICY_VERSION,
-    ParticipantBreakdown, SCORING_PROFILE, ScoreComponents, ScoringMetadata, ScoringWeights,
-    SolveRequest, SolveResponse, SolverCandidate, SolverError, SolverParticipant, SolverResponse,
+pub use application::{SolveError, SolveErrorCode, SolverError, solve};
+pub use contract::{
+    CandidatePlace, CandidateResult, CandidateTime, Conflict, Coverage, ParticipantBreakdown,
+    ScoreComponents, ScoringMetadata, ScoringWeights, SolveRequest, SolveResponse, SolverCandidate,
+    SolverParticipant, SolverResponse,
 };
-pub use scoring::solve;
+pub use domain::policy::{POLICY_VERSION, SCORING_PROFILE};
