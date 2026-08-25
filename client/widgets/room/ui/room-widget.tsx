@@ -52,10 +52,10 @@ export function RoomWidget({ roomId }: { roomId: string }) {
   });
 
   return (
-    <main className="min-h-screen bg-[#f6f7f3] px-4 py-8 font-sans text-slate-950 sm:px-6 sm:py-12">
-      <div className="mx-auto w-full max-w-6xl">
-        <div className="mb-8 flex items-center justify-between gap-4">
-          <Link className="text-lg font-bold tracking-tight" href="/">
+    <main className="mp-page px-3 py-4 font-sans text-slate-950 sm:px-6 sm:py-6">
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="mb-5 flex items-center justify-between gap-4">
+          <Link className="text-base font-bold tracking-tight" href="/">
             MeetPoint
           </Link>
           <span className="text-xs font-medium text-slate-400">방 대기</span>
@@ -66,7 +66,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
           <ErrorView error={error} onRetry={() => void loadRoom()} />
         )}
         {!isLoading && !error && room && (
-          <div className="space-y-5">
+          <div className="space-y-4">
             <RoomSummary room={room} />
             <RoomParticipantsWidget
               actionError={lifecycleError}
@@ -81,7 +81,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
             {refreshError && (
               <p
                 aria-live="polite"
-                className="rounded-xl bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-800"
+                className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800"
               >
                 자동 갱신에 실패했습니다. {refreshError.message}
               </p>
@@ -99,7 +99,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
                 latestScoreResult={latestScoreResult}
               />
             ) : (
-              <section className="rounded-2xl border border-amber-100 bg-amber-50 p-5 text-sm leading-6 text-amber-800">
+              <section className="mp-card border-amber-100 bg-amber-50/80 p-4 text-sm leading-5 text-amber-800">
                 이 브라우저에서 참여자 정보를 찾을 수 없어 후보 등록과 응답을 사용할 수
                 없습니다. 방 코드로 다시 입장하면 계속할 수 있습니다.
               </section>

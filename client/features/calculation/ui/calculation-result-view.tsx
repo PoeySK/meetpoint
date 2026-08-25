@@ -54,7 +54,7 @@ export function CalculationStatus({
 }) {
   if (isCalculationRunning(calculation.status)) {
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+      <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-200 border-t-amber-700" />
         계산 중입니다. 완료되면 자동으로 갱신합니다.
       </div>
@@ -63,7 +63,7 @@ export function CalculationStatus({
 
   if (calculation.status === "FAILED") {
     return (
-      <div className="rounded-xl bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
+      <div className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700">
         {calculation.error
           ? getCalculationCodeLabel(calculation.error.code)
           : "계산이 완료되지 않았습니다."}
@@ -74,7 +74,7 @@ export function CalculationStatus({
 
   if (calculation.status === "STALE") {
     return (
-      <div className="rounded-xl bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-700">
+      <div className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-700">
         방 정보가 변경되어 이 결과는 최신 상태가 아닙니다. 다시 계산해 주세요.
       </div>
     );
@@ -101,9 +101,9 @@ export function CompletedResult({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       <div className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl bg-slate-50 p-4">
+        <div className="rounded-xl bg-slate-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             추천 상태
           </p>
@@ -113,7 +113,7 @@ export function CompletedResult({
               : "-"}
           </p>
         </div>
-        <div className="rounded-xl bg-slate-50 p-4">
+        <div className="rounded-xl bg-slate-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             응답 현황
           </p>
@@ -122,7 +122,7 @@ export function CompletedResult({
             {calculation.coverage.expectedResponses}
           </p>
         </div>
-        <div className="rounded-xl bg-slate-50 p-4">
+        <div className="rounded-xl bg-slate-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             계산 프로필
           </p>
@@ -133,26 +133,26 @@ export function CompletedResult({
       </div>
 
       {calculation.recommendationWarnings.length > 0 && (
-        <div className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
           주의: {calculation.recommendationWarnings
             .map(getCalculationCodeLabel)
             .join(", ")}
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-3 lg:grid-cols-2">
         {calculation.candidates.map((candidate) => {
           const roomCandidate = room.candidates.find(
             (item) => item.id === candidate.candidateId,
           );
           const isSelected = selectedCandidateId === candidate.candidateId;
           const selectionClassName = isSelected
-            ? "mt-5 w-full rounded-xl border border-emerald-700 bg-emerald-700 px-4 py-3 text-sm font-semibold text-white"
-            : "mt-5 w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-700 hover:border-emerald-500 hover:text-emerald-700";
+            ? "mp-button mt-4 w-full border border-emerald-700 bg-emerald-700 px-3 py-2.5 text-sm text-white hover:bg-emerald-800"
+            : "mp-button mp-button-secondary mt-4 w-full px-3 py-2.5 text-sm hover:border-emerald-500 hover:text-emerald-700";
 
           return (
             <article
-              className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+              className="mp-card rounded-xl p-4 shadow-none"
               key={candidate.candidateId}
             >
               <div className="flex items-start justify-between gap-4">
@@ -165,7 +165,7 @@ export function CompletedResult({
                   </h3>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-bold text-slate-950">
+                  <p className="text-xl font-bold text-slate-950">
                     {candidate.overallScore.toFixed(1)}
                   </p>
                   <p className="text-xs font-semibold text-slate-500">

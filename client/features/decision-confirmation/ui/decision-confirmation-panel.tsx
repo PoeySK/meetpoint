@@ -52,7 +52,7 @@ export function DecisionConfirmationPanel({
       {decision && (
         <section
           aria-labelledby="decision-summary-heading"
-          className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5"
+          className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/55 p-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -100,7 +100,7 @@ export function DecisionConfirmationPanel({
               <label className="block space-y-2 text-sm font-semibold text-slate-800">
                 재검토 사유
                 <textarea
-                  className="min-h-20 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                  className="mp-input min-h-20 resize-y"
                   disabled={isReopening}
                   maxLength={300}
                   onChange={(event) => onReopenReasonChange(event.target.value)}
@@ -109,7 +109,7 @@ export function DecisionConfirmationPanel({
                 />
               </label>
               <button
-                className="mt-3 rounded-xl border border-slate-400 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-700 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
+                className="mp-button mp-button-secondary mt-3 text-sm hover:border-slate-700 hover:text-slate-950 disabled:opacity-60"
                 disabled={isReopening}
                 onClick={onReopen}
                 type="button"
@@ -124,7 +124,7 @@ export function DecisionConfirmationPanel({
       {decisionNotice && (
         <p
           aria-live="polite"
-          className="mt-5 rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-700"
+          className="mt-4 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm leading-5 text-emerald-700"
         >
           {decisionNotice}
         </p>
@@ -132,7 +132,7 @@ export function DecisionConfirmationPanel({
       {decisionError && (
         <p
           aria-live="polite"
-          className="mt-5 rounded-xl bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700"
+          className="mt-4 rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700"
         >
           {decisionError}
         </p>
@@ -144,7 +144,7 @@ export function DecisionConfirmationPanel({
         decision?.status !== "CONFIRMED" && (
           <section
             aria-labelledby="decision-form-heading"
-            className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-5"
+            className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
           >
             <p className="text-sm font-semibold text-emerald-700">호스트 결정</p>
             <h3
@@ -158,13 +158,13 @@ export function DecisionConfirmationPanel({
             </p>
 
             {!selectedCandidate && (
-              <p className="mt-4 rounded-xl bg-white px-4 py-3 text-sm text-slate-600">
+              <p className="mt-3 rounded-xl bg-white px-3 py-2.5 text-sm text-slate-600">
                 후보 카드의 “이 후보 선택” 버튼을 먼저 눌러 주세요.
               </p>
             )}
 
             {selectedCandidate && calculation && (
-              <div className="mt-4 space-y-4 rounded-xl bg-white p-4">
+              <div className="mt-3 space-y-3 rounded-xl bg-white p-3.5">
                 <p className="text-sm text-slate-700">
                   선택 후보: <strong>{selectedCandidateName ?? selectedCandidate.candidateId}</strong>
                 </p>
@@ -190,7 +190,7 @@ export function DecisionConfirmationPanel({
                 <label className="block space-y-2 text-sm font-semibold text-slate-800">
                   결정 메모 {selectedCandidateHasIssues ? "(필수)" : "(선택)"}
                   <textarea
-                    className="min-h-20 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+                    className="mp-input min-h-20 resize-y"
                     disabled={isConfirming}
                     maxLength={300}
                     onChange={(event) => onDecisionNoteChange(event.target.value)}
@@ -206,7 +206,7 @@ export function DecisionConfirmationPanel({
                   </span>
                 </label>
                 <button
-                  className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-300"
+                  className="mp-button mp-button-primary w-full"
                   disabled={
                     isConfirming ||
                     !coverageIsComplete ||

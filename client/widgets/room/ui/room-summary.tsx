@@ -31,29 +31,29 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
 
   return (
     <>
-      <section className='rounded-4xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8'>
-        <div className='flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between'>
+      <section className='mp-card mp-card-raised p-4 sm:p-6'>
+        <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
           <div className='space-y-3'>
-            <span className='inline-flex rounded-full bg-amber-50 px-3 py-1 text-sm font-semibold text-amber-700'>
+            <span className='inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700'>
               {statusLabels[room.room.status]}
             </span>
             <div>
               <p className='text-sm font-semibold text-emerald-700'>방 대기</p>
-              <h1 className='mt-1 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl'>
+              <h1 className='mt-1 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl'>
                 {room.room.title}
               </h1>
             </div>
           </div>
 
-          <div className='rounded-2xl bg-slate-950 p-4 text-white sm:min-w-44 sm:text-right'>
+          <div className='rounded-xl bg-slate-950 p-3 text-white sm:min-w-36 sm:text-right'>
             <p className='text-xs font-semibold uppercase tracking-[0.18em] text-slate-400'>
               방 코드
             </p>
-            <p className='mt-1 text-3xl font-bold tracking-[0.18em]'>
+            <p className='mt-1 text-2xl font-bold tracking-[0.16em]'>
               {room.room.roomCode}
             </p>
             <button
-              className='mt-3 rounded-lg border border-white/20 px-3 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-300'
+              className='mt-2 rounded-lg border border-white/20 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-300'
               onClick={copyRoomCode}
               type='button'
             >
@@ -69,15 +69,15 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
         )}
       </section>
 
-      <section className='grid gap-4 sm:grid-cols-3'>
-        <div className='rounded-2xl border border-slate-200 bg-white p-5'>
+      <section className='grid gap-3 sm:grid-cols-3'>
+        <div className='mp-card p-3.5'>
           <p className='text-sm text-slate-500'>호스트</p>
           <p className='mt-2 font-semibold text-slate-950'>
             {room.hostParticipant.displayName}
           </p>
           <p className='mt-1 text-xs text-emerald-700'>호스트</p>
         </div>
-        <div className='rounded-2xl border border-slate-200 bg-white p-5'>
+        <div className='mp-card p-3.5'>
           <p className='text-sm text-slate-500'>참여자</p>
           <p className='mt-2 font-semibold text-slate-950'>
             {room.participants.length}명
@@ -86,7 +86,7 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
             최대 {room.room.maxParticipants}명
           </p>
         </div>
-        <div className='rounded-2xl border border-slate-200 bg-white p-5'>
+        <div className='mp-card p-3.5'>
           <p className='text-sm text-slate-500'>현재 단계</p>
           <p className='mt-2 font-semibold text-slate-950'>
             {room.room.status === 'CONFIRMED'
@@ -107,8 +107,8 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
         </div>
       </section>
 
-      <section className='grid gap-4 md:grid-cols-2'>
-        <div className='rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6'>
+      <section className='grid gap-3 md:grid-cols-2'>
+        <div className='rounded-xl border border-dashed border-slate-300 bg-white/65 p-4'>
           <p className='text-sm font-semibold text-slate-950'>후보 장소</p>
           <p className='mt-3 text-sm leading-6 text-slate-500'>
             {room.candidates.length === 0
@@ -116,7 +116,7 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
               : `${room.candidates.length}개의 후보가 등록되어 있습니다.`}
           </p>
         </div>
-        <div className='rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6'>
+        <div className='rounded-xl border border-dashed border-slate-300 bg-white/65 p-4'>
           <p className='text-sm font-semibold text-slate-950'>계산 결과</p>
           <p className='mt-3 text-sm leading-6 text-slate-500'>
             {!room.room.latestScoreResultId

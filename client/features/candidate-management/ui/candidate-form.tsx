@@ -71,33 +71,33 @@ export function CandidateForm({
   onTagsChange,
 }: CandidateFormProps) {
   return (
-    <form className="space-y-5" onSubmit={onSubmit} noValidate>
-      <div className="rounded-2xl border border-emerald-100 bg-white/70 px-4 py-3 text-sm text-emerald-800">
+    <form className="space-y-4" onSubmit={onSubmit} noValidate>
+      <div className="rounded-xl border border-emerald-100 bg-white/70 px-3 py-2.5 text-xs text-emerald-800">
         후보 {nextCandidateNumber}번으로 저장됩니다. 모든 시간은 한국 시간
         기준입니다.
       </div>
 
-      <fieldset className="space-y-3">
+      <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-slate-800">
           모임 날짜
         </legend>
         <div className="flex flex-wrap gap-2">
           <button
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
             onClick={() => onDateChange(getKstDateValue())}
             type="button"
           >
             오늘
           </button>
           <button
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
             onClick={() => onDateChange(getKstDateValue(1))}
             type="button"
           >
             내일
           </button>
           <button
-            className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+            className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
             onClick={() => onDateChange(getKstWeekdayDate(6))}
             type="button"
           >
@@ -111,12 +111,12 @@ export function CandidateForm({
         />
       </fieldset>
 
-      <fieldset className="space-y-3">
+      <fieldset className="space-y-2">
         <legend className="text-sm font-semibold text-slate-800">시간</legend>
         <div className="flex flex-wrap gap-2">
           {TIME_PRESETS.map((preset) => (
             <button
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-emerald-400 hover:text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
               key={preset.label}
               onClick={() => onTimePreset(preset.start, preset.end)}
               type="button"
@@ -125,12 +125,12 @@ export function CandidateForm({
             </button>
           ))}
         </div>
-        <div className="grid gap-4 sm:grid-cols-2">
+        <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-2 text-sm font-semibold text-slate-800">
             시작 시간
             <input
               aria-invalid={Boolean(fieldErrors.time)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="mp-input"
               onChange={(event) => onStartTimeChange(event.target.value)}
               type="time"
               value={startTime}
@@ -140,7 +140,7 @@ export function CandidateForm({
             종료 시간
             <input
               aria-invalid={Boolean(fieldErrors.time)}
-              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+              className="mp-input"
               onChange={(event) => onEndTimeChange(event.target.value)}
               type="time"
               value={endTime}
@@ -154,11 +154,11 @@ export function CandidateForm({
         )}
       </fieldset>
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-2 text-sm font-semibold text-slate-800">
           장소명
           <input
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            className="mp-input"
             maxLength={120}
             onChange={(event) => onPlaceNameChange(event.target.value)}
             placeholder="예: MeetPoint Cafe"
@@ -168,7 +168,7 @@ export function CandidateForm({
         <label className="space-y-2 text-sm font-semibold text-slate-800">
           지역
           <input
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            className="mp-input"
             onChange={(event) => onAreaChange(event.target.value)}
             placeholder="예: 중구"
             value={area}
@@ -178,7 +178,7 @@ export function CandidateForm({
       <label className="block space-y-2 text-sm font-semibold text-slate-800">
         주소
         <input
-          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+          className="mp-input"
           maxLength={120}
           onChange={(event) => onAddressChange(event.target.value)}
           placeholder="예: 서울 중구 1"
@@ -189,11 +189,11 @@ export function CandidateForm({
         <p className="-mt-3 text-xs text-rose-600">{fieldErrors.place}</p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2">
         <label className="space-y-2 text-sm font-semibold text-slate-800">
           1인 예상 비용 (원)
           <input
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            className="mp-input"
             inputMode="numeric"
             min="0"
             onChange={(event) => onCostChange(event.target.value)}
@@ -209,7 +209,7 @@ export function CandidateForm({
         <label className="space-y-2 text-sm font-semibold text-slate-800">
           태그
           <input
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            className="mp-input"
             onChange={(event) => onTagsChange(event.target.value)}
             placeholder="쉼표로 구분 (예: 조용함, 커피)"
             value={tags}
@@ -225,14 +225,14 @@ export function CandidateForm({
       {formError && (
         <p
           aria-live="polite"
-          className="rounded-xl bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700"
+          className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700"
         >
           {formError}
         </p>
       )}
 
       <button
-        className="w-full rounded-xl bg-emerald-700 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-300"
+        className="mp-button mp-button-primary w-full bg-emerald-700 hover:bg-emerald-800"
         disabled={isSubmitting}
         type="submit"
       >

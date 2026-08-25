@@ -97,16 +97,16 @@ export function CreateRoomForm() {
   }
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8">
-      <div className="mb-8 space-y-2">
+    <section className="mp-card mp-card-raised p-4 sm:p-6">
+      <div className="mb-5 space-y-1.5">
         <p className="text-sm font-semibold text-emerald-700">새 방</p>
-        <h2 className="text-2xl font-semibold tracking-tight">모임 정보 입력</h2>
+        <h2 className="text-xl font-semibold tracking-tight">모임 정보 입력</h2>
         <p className="text-sm leading-6 text-slate-500">
           방을 만든 사람은 자동으로 호스트가 됩니다.
         </p>
       </div>
 
-      <form className="space-y-5" onSubmit={handleSubmit} noValidate>
+      <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800" htmlFor="title">
             모임 제목
@@ -114,7 +114,7 @@ export function CreateRoomForm() {
           <input
             aria-describedby={fieldErrors.title ? "title-error" : undefined}
             aria-invalid={Boolean(fieldErrors.title)}
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            className="mp-input"
             id="title"
             maxLength={80}
             onChange={(event) => setTitle(event.target.value)}
@@ -128,7 +128,7 @@ export function CreateRoomForm() {
           )}
         </div>
 
-        <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800">
+        <p className="rounded-xl bg-emerald-50 px-3 py-2.5 text-xs leading-5 text-emerald-800">
           모든 시간은 한국 시간으로 입력하고 표시합니다.
         </p>
 
@@ -145,7 +145,7 @@ export function CreateRoomForm() {
             }
             aria-invalid={Boolean(fieldErrors.displayName)}
             autoComplete="nickname"
-            className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
+            className="mp-input"
             id="displayName"
             maxLength={30}
             onChange={(event) => setDisplayName(event.target.value)}
@@ -162,14 +162,14 @@ export function CreateRoomForm() {
         {formError && (
           <p
             aria-live="polite"
-            className="rounded-xl bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700"
+            className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700"
           >
             {formError}
           </p>
         )}
 
         <button
-          className="flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-3.5 text-base font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mp-button mp-button-primary flex w-full items-center justify-center"
           disabled={isSubmitting}
           type="submit"
         >

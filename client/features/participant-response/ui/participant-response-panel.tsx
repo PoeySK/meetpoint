@@ -363,7 +363,7 @@ export function ParticipantResponsePanel({
     <section className="space-y-4">
       <div className="space-y-2">
         <p className="text-sm font-semibold text-emerald-700">참여자 응답</p>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+        <h2 className="text-xl font-semibold tracking-tight text-slate-950">
           후보별 응답
         </h2>
         <p className="text-sm leading-6 text-slate-500">
@@ -371,7 +371,7 @@ export function ParticipantResponsePanel({
           반영되지 않습니다.
         </p>
         {isReadOnly && (
-          <p className="rounded-xl bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-600">
+          <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600">
             방이 확정되어 응답을 읽기 전용으로 표시합니다. 다시 변경하려면 호스트가
             먼저 재검토를 시작해야 합니다.
           </p>
@@ -379,7 +379,7 @@ export function ParticipantResponsePanel({
       </div>
 
       {candidates.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6 text-sm leading-6 text-slate-500">
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white/65 p-4 text-sm leading-5 text-slate-500">
           호스트가 후보를 등록하면 이곳에서 응답할 수 있습니다.
         </div>
       ) : (
@@ -395,7 +395,7 @@ export function ParticipantResponsePanel({
             travelBurden={fastTravelBurden}
           />
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-3 lg:grid-cols-2">
             {candidates.map((candidate) => (
               <CandidateResponseCard
                 candidate={candidate}

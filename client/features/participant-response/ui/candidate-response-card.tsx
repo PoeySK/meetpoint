@@ -38,7 +38,7 @@ export function CandidateResponseCard({
 
   return (
     <article
-      className={`rounded-2xl border bg-white p-5 shadow-sm ${
+      className={`mp-card rounded-xl p-4 shadow-none ${
         responseState === "saved"
           ? "border-emerald-200"
           : responseState === "dirty"
@@ -90,7 +90,7 @@ export function CandidateResponseCard({
         )}
       </div>
 
-      <div className="mt-5 space-y-4 border-t border-slate-100 pt-5">
+      <div className="mt-4 space-y-3 border-t border-slate-100 pt-4">
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-slate-800">
             참석 가능 여부
@@ -154,7 +154,7 @@ export function CandidateResponseCard({
         <label className="block space-y-2 text-sm font-semibold text-slate-800">
           메모 (선택)
           <textarea
-            className="min-h-20 w-full resize-y rounded-xl border border-slate-300 bg-white px-4 py-3 font-normal outline-none focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:bg-slate-50"
+            className="mp-input min-h-20 resize-y disabled:cursor-not-allowed disabled:bg-slate-50"
             disabled={isDisabled}
             maxLength={300}
             onChange={(event) =>
@@ -186,7 +186,7 @@ export function CandidateResponseCard({
         )}
 
         <button
-          className="w-full rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-300"
+          className="mp-button mp-button-primary w-full"
           disabled={isDisabled}
           onClick={onSave}
           type="button"

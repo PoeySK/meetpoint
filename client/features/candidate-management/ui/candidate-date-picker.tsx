@@ -160,7 +160,7 @@ export function CandidateDatePicker({
       <button
         aria-expanded={isOpen}
         aria-haspopup="dialog"
-        className={`flex w-full items-center justify-between rounded-xl border bg-white px-4 py-3 text-left text-base outline-none transition focus:ring-4 focus:ring-emerald-100 ${
+        className={`mp-input flex items-center justify-between text-left ${
           error
             ? "border-rose-400"
             : "border-slate-300 focus:border-emerald-500"
@@ -179,14 +179,14 @@ export function CandidateDatePicker({
       {isOpen && visibleMonth && (
         <div
           aria-label="모임 날짜 선택"
-          className="absolute z-20 mt-2 w-full rounded-2xl border border-slate-200 bg-white p-4 shadow-xl shadow-slate-200/60"
+          className="absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-lg shadow-slate-200/50"
           id="candidate-date-calendar"
           role="dialog"
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-3 flex items-center justify-between">
             <button
               aria-label="이전 달"
-              className="rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="rounded-lg px-2 py-1.5 text-base text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               onClick={() => moveMonth(-1)}
               type="button"
             >
@@ -197,7 +197,7 @@ export function CandidateDatePicker({
             </p>
             <button
               aria-label="다음 달"
-              className="rounded-lg px-3 py-2 text-lg text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="rounded-lg px-2 py-1.5 text-base text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               onClick={() => moveMonth(1)}
               type="button"
             >
