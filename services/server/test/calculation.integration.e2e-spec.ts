@@ -4,12 +4,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
-import { Participant } from '../src/participants/entities/participant.entity';
-import { Candidate } from '../src/rooms/entities/candidate.entity';
-import { Decision } from '../src/rooms/entities/decision.entity';
-import { ParticipantResponse } from '../src/rooms/entities/participant-response.entity';
-import { Room } from '../src/rooms/entities/room.entity';
-import { ScoreResult } from '../src/rooms/entities/score-result.entity';
+import { Participant } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant.entity';
+import { Candidate } from '../src/rooms/infrastructure/persistence/typeorm/entities/candidate.entity';
+import { Decision } from '../src/rooms/infrastructure/persistence/typeorm/entities/decision.entity';
+import { ParticipantResponse } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { Room } from '../src/rooms/infrastructure/persistence/typeorm/entities/room.entity';
+import { ScoreResult } from '../src/rooms/infrastructure/persistence/typeorm/entities/score-result.entity';
 import { RoomsModule } from '../src/rooms/rooms.module';
 
 const runCalculationE2e = process.env.RUN_CALCULATION_E2E === 'true';
