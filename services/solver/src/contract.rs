@@ -1,60 +1,85 @@
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
-pub const POLICY_VERSION: &str = "mvp-1";
-pub const SCORING_PROFILE: &str = "MVP_NO_CONDITIONS";
-
+/// JSON input accepted by the solver HTTP API.
+///
+/// The wire contract intentionally keeps user-provided enum values as strings.
+/// They are converted to typed domain values by the application validation
+/// boundary so that the scoring core never has to handle unknown variants.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SolveRequest {
+    #[serde(default)]
     pub request_id: String,
+    #[serde(default)]
     pub policy_version: String,
+    #[serde(default)]
     pub scoring_profile: String,
+    #[serde(default)]
     pub room_id: String,
+    #[serde(default)]
     pub participants: Vec<SolverParticipant>,
+    #[serde(default)]
     pub candidates: Vec<SolverCandidate>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SolverParticipant {
+    #[serde(default)]
     pub participant_id: String,
+    #[serde(default)]
     pub responses: Vec<SolverResponse>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SolverResponse {
+    #[serde(default)]
     pub candidate_id: String,
+    #[serde(default)]
     pub availability_status: String,
+    #[serde(default)]
     pub travel_burden: String,
+    #[serde(default)]
     pub note: Option<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SolverCandidate {
+    #[serde(default)]
     pub candidate_id: String,
+    #[serde(default)]
     pub display_order: i32,
+    #[serde(default)]
     pub time: CandidateTime,
+    #[serde(default)]
     pub place: CandidatePlace,
+    #[serde(default)]
     pub estimated_cost_per_person_krw: i32,
+    #[serde(default)]
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CandidateTime {
+    #[serde(default)]
     pub starts_at: String,
+    #[serde(default)]
     pub ends_at: String,
+    #[serde(default)]
     pub timezone: String,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct CandidatePlace {
+    #[serde(default)]
     pub name: String,
+    #[serde(default)]
     pub address: String,
+    #[serde(default)]
     pub area: String,
 }
 
@@ -147,25 +172,4 @@ pub struct ScoreComponents {
 pub struct Conflict {
     pub participant_id: String,
     pub code: String,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct SolverError {
-    pub status: u16,
-    pub code: &'static str,
-    pub message: String,
-    pub retryable: bool,
-    pub details: Value,
-}
-
-impl SolverError {
-    pub(crate) fn validation(code: &'static str, message: &str, details: Value) -> Self {
-        Self {
-            status: 422,
-            code,
-            message: message.to_string(),
-            retryable: false,
-            details,
-        }
-    }
 }

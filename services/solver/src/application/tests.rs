@@ -1,7 +1,7 @@
-use super::*;
+use super::solve;
 use crate::{
-    CandidatePlace, CandidateTime, POLICY_VERSION, SolverCandidate, SolverParticipant,
-    SolverResponse,
+    CandidatePlace, CandidateTime, POLICY_VERSION, SCORING_PROFILE, SolveRequest, SolverCandidate,
+    SolverParticipant, SolverResponse,
 };
 
 fn request_with_responses(responses: Vec<SolverResponse>) -> SolveRequest {
@@ -175,7 +175,23 @@ fn determines_full_and_partial_match_levels() {
 }
 
 #[test]
-fn sorts_ties_by_eligibility_score_minimum_conflicts_then_display_order() {
+fn averages_multiple_participants_without_dropping_missing_participants() {
+    let mut request = request_with_responses(vec![response("candidate_1", "AVAILABLE", "EASY")]);
+    request.participants.push(SolverParticipant {
+        participant_id: "participant_2".to_string(),
+        responses: vec![],
+    });
+
+    let result = solve(request).unwrap();
+    let candidate = &result.candidates[0];
+    assert_eq!(candidate.overall_score, 50.0);
+    assert_eq!(candidate.coverage.submitted_responses, 1);
+    assert_eq!(candidate.coverage.expected_responses, 2);
+    assert_eq!(result.coverage.total_participants, 2);
+}
+
+#[test]
+fn sorts_ties_deterministically_by_display_order_then_candidate_id() {
     let mut request = request_with_responses(vec![
         response("candidate_1", "AVAILABLE", "EASY"),
         response("candidate_2", "AVAILABLE", "EASY"),
@@ -185,42 +201,63 @@ fn sorts_ties_by_eligibility_score_minimum_conflicts_then_display_order() {
 
     let result = solve(request).unwrap();
     assert_eq!(result.ranking, vec!["candidate_2", "candidate_1"]);
-    assert_eq!(result.candidates[0].rank, 1);
-    assert_eq!(result.candidates[1].rank, 2);
-}
 
-#[test]
-fn sorts_same_display_order_deterministically_by_candidate_id() {
-    let mut request = request_with_responses(vec![
+    let mut same_order = request_with_responses(vec![
         response("candidate_1", "AVAILABLE", "EASY"),
         response("candidate_2", "AVAILABLE", "EASY"),
     ]);
-    request.candidates[0].display_order = 1;
-    request.candidates[1].display_order = 1;
-    request.candidates.reverse();
-
-    let result = solve(request).unwrap();
-
-    assert_eq!(result.ranking, vec!["candidate_1", "candidate_2"]);
+    same_order.candidates[0].display_order = 1;
+    same_order.candidates[1].display_order = 1;
+    same_order.candidates.reverse();
+    assert_eq!(
+        solve(same_order).unwrap().ranking,
+        vec!["candidate_1", "candidate_2"]
+    );
 }
 
 #[test]
 fn rejects_invalid_request_data() {
     let mut no_participants = request_with_responses(vec![]);
     no_participants.participants.clear();
-    assert_eq!(solve(no_participants).unwrap_err().code, "NO_PARTICIPANTS");
+    assert_eq!(
+        solve(no_participants).unwrap_err().code.as_str(),
+        "NO_PARTICIPANTS"
+    );
 
     let mut no_candidates = request_with_responses(vec![]);
     no_candidates.candidates.clear();
-    assert_eq!(solve(no_candidates).unwrap_err().code, "NO_CANDIDATES");
+    assert_eq!(
+        solve(no_candidates).unwrap_err().code.as_str(),
+        "NO_CANDIDATES"
+    );
 
     let mut invalid_time = request_with_responses(vec![]);
     invalid_time.candidates[0].time.ends_at = "not-a-time".to_string();
-    assert_eq!(solve(invalid_time).unwrap_err().code, "INVALID_TIME_RANGE");
+    assert_eq!(
+        solve(invalid_time).unwrap_err().code.as_str(),
+        "INVALID_TIME_RANGE"
+    );
 
     let invalid_response = request_with_responses(vec![response("candidate_1", "UNKNOWN", "EASY")]);
     assert_eq!(
-        solve(invalid_response).unwrap_err().code,
+        solve(invalid_response).unwrap_err().code.as_str(),
         "RESPONSE_FIELD_MISSING"
+    );
+}
+
+#[test]
+fn rejects_unsupported_policy_and_duplicate_ids() {
+    let mut unsupported_policy = request_with_responses(vec![]);
+    unsupported_policy.policy_version = "future-1".to_string();
+    assert_eq!(
+        solve(unsupported_policy).unwrap_err().code.as_str(),
+        "INVALID_SCHEMA"
+    );
+
+    let mut duplicate_candidates = request_with_responses(vec![]);
+    duplicate_candidates.candidates[1].candidate_id = "candidate_1".to_string();
+    assert_eq!(
+        solve(duplicate_candidates).unwrap_err().code.as_str(),
+        "INVALID_SCHEMA"
     );
 }
