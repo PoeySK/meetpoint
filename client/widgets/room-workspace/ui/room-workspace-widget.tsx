@@ -1,6 +1,7 @@
 import { CandidateManagementPanel } from "@/features/candidate-management";
 import { CalculationResultPanel } from "@/features/calculation";
 import { ParticipantResponsePanel } from "@/features/participant-response";
+import { ParticipantConditionPanel } from "@/features/participant-condition";
 import type { Candidate } from "@/entities/candidate";
 import type { CalculationPayload } from "@/entities/calculation";
 import type { DecisionPayload } from "@/entities/decision";
@@ -38,6 +39,16 @@ export function RoomWorkspaceWidget({
         roomId={roomId}
         token={token}
       />
+      <ParticipantConditionPanel
+        condition={room.myCondition}
+        isReadOnly={
+          room.room.status === "CONFIRMED" || room.room.status === "CLOSED"
+        }
+        onRoomRefresh={onRoomRefresh}
+        participantId={participantId}
+        roomId={roomId}
+        token={token}
+      />
       <ParticipantResponsePanel
         candidates={room.candidates}
         isReadOnly={
@@ -45,6 +56,7 @@ export function RoomWorkspaceWidget({
         }
         participantId={participantId}
         responses={room.myResponses}
+        hasCondition={room.myCondition !== null}
         roomId={roomId}
         token={token}
         onRoomRefresh={onRoomRefresh}

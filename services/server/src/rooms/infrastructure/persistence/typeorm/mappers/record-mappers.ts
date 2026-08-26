@@ -2,12 +2,14 @@ import { Candidate } from '../entities/candidate.entity';
 import { Decision } from '../entities/decision.entity';
 import { Participant } from '../entities/participant.entity';
 import { ParticipantResponse } from '../entities/participant-response.entity';
+import { ParticipantCondition } from '../entities/participant-condition.entity';
 import { Room } from '../entities/room.entity';
 import { ScoreResult } from '../entities/score-result.entity';
 import type { CandidateRecord } from '../../../../domain/candidate/candidate';
 import type { DecisionRecord } from '../../../../domain/decision/decision';
 import type { ParticipantRecord } from '../../../../domain/participant/participant';
 import type { ParticipantResponseRecord } from '../../../../domain/participant-response/participant-response';
+import type { ParticipantConditionRecord } from '../../../../domain/participant-condition/participant-condition';
 import type { RoomRecord } from '../../../../domain/room/room-status';
 import type { ScoreResultRecord } from '../../../../domain/calculation/score-result';
 
@@ -96,6 +98,48 @@ export function toParticipantResponseEntity(
   record: ParticipantResponseRecord
 ): ParticipantResponse {
   return Object.assign(new ParticipantResponse(), record);
+}
+
+export function toParticipantConditionRecord(
+  entity: ParticipantCondition
+): ParticipantConditionRecord {
+  return {
+    participantId: entity.participantId,
+    roomId: entity.roomId,
+    availabilityWindows: Array.isArray(entity.availabilityWindows)
+      ? entity.availabilityWindows.map((window) => ({ ...window }))
+      : [],
+    maxBudgetKrw: entity.maxBudgetKrw,
+    preferences: {
+      requiredTags: Array.isArray(entity.requiredTags)
+        ? [...entity.requiredTags]
+        : [],
+      preferredTags: Array.isArray(entity.preferredTags)
+        ? [...entity.preferredTags]
+        : [],
+      avoidTags: Array.isArray(entity.avoidTags) ? [...entity.avoidTags] : [],
+    },
+    submittedAt: entity.submittedAt,
+    updatedAt: entity.updatedAt,
+  };
+}
+
+export function toParticipantConditionEntity(
+  record: ParticipantConditionRecord
+): ParticipantCondition {
+  return Object.assign(new ParticipantCondition(), {
+    participantId: record.participantId,
+    roomId: record.roomId,
+    availabilityWindows: record.availabilityWindows.map((window) => ({
+      ...window,
+    })),
+    maxBudgetKrw: record.maxBudgetKrw,
+    requiredTags: [...record.preferences.requiredTags],
+    preferredTags: [...record.preferences.preferredTags],
+    avoidTags: [...record.preferences.avoidTags],
+    submittedAt: record.submittedAt,
+    updatedAt: record.updatedAt,
+  });
 }
 
 export function toScoreResultRecord(entity: ScoreResult): ScoreResultRecord {

@@ -5,6 +5,7 @@ import { Candidate } from './entities/candidate.entity';
 import { Decision } from './entities/decision.entity';
 import { Participant } from './entities/participant.entity';
 import { ParticipantResponse } from './entities/participant-response.entity';
+import { ParticipantCondition } from './entities/participant-condition.entity';
 import { Room } from './entities/room.entity';
 import { ScoreResult } from './entities/score-result.entity';
 import { CandidateStatus } from '../../../domain/candidate/candidate';
@@ -14,6 +15,7 @@ import type {
   DecisionRepositoryPort,
   ParticipantRepositoryPort,
   ParticipantResponseRepositoryPort,
+  ParticipantConditionRepositoryPort,
   RoomRepositoryPort,
   RoomsPersistencePort,
   RoomsRepositories,
@@ -28,6 +30,8 @@ import {
   toParticipantRecord,
   toParticipantResponseEntity,
   toParticipantResponseRecord,
+  toParticipantConditionEntity,
+  toParticipantConditionRecord,
   toRoomEntity,
   toRoomRecord,
   toScoreResultEntity,
@@ -52,6 +56,7 @@ export class TypeOrmRoomsPersistenceAdapter implements RoomsPersistencePort {
       participants: this.createParticipantRepository(manager),
       candidates: this.createCandidateRepository(manager),
       responses: this.createParticipantResponseRepository(manager),
+      conditions: this.createParticipantConditionRepository(manager),
       scoreResults: this.createScoreResultRepository(manager),
       decisions: this.createDecisionRepository(manager),
     };
@@ -165,6 +170,28 @@ export class TypeOrmRoomsPersistenceAdapter implements RoomsPersistencePort {
       async save(response) {
         return toParticipantResponseRecord(
           await repository.save(toParticipantResponseEntity(response))
+        );
+      },
+    };
+  }
+
+  private createParticipantConditionRepository(
+    manager: EntityManager
+  ): ParticipantConditionRepositoryPort {
+    const repository = manager.getRepository(ParticipantCondition);
+
+    return {
+      async findByParticipantId(roomId, participantId) {
+        const entity = await repository.findOneBy({ roomId, participantId });
+        return entity ? toParticipantConditionRecord(entity) : null;
+      },
+      async findByRoomId(roomId) {
+        const entities = await repository.find({ where: { roomId } });
+        return entities.map(toParticipantConditionRecord);
+      },
+      async save(condition) {
+        return toParticipantConditionRecord(
+          await repository.save(toParticipantConditionEntity(condition))
         );
       },
     };

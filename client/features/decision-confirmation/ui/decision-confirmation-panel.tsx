@@ -166,7 +166,7 @@ export function DecisionConfirmationPanel({
             {selectedCandidate && calculation && (
               <div className="mt-3 space-y-3 rounded-xl bg-white p-3.5">
                 <p className="text-sm text-slate-700">
-                  선택 후보: <strong>{selectedCandidateName ?? selectedCandidate.candidateId}</strong>
+                  선택 후보: <strong>{selectedCandidateName ?? "후보 정보를 확인할 수 없습니다"}</strong>
                 </p>
                 {!coverageIsComplete && (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">

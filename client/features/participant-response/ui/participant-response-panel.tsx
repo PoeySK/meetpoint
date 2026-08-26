@@ -27,6 +27,7 @@ type ParticipantResponsePanelProps = {
   participantId: string;
   candidates: Candidate[];
   responses: ParticipantResponsePayload[];
+  hasCondition?: boolean;
   isReadOnly?: boolean;
   onRoomRefresh: () => Promise<void>;
 };
@@ -42,6 +43,12 @@ function describeResponseError(error: unknown) {
     if (error.code === "RESOURCE_NOT_FOUND") {
       return "응답 대상 후보를 찾을 수 없습니다.";
     }
+    if (error.code === "CONDITION_INCOMPLETE") {
+      return "먼저 참여자 조건을 저장한 뒤 후보 응답을 입력해 주세요.";
+    }
+    if (error.code === "TIME_CONDITION_CONFLICT") {
+      return "가능 시간에 포함되지 않는 후보입니다. 참석 가능 여부를 다시 확인해 주세요.";
+    }
     if (error.code === "VALIDATION_ERROR") {
       return "응답 입력을 다시 확인해 주세요.";
     }
@@ -56,6 +63,7 @@ export function ParticipantResponsePanel({
   participantId,
   candidates,
   responses,
+  hasCondition = true,
   isReadOnly = false,
   onRoomRefresh,
 }: ParticipantResponsePanelProps) {
@@ -76,7 +84,7 @@ export function ParticipantResponsePanel({
     (form) => form.isSubmitting,
   );
   const isInteractionDisabled =
-    isReadOnly || isBulkSubmitting || hasSubmittingForm;
+    isReadOnly || !hasCondition || isBulkSubmitting || hasSubmittingForm;
 
   useEffect(() => {
     const incomingResponsesByCandidateId = new Map(
@@ -175,7 +183,7 @@ export function ParticipantResponsePanel({
   }
 
   async function saveResponse(candidateId: string) {
-    if (isBulkSubmitting) {
+    if (isBulkSubmitting || !hasCondition) {
       return;
     }
 
@@ -257,7 +265,7 @@ export function ParticipantResponsePanel({
   }
 
   async function saveAllResponses() {
-    if (isInteractionDisabled || candidates.length === 0) {
+    if (isInteractionDisabled || candidates.length === 0 || !hasCondition) {
       return;
     }
 
@@ -376,6 +384,11 @@ export function ParticipantResponsePanel({
             먼저 재검토를 시작해야 합니다.
           </p>
         )}
+        {!isReadOnly && !hasCondition && (
+          <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800">
+            후보 응답을 시작하려면 위의 참여자 조건을 먼저 저장해 주세요.
+          </p>
+        )}
       </div>
 
       {candidates.length === 0 ? (
@@ -401,7 +414,7 @@ export function ParticipantResponsePanel({
                 candidate={candidate}
                 form={getForm(candidate.id)}
                 isBulkSubmitting={isBulkSubmitting}
-                isReadOnly={isReadOnly}
+                isReadOnly={isReadOnly || !hasCondition}
                 key={candidate.id}
                 onSave={() => void saveResponse(candidate.id)}
                 onUpdate={(update) => updateForm(candidate.id, update)}

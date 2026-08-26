@@ -3,9 +3,9 @@
 ## 문서 상태
 
 - **확정**: 점수 계산은 GPT가 아니라 Rust Solver가 담당한다. NestJS는 입력 스냅샷을 만들고 Solver 결과를 저장·전달한다.
-- **확정**: MVP의 모든 참가자는 동일한 기본 가중치를 사용하고, 계산은 `policyVersion: mvp-1` 규칙으로 결정적으로 수행한다.
+- **확정**: 현재 계산은 모든 참가자에게 동일한 가중치를 사용하고, `policyVersion: condition-aware-1` 및 `scoringProfile: CONDITION_AWARE` 규칙으로 결정적으로 수행한다. 기존 `mvp-1` 결과는 재현을 위해 Solver가 계속 읽는다.
 - **확정**: 미응답 후보를 찬성으로 간주하지 않는다. 점수에는 0으로 반영하고 커버리지·충돌 표시를 남기며, 미응답 상태에서는 최종 확정을 막는다.
-- **미결정**: MVP 사용성 검증 이후 가중치나 선호 태그 체계를 바꿀지, 바꾼다면 기존 결과를 어떻게 재현할지는 별도 결정한다. 정책 버전은 바뀐 규칙을 식별하는 데 사용한다.
+- **미결정**: 사용성 검증 이후 가중치나 선호 태그 체계를 바꿀지, 바꾼다면 기존 결과를 어떻게 재현할지는 별도 결정한다. 정책 버전은 바뀐 규칙을 식별하는 데 사용한다.
 
 ## 1. 계산 대상과 기본 정책
 
@@ -13,7 +13,7 @@
 
 ```json
 {
-  "policyVersion": "mvp-1",
+  "policyVersion": "condition-aware-1",
   "weights": {
     "time": 40,
     "travelBurden": 25,
@@ -25,33 +25,28 @@
 }
 ```
 
-## Current calculation profile: `MVP_NO_CONDITIONS`
+## Current calculation profile: `CONDITION_AWARE`
 
-The first calculation vertical slice intentionally does not add or persist
-`Participant.condition`. NestJS sends only active candidates and stored
-Participant responses to Rust Solver.
+현재 Server는 활성 후보, 저장된 ParticipantCondition, ParticipantResponse를 하나의 snapshot으로 만들어 Rust Solver에 보낸다.
 
-- Actual participant inputs: `availabilityStatus`, `travelBurden`
+- Actual participant inputs: `condition`, `availabilityStatus`, `travelBurden`
 - Fixed weights: `time=40`, `travelBurden=25`, `budget=20`, `preference=15`
-- `budget=20` means no budget constraint was supplied; it is not user data.
-- `preference=15` means preference matching is not evaluated; it is not user data.
-- `CONDITION_INCOMPLETE`, budget conflicts, and preference conflicts do not occur
-  in this profile.
-- Solver and persisted result metadata expose `scoringProfile: MVP_NO_CONDITIONS`
-  so a future condition-aware profile can be added without
-  changing this result's meaning.
+- `budget=20` means the participant selected no budget limit; it is reflected by
+  `NO_BUDGET_CONSTRAINT`.
+- `preference=15` means all required/avoid rules pass and all preferred tags match.
+- `CONDITION_INCOMPLETE`, budget conflicts, preference conflicts, and time
+  condition conflicts are represented explicitly in the result.
+- Solver and persisted result metadata expose `scoringProfile: CONDITION_AWARE`.
 
-> 아래에서 `ParticipantCondition`, 예산 상한, 선호 태그를 사용하는 규칙은
-> condition-aware profile을 위한 향후 설계 참고다. 현재 `MVP_NO_CONDITIONS`
-> 계산에서는 사용하지 않으며, `availabilityStatus`와 `travelBurden`만
-> 응답 입력으로 사용하고 예산·선호 점수는 고정 기본값을 적용한다.
+> 기존에 저장된 `MVP_NO_CONDITIONS` 결과는 당시 의미를 바꾸지 않는다. 새
+> 계산만 `CONDITION_AWARE` 프로필을 사용한다.
 
-후보 하나에 대해 참가자별 0~100 점수를 만들고, 모든 활성 참가자의 평균을 후보 총점으로 만든다. 호스트도 다른 참가자와 같은 가중치를 받는다. 특정 사람이 “더 중요한 사람”이라는 설정은 MVP에 없다.
+후보 하나에 대해 참가자별 0~100 점수를 만들고, 모든 활성 참가자의 평균을 후보 총점으로 만든다. 호스트도 다른 참가자와 같은 가중치를 받는다. 특정 사람이 “더 중요한 사람”이라는 설정은 현재 제품에 없다.
 
 ### 계산 순서
 
 1. 후보의 시간·장소와 참가자의 후보별 응답을 정규화한다.
-2. 참가자별로 시간·이동 점수를 계산하고 예산·선호 고정 기본값을 적용한다.
+2. 참가자별로 시간·이동·예산·선호 점수를 계산한다.
 3. 현재 입력의 하드 충돌과 미응답을 구조화된 결과로 기록한다.
 4. 참가자별 점수의 평균을 후보 총점으로 계산한다. 미응답도 분모에 포함한다.
 5. 후보의 `eligible`, `coverage`, `recommendationStatus`를 결정한다.
@@ -67,14 +62,14 @@ Participant responses to Rust Solver.
 | `MAYBE` | 20 | 조정하면 가능하지만 확정적이지 않음 | 없음. 단, 설명 플래그 표시 |
 | `UNAVAILABLE` | 0 | 참여할 수 없음 | `TIME_UNAVAILABLE` |
 
-- `AVAILABLE`은 후보 시간이 적어도 하나의 가능한 시간 구간과 겹쳐야 한다. 서버가 이 규칙을 먼저 검증한다.
+- `AVAILABLE`은 후보 시간이 적어도 하나의 가능한 시간 구간 안에 완전히 포함되어야 한다. Server가 응답 저장 시 먼저 검증하고 Solver도 snapshot을 방어적으로 검증한다.
 - `MAYBE`는 투표의 반쪽 찬성이 아니라 불확실성으로 표시한다. 20점을 주지만 “모두가 확실히 가능”으로 설명하지 않는다.
 - `UNAVAILABLE`인 참가자가 한 명이라도 있으면 후보는 `eligible=false`다.
 - 시간 구간의 날짜와 시간대는 후보의 `time`과 같은 기준으로 비교한다. 시간대 변환 후 실제 순간의 겹침을 계산한다.
 
 ## 3. 이동 부담 또는 위치 조건 반영
 
-MVP에는 지도·실제 이동시간·좌표 기반 거리 API가 없다. 장소의 주소에서 Rust가 이동거리나 이동시간을 추정하지 않는다. 참여자가 각 후보에 대해 자신의 체감 이동 부담을 직접 선택한다.
+현재 기본 계산에는 지도·실제 이동시간·좌표 기반 거리 API가 없다. 장소의 주소에서 Rust가 이동거리나 이동시간을 추정하지 않는다. 참여자가 각 후보에 대해 자신의 체감 이동 부담을 직접 선택한다.
 
 `ParticipantResponse.travelBurden`은 다음 세 값만 허용한다.
 
@@ -86,11 +81,11 @@ MVP에는 지도·실제 이동시간·좌표 기반 거리 API가 없다. 장�
 
 - `travelBurden`은 모든 활성 후보에 필수다. 응답 자체가 없으면 `MISSING_RESPONSE`로 처리한다.
 - 이 값은 참가자의 주관적 평가이므로 결과 화면에 `SELF_REPORTED_TRAVEL_BURDEN` 플래그를 표시한다.
-- `place.name`, `place.address`, `place.area`는 MVP에서 표시용이다. `Candidate.tags`는 선호 점수에, 후보 비용은 예산 점수에 사용한다.
+- `place.name`, `place.address`, `place.area`는 현재 표시용이다. `Candidate.tags`는 선호 점수에, 후보 비용은 예산 점수에 사용한다.
 - `ParticipantResponse.note`는 참가자에게 다시 보여주는 설명용 값이며 계산 입력에는 포함하지 않는다.
 - 숫자 이동시간이나 실제 거리로 환산하지 않는다. 따라서 결과 문장도 “예상 이동 25분”이 아니라 “참여자 평가: 이동 부담 EASY”라고 표시한다.
 
-## 4. 예산 조건 반영 (향후 condition-aware profile)
+## 4. 예산 조건 반영
 
 후보의 `estimatedCostPerPersonKrw = C`와 참가자의 `maxBudgetKrw = B`를 비교한다.
 
@@ -111,7 +106,7 @@ budgetScore = 20 × (2 - 28,000 / 25,000)
 
 이 경우 점수는 17.6점이지만 `BUDGET_LIMIT_EXCEEDED`가 있으므로 후보 `eligible`은 false다.
 
-## 5. 개인 선호도 반영 (향후 condition-aware profile)
+## 5. 개인 선호도 반영
 
 후보의 `tags`와 개인 조건의 세 종류 태그를 비교한다. 선호 점수는 총 15점이다.
 
@@ -129,7 +124,8 @@ preferredScore = 5 × (matchedPreferredTags / preferredTags의 개수)
 
 - 선호 태그가 2개이고 1개가 맞으면 2.5점
 - 선호 태그가 없으면 제한이 없는 것으로 보고 5점을 준다.
-- 태그가 없거나 매핑되지 않은 자연어는 Solver가 추측하지 않는다. 서버가 정규화된 태그로 저장하지 못한 조건은 `PREFERENCE_UNEVALUATED`로 표시한다.
+- 태그 비교는 Server가 정규화해 저장한 문자열만 사용한다. 조건이나 후보 응답이 없어
+  선호를 계산할 수 없는 경우에는 이유에 `PREFERENCE_UNEVALUATED`를 남긴다.
 
 ### 선호도 예시
 
@@ -143,7 +139,7 @@ preferenceScore      = 15
 
 ## 6. 참여자별 가중치 적용 여부
 
-MVP에서는 **참여자별 숫자 가중치를 적용하지 않는다**.
+현재 기본 계산에서는 **참여자별 숫자 가중치를 적용하지 않는다**.
 
 - 모든 참가자는 시간 40, 이동 25, 예산 20, 선호 15의 동일한 구성으로 계산한다.
 - 호스트에게 별도 가중치를 주지 않는다.
@@ -221,7 +217,6 @@ overallScore = round_half_up((S_1 + S_2 + ... + S_P) / P, 1)
 | `SELF_REPORTED_TRAVEL_BURDEN` | 이동 부담이 참여자의 자기 평가임 |
 | `MAYBE_RESPONSE` | 시간 응답이 확정 가능이 아니라 조정 가능임 |
 | `NO_BUDGET_CONSTRAINT` | 예산 제한이 없어 예산 점수를 만점 처리함 |
-| `PREFERENCE_UNEVALUATED` | 정규화된 태그로 비교하지 못함 |
 | `MISSING_RESPONSE` | 후보별 응답이 없음 |
 | `NO_FULL_MATCH` | 모든 후보에 하드 충돌이 하나 이상 있음 |
 | `TRAVEL_BURDEN_UNCERTAIN` | 이동 부담이 `NORMAL`임 |
@@ -240,7 +235,7 @@ overallScore = round_half_up((S_1 + S_2 + ... + S_P) / P, 1)
 }
 ```
 
-MVP의 Solver는 이 근거를 자연어로 새로 추론하지 않는다. 입력값을 설명 템플릿에 채우는 수준으로 제한한다. 자연어 조건 해석이 필요해지는 경우에도 GPT는 조건 구조화 또는 설명 보조에만 사용하고 점수의 최종 값은 규칙이 만든다.
+현재 기본 Solver는 이 근거를 자연어로 새로 추론하지 않는다. 입력값을 설명 템플릿에 채우는 수준으로 제한한다. 자연어 조건 해석이 필요해지는 경우에도 GPT는 조건 구조화 또는 설명 보조에만 사용하고 점수의 최종 값은 규칙이 만든다.
 
 ## 11. 전체 계산 JSON 예시
 
@@ -248,7 +243,7 @@ MVP의 Solver는 이 근거를 자연어로 새로 추론하지 않는다. 입�
 
 ```json
 {
-  "policyVersion": "mvp-1",
+  "policyVersion": "condition-aware-1",
   "weights": {
     "time": 40,
     "travelBurden": 25,
@@ -388,7 +383,7 @@ c2 overallScore = (40.0 + 20.0 + 100.0) / 3
 
 ```json
 {
-  "policyVersion": "mvp-1",
+  "policyVersion": "condition-aware-1",
   "recommendationStatus": "PARTIAL_MATCH",
   "recommendationWarnings": [],
   "ranking": ["c1", "c2"],
@@ -428,7 +423,7 @@ c2 overallScore = (40.0 + 20.0 + 100.0) / 3
 
 ## 확정 사항과 미결정 사항 요약
 
-- **확정**: `40/25/20/15` 고정 가중치, 참가자 평균, 하드 충돌 별도 표시, 미응답 0점·확정 차단, 결정적 tie-breaker를 MVP 규칙으로 사용한다.
+- **확정**: `40/25/20/15` 고정 가중치, 참가자 평균, 하드 충돌 별도 표시, 미응답 0점·확정 차단, 결정적 tie-breaker를 현재 기본 계산 규칙으로 사용한다.
 - **확정**: 이동 부담은 `EASY/NORMAL/HARD` 자기 평가이며, 실제 이동거리·시간을 보장하지 않는다는 플래그를 표시한다.
 - **확정**: 미응답이 없는 계산에서 최고 후보의 점수가 60.0 미만이면 `LOW_SCORE` 경고를 표시하고 호스트의 이슈 인지를 요구한다. 점수나 순위를 자동으로 무효화하지 않는다.
-- **미결정**: 실제 사용자 피드백을 반영한 가중치 튜닝, 자연어를 태그로 변환하는 목록, 지도 API 도입 후 이동 점수의 재정의는 MVP 이후 결정한다.
+- **미결정**: 실제 사용자 피드백을 반영한 가중치 튜닝, 자연어를 태그로 변환하는 목록, 지도 API 도입 후 이동 점수의 재정의는 향후 결정한다.

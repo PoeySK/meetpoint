@@ -23,4 +23,4 @@ DATABASE_URL=postgresql://meetpoint:meetpoint-local@localhost:5432/meetpoint
 GET http://localhost:3001/health
 ```
 
-NestJS와 PostgreSQL 연결에는 `@nestjs/typeorm`과 TypeORM을 사용합니다. `synchronize`와 자동 migration 실행은 끄고, Room·Participant·Candidate 엔티티와 migration은 다음 구현 단계에서 추가합니다.
+NestJS와 PostgreSQL 연결에는 `@nestjs/typeorm`과 TypeORM을 사용합니다. `synchronize`와 자동 migration 실행은 끄고, Room·Participant·Candidate·ParticipantCondition·ParticipantResponse·ScoreResult·Decision을 명시적 migration으로 관리합니다. ParticipantCondition 저장과 조건 기반 응답 상태 전환은 현재 API에 연결되어 있습니다.

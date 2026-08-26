@@ -20,7 +20,7 @@ export class Participant {
   @PrimaryColumn({ type: 'uuid' })
   id!: string;
 
-  // 이 MVP에서 관계로 매핑되는 ID는 roomId뿐이다. roomId 컬럼을 관계의
+  // 현재 구조에서 관계로 매핑되는 ID는 roomId뿐이다. roomId 컬럼을 관계의
   // 조인 컬럼으로 사용하여 participants.roomId에 외래 키 하나만 생성한다.
   @Column({ type: 'uuid' })
   roomId!: string;

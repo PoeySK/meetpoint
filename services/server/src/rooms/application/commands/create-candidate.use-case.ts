@@ -7,7 +7,10 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { ParticipantRole } from '../../domain/participant/participant';
+import {
+  ParticipantRole,
+  ParticipantStatus,
+} from '../../domain/participant/participant';
 import {
   CandidateStatus,
   type CandidateRecord,
@@ -47,7 +50,7 @@ export class CreateCandidateUseCase {
 
     const normalizedInput = validateCandidateInput(input);
     const created = await this.persistence.transaction(async (repositories) => {
-      const { rooms, candidates } = repositories;
+      const { rooms, candidates, participants } = repositories;
       const room = await rooms.findById(roomId, { lock: true });
       if (!room) {
         throw new NotFoundException('RESOURCE_NOT_FOUND');
@@ -97,7 +100,18 @@ export class CreateCandidateUseCase {
         createdAt: now,
         updatedAt: now,
       };
-      return candidates.save(candidate);
+      const savedCandidate = await candidates.save(candidate);
+      const activeParticipants = await participants.findByRoomId(room.id);
+      for (const participant of activeParticipants) {
+        if (participant.status === ParticipantStatus.RESPONDED) {
+          await participants.save({
+            ...participant,
+            status: ParticipantStatus.JOINED,
+            updatedAt: now,
+          });
+        }
+      }
+      return savedCandidate;
     });
 
     return { candidate: created };

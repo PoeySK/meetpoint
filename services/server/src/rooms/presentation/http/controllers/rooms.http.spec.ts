@@ -4,6 +4,7 @@ import {
   createRoomsTestContext,
   expectRoomError,
   validCandidatePayload,
+  validConditionPayload,
   validPayload,
   type RoomsTestContext,
 } from '../../../test/rooms-http-test-harness';
@@ -111,6 +112,19 @@ describe('Rooms HTTP contract', () => {
       .send(validCandidatePayload())
       .expect(201);
 
+    for (const participant of [firstParticipant, secondParticipant]) {
+      await request(app.getHttpServer())
+        .put(
+          `/api/v1/rooms/${created.body.room.id}/participants/${participant.body.participant.id}/conditions`
+        )
+        .set(
+          'Authorization',
+          `Bearer ${participant.body.access.participantToken}`
+        )
+        .send(validConditionPayload())
+        .expect(200);
+    }
+
     const firstSaved = await request(app.getHttpServer())
       .put(
         `/api/v1/rooms/${created.body.room.id}/participants/${firstParticipant.body.participant.id}/responses/${candidate.body.candidate.id}`
@@ -194,6 +208,13 @@ describe('Rooms HTTP contract', () => {
       .set('Authorization', `Bearer ${created.body.access.hostToken}`)
       .send(validCandidatePayload())
       .expect(201);
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/conditions`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validConditionPayload())
+      .expect(200);
     const saved = await request(app.getHttpServer())
       .put(
         `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`

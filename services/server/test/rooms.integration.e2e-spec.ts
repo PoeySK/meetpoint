@@ -8,6 +8,7 @@ import { Participant } from '../src/rooms/infrastructure/persistence/typeorm/ent
 import { Candidate } from '../src/rooms/infrastructure/persistence/typeorm/entities/candidate.entity';
 import { Decision } from '../src/rooms/infrastructure/persistence/typeorm/entities/decision.entity';
 import { ParticipantResponse } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { ParticipantCondition } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from '../src/rooms/infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from '../src/rooms/infrastructure/persistence/typeorm/entities/score-result.entity';
 import { ParticipantStatus } from '../src/rooms/domain/participant/participant';
@@ -35,6 +36,7 @@ const databaseUrl =
         Decision,
         ParticipantResponse,
         ScoreResult,
+        ParticipantCondition,
       ],
       synchronize: false,
       migrationsRun: false,
@@ -122,6 +124,27 @@ describe('Room Candidate and ParticipantResponse integration', () => {
       .send(candidatePayload())
       .expect(201);
     const candidateId = candidateResponse.body.candidate.id;
+
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${roomId}/participants/${joined.body.participant.id}/conditions`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send({
+        availabilityWindows: [
+          {
+            startsAt: '2026-09-01T09:00:00.000Z',
+            endsAt: '2026-09-01T18:00:00.000Z',
+          },
+        ],
+        maxBudgetKrw: null,
+        preferences: {
+          requiredTags: [],
+          preferredTags: [],
+          avoidTags: [],
+        },
+      })
+      .expect(200);
 
     const persistedCandidate = await dataSource
       .getRepository(Candidate)

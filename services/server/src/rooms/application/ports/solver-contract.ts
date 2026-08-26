@@ -12,6 +12,7 @@ import type {
   ScoreResultCoverage,
   ScoreResultMetadata,
 } from '../../domain/calculation/score-result';
+import type { ParticipantPreferences } from '../../domain/participant-condition/participant-condition';
 
 export interface SolverSnapshot {
   requestId: string;
@@ -26,6 +27,11 @@ export interface SolverSnapshot {
       travelBurden: TravelBurden;
       note: string | null;
     }>;
+    condition: {
+      availabilityWindows: Array<{ startsAt: string; endsAt: string }>;
+      maxBudgetKrw: number | null;
+      preferences: ParticipantPreferences;
+    };
   }>;
   candidates: Array<{
     candidateId: string;

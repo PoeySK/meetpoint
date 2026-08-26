@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { CandidateRecord } from '../../../domain/candidate/candidate';
 import type { ParticipantRecord } from '../../../domain/participant/participant';
+import type { ParticipantConditionRecord } from '../../../domain/participant-condition/participant-condition';
 import {
   type ParticipantResponseRecord,
   ParticipantResponseStatus,
@@ -61,6 +62,7 @@ export interface RoomDetailsResponse {
   participants: PublicParticipant[];
   candidates: CandidatePayload[];
   myResponses: ParticipantResponsePayload[];
+  myCondition: ParticipantConditionPayload | null;
   latestScoreResult: null;
   decision: null;
 }
@@ -85,6 +87,30 @@ export interface ParticipantResponsePayload {
 export interface UpsertedParticipantResponse {
   requestId: string;
   response: ParticipantResponsePayload;
+  participantStatus: ParticipantStatus;
+  scoreResultStatus: 'STALE';
+}
+
+export interface ParticipantConditionPayload {
+  participantId: string;
+  availabilityWindows: Array<{
+    startsAt: string;
+    endsAt: string;
+  }>;
+  maxBudgetKrw: number | null;
+  preferences: {
+    requiredTags: string[];
+    preferredTags: string[];
+    avoidTags: string[];
+  };
+  submittedAt: Date;
+  updatedAt: Date;
+}
+
+export interface UpsertedParticipantCondition {
+  requestId: string;
+  participantId: string;
+  condition: ParticipantConditionPayload;
   participantStatus: ParticipantStatus;
   scoreResultStatus: 'STALE';
 }
@@ -154,6 +180,7 @@ export type RoomDetailsResult = {
   participants: ParticipantRecord[];
   candidates: CandidateRecord[];
   myResponses: ParticipantResponseRecord[];
+  myCondition: ParticipantConditionRecord | null;
 };
 
 export type CreatedCandidateResult = {
@@ -162,6 +189,12 @@ export type CreatedCandidateResult = {
 
 export type UpsertedParticipantResponseResult = {
   response: ParticipantResponseRecord;
+  participantStatus: ParticipantStatus;
+  scoreResultStatus: 'STALE';
+};
+
+export type UpsertedParticipantConditionResult = {
+  condition: ParticipantConditionRecord;
   participantStatus: ParticipantStatus;
   scoreResultStatus: 'STALE';
 };
@@ -228,6 +261,25 @@ export function toParticipantResponsePayload(
     status: response.status,
     submittedAt: response.submittedAt,
     updatedAt: response.updatedAt,
+  };
+}
+
+export function toParticipantConditionPayload(
+  condition: ParticipantConditionRecord
+): ParticipantConditionPayload {
+  return {
+    participantId: condition.participantId,
+    availabilityWindows: condition.availabilityWindows.map((window) => ({
+      ...window,
+    })),
+    maxBudgetKrw: condition.maxBudgetKrw,
+    preferences: {
+      requiredTags: [...condition.preferences.requiredTags],
+      preferredTags: [...condition.preferences.preferredTags],
+      avoidTags: [...condition.preferences.avoidTags],
+    },
+    submittedAt: condition.submittedAt,
+    updatedAt: condition.updatedAt,
   };
 }
 
@@ -310,6 +362,9 @@ export function toRoomDetailsResponse(
     participants: result.participants.map(toPublicParticipant),
     candidates: result.candidates.map(toCandidatePayload),
     myResponses: result.myResponses.map(toParticipantResponsePayload),
+    myCondition: result.myCondition
+      ? toParticipantConditionPayload(result.myCondition)
+      : null,
     latestScoreResult: null,
     decision: null,
   };
@@ -330,6 +385,18 @@ export function toUpsertedParticipantResponse(
   return {
     requestId: createRequestId(),
     response: toParticipantResponsePayload(result.response),
+    participantStatus: result.participantStatus,
+    scoreResultStatus: result.scoreResultStatus,
+  };
+}
+
+export function toUpsertedParticipantCondition(
+  result: UpsertedParticipantConditionResult
+): UpsertedParticipantCondition {
+  return {
+    requestId: createRequestId(),
+    participantId: result.condition.participantId,
+    condition: toParticipantConditionPayload(result.condition),
     participantStatus: result.participantStatus,
     scoreResultStatus: result.scoreResultStatus,
   };

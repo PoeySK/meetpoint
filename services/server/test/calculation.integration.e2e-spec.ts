@@ -8,6 +8,7 @@ import { Participant } from '../src/rooms/infrastructure/persistence/typeorm/ent
 import { Candidate } from '../src/rooms/infrastructure/persistence/typeorm/entities/candidate.entity';
 import { Decision } from '../src/rooms/infrastructure/persistence/typeorm/entities/decision.entity';
 import { ParticipantResponse } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { ParticipantCondition } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from '../src/rooms/infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from '../src/rooms/infrastructure/persistence/typeorm/entities/score-result.entity';
 import { RoomsModule } from '../src/rooms/rooms.module';
@@ -30,6 +31,7 @@ const databaseUrl =
         Decision,
         ParticipantResponse,
         ScoreResult,
+        ParticipantCondition,
       ],
       synchronize: false,
       migrationsRun: false,
@@ -146,6 +148,28 @@ describeCalculation(
         ...members,
       ];
       for (const participant of participants) {
+        await request(app.getHttpServer())
+          .put(
+            `/api/v1/rooms/${roomId}/participants/${participant.id}/conditions`
+          )
+          .set('Authorization', `Bearer ${participant.token}`)
+          .send({
+            availabilityWindows: [
+              {
+                startsAt: '2026-09-01T09:00:00.000Z',
+                endsAt: '2026-09-01T18:00:00.000Z',
+              },
+            ],
+            maxBudgetKrw: null,
+            preferences: {
+              requiredTags: [],
+              preferredTags: [],
+              avoidTags: [],
+            },
+          })
+          .expect(200);
+      }
+      for (const participant of participants) {
         for (const candidateId of candidates) {
           await request(app.getHttpServer())
             .put(
@@ -178,8 +202,8 @@ describeCalculation(
       expect(started.body.calculation).toMatchObject({
         roomId,
         status: 'RUNNING',
-        policyVersion: 'mvp-1',
-        scoringProfile: 'MVP_NO_CONDITIONS',
+        policyVersion: 'condition-aware-1',
+        scoringProfile: 'CONDITION_AWARE',
       });
 
       let completed;
@@ -198,9 +222,9 @@ describeCalculation(
 
       expect(completed.body.calculation).toMatchObject({
         status: 'COMPLETED',
-        scoringProfile: 'MVP_NO_CONDITIONS',
+        scoringProfile: 'CONDITION_AWARE',
         metadata: {
-          scoringProfile: 'MVP_NO_CONDITIONS',
+          scoringProfile: 'CONDITION_AWARE',
         },
       });
       expect(completed.body.calculation.candidates).toHaveLength(2);
@@ -218,7 +242,7 @@ describeCalculation(
       expect(latest.body.scoreResult).toMatchObject({
         id: started.body.calculation.id,
         status: 'COMPLETED',
-        scoringProfile: 'MVP_NO_CONDITIONS',
+        scoringProfile: 'CONDITION_AWARE',
       });
 
       const selectedCandidateId =

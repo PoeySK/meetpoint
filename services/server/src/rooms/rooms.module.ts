@@ -4,6 +4,7 @@ import { Participant } from './infrastructure/persistence/typeorm/entities/parti
 import { Candidate } from './infrastructure/persistence/typeorm/entities/candidate.entity';
 import { Decision } from './infrastructure/persistence/typeorm/entities/decision.entity';
 import { ParticipantResponse } from './infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { ParticipantCondition } from './infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from './infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from './infrastructure/persistence/typeorm/entities/score-result.entity';
 import { CandidateController } from './presentation/http/controllers/candidate.controller';
@@ -11,11 +12,13 @@ import { CalculationController } from './presentation/http/controllers/calculati
 import { DecisionController } from './presentation/http/controllers/decision.controller';
 import { RoomsController } from './presentation/http/controllers/rooms.controller';
 import { ParticipantResponseController } from './presentation/http/controllers/participant-response.controller';
+import { ParticipantConditionController } from './presentation/http/controllers/participant-condition.controller';
 import { ParticipantLifecycleController } from './presentation/http/controllers/participant-lifecycle.controller';
 import { CreateRoomUseCase } from './application/commands/create-room.use-case';
 import { JoinParticipantUseCase } from './application/commands/join-participant.use-case';
 import { CreateCandidateUseCase } from './application/commands/create-candidate.use-case';
 import { UpsertParticipantResponseUseCase } from './application/commands/upsert-participant-response.use-case';
+import { UpsertParticipantConditionUseCase } from './application/commands/upsert-participant-condition.use-case';
 import { LeaveRoomUseCase } from './application/commands/leave-room.use-case';
 import { KickParticipantUseCase } from './application/commands/kick-participant.use-case';
 import { StartCalculationUseCase } from './application/commands/start-calculation.use-case';
@@ -45,6 +48,7 @@ import { SOLVER } from './application/ports/solver.port';
       Candidate,
       Decision,
       ParticipantResponse,
+      ParticipantCondition,
       ScoreResult,
     ]),
   ],
@@ -52,6 +56,7 @@ import { SOLVER } from './application/ports/solver.port';
     RoomsController,
     CandidateController,
     ParticipantResponseController,
+    ParticipantConditionController,
     CalculationController,
     DecisionController,
     ParticipantLifecycleController,
@@ -61,6 +66,7 @@ import { SOLVER } from './application/ports/solver.port';
     JoinParticipantUseCase,
     CreateCandidateUseCase,
     UpsertParticipantResponseUseCase,
+    UpsertParticipantConditionUseCase,
     LeaveRoomUseCase,
     KickParticipantUseCase,
     StartCalculationUseCase,

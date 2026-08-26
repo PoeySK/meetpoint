@@ -1,6 +1,7 @@
 import {
   CALCULATION_SCORING_PROFILE,
   CALCULATION_WEIGHTS,
+  LEGACY_CALCULATION_SCORING_PROFILE,
 } from '../../domain/calculation/calculation-policy';
 import {
   SolverCallError,
@@ -27,7 +28,11 @@ const VALID_MATCH_LEVELS = new Set([
 ]);
 const VALID_CONFLICT_CODES = new Set([
   'TIME_UNAVAILABLE',
+  'TIME_CONDITION_CONFLICT',
   'TRAVEL_BURDEN_HARD',
+  'BUDGET_LIMIT_EXCEEDED',
+  'REQUIRED_TAG_MISSING',
+  'AVOID_TAG_PRESENT',
 ]);
 const VALID_BLOCKING_ISSUES = new Set(['MISSING_RESPONSE']);
 const VALID_EXPLANATION_FLAGS = new Set([
@@ -36,6 +41,8 @@ const VALID_EXPLANATION_FLAGS = new Set([
   'SELF_REPORTED_TRAVEL_BURDEN',
   'MISSING_RESPONSE',
   'NO_FULL_MATCH',
+  'NO_BUDGET_CONSTRAINT',
+  'PREFERENCE_UNEVALUATED',
 ]);
 
 export function validateSolverResponse(
@@ -61,7 +68,7 @@ export function validateSolverResponse(
     response.requestId !== snapshot.requestId ||
     response.policyVersion !== snapshot.policyVersion ||
     response.scoringProfile !== snapshot.scoringProfile ||
-    response.metadata.scoringProfile !== CALCULATION_SCORING_PROFILE ||
+    response.metadata.scoringProfile !== snapshot.scoringProfile ||
     response.candidates.length !== expectedCandidateIds.length ||
     JSON.stringify(expected) !== JSON.stringify(actual) ||
     JSON.stringify(response.ranking) !== JSON.stringify(actualCandidateIds)
@@ -70,7 +77,7 @@ export function validateSolverResponse(
   }
 
   if (
-    !isValidScoringMetadata(response.metadata) ||
+    !isValidScoringMetadata(response.metadata, snapshot.scoringProfile) ||
     !VALID_RECOMMENDATION_STATUSES.has(response.recommendationStatus) ||
     response.recommendationWarnings.some((warning) => warning !== 'LOW_SCORE')
   ) {
@@ -268,13 +275,19 @@ function isValidParticipantBreakdown(value: unknown): boolean {
   );
 }
 
-function isValidScoringMetadata(value: unknown): value is ScoreResultMetadata {
+function isValidScoringMetadata(
+  value: unknown,
+  expectedProfile?: string
+): value is ScoreResultMetadata {
   const record = toRecord(value);
   const weights = toRecord(record?.weights);
 
   return Boolean(
     record &&
-    record.scoringProfile === CALCULATION_SCORING_PROFILE &&
+    (expectedProfile === undefined ||
+      record.scoringProfile === expectedProfile) &&
+    (record.scoringProfile === CALCULATION_SCORING_PROFILE ||
+      record.scoringProfile === LEGACY_CALCULATION_SCORING_PROFILE) &&
     weights &&
     weights.time === CALCULATION_WEIGHTS.time &&
     weights.travelBurden === CALCULATION_WEIGHTS.travelBurden &&

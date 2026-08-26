@@ -5,12 +5,29 @@ pub(crate) struct SolveInput {
     pub(crate) scoring_profile: String,
     pub(crate) participants: Vec<Participant>,
     pub(crate) candidates: Vec<Candidate>,
+    pub(crate) policy: crate::domain::policy::ScoringPolicy,
 }
 
 #[derive(Debug, Clone)]
 pub(crate) struct Participant {
     pub(crate) id: String,
     pub(crate) responses: Vec<ParticipantResponse>,
+    pub(crate) condition: Option<ParticipantCondition>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct ParticipantCondition {
+    pub(crate) availability_windows: Vec<AvailabilityWindow>,
+    pub(crate) max_budget_krw: Option<i32>,
+    pub(crate) required_tags: Vec<String>,
+    pub(crate) preferred_tags: Vec<String>,
+    pub(crate) avoid_tags: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct AvailabilityWindow {
+    pub(crate) starts_at: time::OffsetDateTime,
+    pub(crate) ends_at: time::OffsetDateTime,
 }
 
 #[derive(Debug, Clone)]
@@ -60,4 +77,8 @@ impl TravelBurden {
 pub(crate) struct Candidate {
     pub(crate) id: String,
     pub(crate) display_order: i32,
+    pub(crate) starts_at: time::OffsetDateTime,
+    pub(crate) ends_at: time::OffsetDateTime,
+    pub(crate) estimated_cost_per_person_krw: i32,
+    pub(crate) tags: Vec<String>,
 }

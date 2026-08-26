@@ -1,7 +1,8 @@
 use super::solve;
 use crate::{
+    AvailabilityWindow, CONDITION_AWARE_POLICY_VERSION, CONDITION_AWARE_SCORING_PROFILE,
     CandidatePlace, CandidateTime, POLICY_VERSION, SCORING_PROFILE, SolveRequest, SolverCandidate,
-    SolverParticipant, SolverResponse,
+    SolverCondition, SolverParticipant, SolverPreferences, SolverResponse,
 };
 
 fn request_with_responses(responses: Vec<SolverResponse>) -> SolveRequest {
@@ -13,6 +14,7 @@ fn request_with_responses(responses: Vec<SolverResponse>) -> SolveRequest {
         participants: vec![SolverParticipant {
             participant_id: "participant_1".to_string(),
             responses,
+            condition: None,
         }],
         candidates: vec![candidate("candidate_1", 1), candidate("candidate_2", 2)],
     }
@@ -44,6 +46,32 @@ fn response(candidate_id: &str, availability_status: &str, travel_burden: &str) 
         travel_burden: travel_burden.to_string(),
         note: None,
     }
+}
+
+fn condition_request() -> SolveRequest {
+    let mut request = request_with_responses(vec![
+        response("candidate_1", "AVAILABLE", "EASY"),
+        response("candidate_2", "AVAILABLE", "EASY"),
+    ]);
+    request.policy_version = CONDITION_AWARE_POLICY_VERSION.to_string();
+    request.scoring_profile = CONDITION_AWARE_SCORING_PROFILE.to_string();
+    request.participants[0].condition = Some(SolverCondition {
+        availability_windows: vec![AvailabilityWindow {
+            starts_at: "2026-09-01T09:00:00Z".to_string(),
+            ends_at: "2026-09-01T18:00:00Z".to_string(),
+        }],
+        max_budget_krw: Some(30000),
+        preferences: SolverPreferences {
+            required_tags: vec!["INDOOR".to_string()],
+            preferred_tags: vec!["QUIET".to_string()],
+            avoid_tags: vec!["SMOKING".to_string()],
+        },
+    });
+    request.candidates[0].estimated_cost_per_person_krw = 30000;
+    request.candidates[0].tags = vec!["INDOOR".to_string(), "QUIET".to_string()];
+    request.candidates[1].estimated_cost_per_person_krw = 60000;
+    request.candidates[1].tags = vec!["INDOOR".to_string(), "SMOKING".to_string()];
+    request
 }
 
 #[test]
@@ -180,6 +208,7 @@ fn averages_multiple_participants_without_dropping_missing_participants() {
     request.participants.push(SolverParticipant {
         participant_id: "participant_2".to_string(),
         responses: vec![],
+        condition: None,
     });
 
     let result = solve(request).unwrap();
@@ -260,4 +289,73 @@ fn rejects_unsupported_policy_and_duplicate_ids() {
         solve(duplicate_candidates).unwrap_err().code.as_str(),
         "INVALID_SCHEMA"
     );
+}
+
+#[test]
+fn applies_condition_budget_and_preference_scores_and_conflicts() {
+    let result = solve(condition_request()).unwrap();
+    let matching = result
+        .candidates
+        .iter()
+        .find(|candidate| candidate.candidate_id == "candidate_1")
+        .unwrap();
+    assert_eq!(matching.overall_score, 100.0);
+    assert!(matching.eligible);
+    assert_eq!(matching.participant_breakdown[0].components.budget, 20.0);
+    assert_eq!(
+        matching.participant_breakdown[0].components.preference,
+        15.0
+    );
+
+    let conflicted = result
+        .candidates
+        .iter()
+        .find(|candidate| candidate.candidate_id == "candidate_2")
+        .unwrap();
+    assert!(!conflicted.eligible);
+    assert!(
+        conflicted
+            .conflicts
+            .iter()
+            .any(|conflict| conflict.code == "BUDGET_LIMIT_EXCEEDED")
+    );
+    assert!(
+        conflicted
+            .conflicts
+            .iter()
+            .any(|conflict| conflict.code == "AVOID_TAG_PRESENT")
+    );
+    assert_eq!(conflicted.participant_breakdown[0].components.budget, 0.0);
+}
+
+#[test]
+fn rejects_condition_aware_requests_without_each_participant_condition() {
+    let mut request = condition_request();
+    request.participants[0].condition = None;
+
+    assert_eq!(
+        solve(request).unwrap_err().code.as_str(),
+        "CONDITION_MISSING"
+    );
+}
+
+#[test]
+fn reports_available_response_outside_condition_window_as_a_conflict() {
+    let mut request = condition_request();
+    request.candidates[1].time.starts_at = "2026-09-01T20:00:00Z".to_string();
+    request.candidates[1].time.ends_at = "2026-09-01T22:00:00Z".to_string();
+
+    let result = solve(request).unwrap();
+    let candidate = result
+        .candidates
+        .iter()
+        .find(|candidate| candidate.candidate_id == "candidate_2")
+        .unwrap();
+    assert!(
+        candidate
+            .conflicts
+            .iter()
+            .any(|conflict| conflict.code == "TIME_CONDITION_CONFLICT")
+    );
+    assert!(!candidate.eligible);
 }

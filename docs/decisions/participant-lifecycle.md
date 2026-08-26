@@ -34,7 +34,7 @@
 
 ### 3. HOST 본인의 방 나가기
 
-- MVP에서는 HOST의 방 나가기를 금지한다.
+- 현재는 HOST의 방 나가기를 금지한다.
 - `Room.hostParticipantId`와 HOST 전용 작업의 소유자를 다른 Participant로 자동 변경하지 않는다.
 - HOST 승계나 방 폐쇄가 필요해지는 경우 별도의 정책과 vertical slice로 결정한다.
 
@@ -43,7 +43,7 @@
 - `LEFT`·`REMOVED` Participant를 같은 Participant ID로 복구하거나 활성 상태로 되돌리지 않는다.
 - 방 코드로 다시 입장하면 새로운 Participant ID와 새로운 room-scoped token을 발급한다.
 - 새 Participant는 이전 Participant의 응답, 상태, 계산 근거를 상속하지 않는다.
-- 익명 방 코드와 표시 이름만 사용하는 MVP에서는 `REMOVED` 상태가 같은 사람의 재입장을 영구적으로 식별·차단하는 계정 기반 ban을 의미하지 않는다. 영구 차단과 계정 연결은 MVP 범위 밖이다.
+- 익명 방 코드와 표시 이름만 사용하는 현재 방식에서는 `REMOVED` 상태가 같은 사람의 재입장을 영구적으로 식별·차단하는 계정 기반 ban을 의미하지 않는다. 영구 차단과 계정 연결은 별도 계정 정책으로 다룬다.
 
 ### 5. Room 상태별 변경 허용
 
@@ -55,7 +55,7 @@
 | `CALCULATED` | 허용 | 최신 완료 ScoreResult를 `STALE`로 만들고 Room을 `OPEN`으로 전환 |
 | `CONFIRMED` | 차단 | HOST가 먼저 Decision 재검토를 열어 `OPEN`으로 전환해야 함 |
 | `OPEN` + 현재 Decision이 `REOPENED` | 허용 | 기존 Decision과 `currentDecisionId`를 보존하고 Participant 변경 후 재계산 요구 |
-| `CLOSED` | 차단 | MVP에서는 Room 종결을 변경할 수 없음 |
+| `CLOSED` | 차단 | 현재는 Room 종결을 변경할 수 없음 |
 
 `CALCULATED` 상태에서 변경할 때도 완료된 결과를 현재 데이터로 덮어쓰지 않는다. 기존 ScoreResult 행의 상태만 `STALE`로 바꾸고, 새 계산은 별도의 ScoreResult로 저장한다.
 
@@ -97,7 +97,7 @@
 - Participant와 응답을 논리적으로 보존하면 과거 계산 snapshot과 Decision의 근거를 재현할 수 있다.
 - 활성 Participant 집합을 계산 입력과 동일하게 정의하면 Participant 변경 뒤 coverage와 Participant count가 과거 결과에 남아 있는 문제를 피할 수 있다.
 - `CONFIRMED` 상태에서 직접 변경을 금지하면 확정 결과가 사용자 모르게 현재 참가자 집합으로 바뀌는 일을 막을 수 있다.
-- HOST 승계와 계정 기반 영구 차단은 별도의 권한·복구·UI 정책이 필요하므로 익명 토큰 MVP에 포함하지 않는다.
+- HOST 승계와 계정 기반 영구 차단은 별도의 권한·복구·UI 정책이 필요하므로 익명 토큰 방식의 현재 범위에 포함하지 않는다.
 - 기존 오류 코드와 token 폐기 방식을 재사용하면 새로운 정책 때문에 인증·오류 envelope가 불필요하게 늘어나지 않는다.
 
 ## 상태·데이터 보존 영향

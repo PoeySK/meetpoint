@@ -61,8 +61,14 @@ export class StartCalculationUseCase {
     const requestId = `req_${randomUUID()}`;
     const prepared = await this.persistence.transaction(
       async (repositories) => {
-        const { rooms, participants, candidates, responses, scoreResults } =
-          repositories;
+        const {
+          rooms,
+          participants,
+          candidates,
+          responses,
+          conditions,
+          scoreResults,
+        } = repositories;
         const room = await rooms.findById(roomId, { lock: true });
         if (!room) {
           throw new NotFoundException('RESOURCE_NOT_FOUND');
@@ -102,12 +108,28 @@ export class StartCalculationUseCase {
           throw new UnprocessableEntityException('NO_ACTIVE_CANDIDATES');
         }
 
+        const participantConditions = await conditions.findByRoomId(room.id);
+        const conditionByParticipantId = new Map(
+          participantConditions.map((condition) => [
+            condition.participantId,
+            condition,
+          ])
+        );
+        if (
+          activeParticipants.some(
+            (participant) => !conditionByParticipantId.has(participant.id)
+          )
+        ) {
+          throw new UnprocessableEntityException('CONDITION_INCOMPLETE');
+        }
+
         const snapshot = createSolverSnapshot(
           requestId,
           room,
           activeParticipants,
           activeCandidates,
           await responses.findByRoomId(room.id),
+          participantConditions,
           CALCULATION_POLICY_VERSION,
           CALCULATION_SCORING_PROFILE
         );

@@ -6,8 +6,8 @@
 - **확정**: 외부 클라이언트용 API와 내부 Rust Solver API를 분리한다. PostgreSQL은 NestJS 서버만 접근한다.
 - **확정**: 모든 날짜·시간은 ISO 8601 문자열로 전달하고, 시간대가 필요한 값에는 `timezone`을 함께 둔다.
 - **확정**: 금액은 부동소수점이 아닌 KRW 정수(`estimatedCostPerPersonKrw`, `maxBudgetKrw`)로 전달한다.
-- **확정**: MVP 토큰은 방 코드와 별개의 불투명 난수 토큰으로 발급하고 서버에는 해시만 저장한다. Client는 방별 `sessionStorage`에 보관하며 URL·로그에는 넣지 않는다. 토큰은 발급 후 24시간 유효하고 갱신 API는 MVP에서 제공하지 않는다.
-- **확정**: MVP 외부 API에는 `CLOSED` 전환 endpoint를 제공하지 않는다. Room 자체는 자동 만료되지 않으며, 이번 단계에서는 시간에 따른 `CLOSED` 전환도 구현하지 않는다.
+- **확정**: 현재 token은 방 코드와 별개의 불투명 난수로 발급하고 서버에는 해시만 저장한다. Client는 방별 `sessionStorage`에 보관하며 URL·로그에는 넣지 않는다. token은 발급 후 24시간 유효하고 현재 갱신 API는 제공하지 않는다.
+- **확정**: 현재 외부 API에는 `CLOSED` 전환 endpoint를 제공하지 않는다. Room 자체는 자동 만료되지 않으며, 현재 시간에 따른 `CLOSED` 전환도 구현하지 않는다.
 - **확정**: 방 생성 API는 Room과 최소 HOST Participant를 하나의 트랜잭션으로 생성한다. 호스트 토큰 원문은 응답에서 한 번만 반환하고 서버에는 해시와 만료 정보만 저장한다.
 - **미결정**: API 문서 도구(OpenAPI 등), 방 데이터 삭제·보존 기간은 추후 확정한다.
 
@@ -23,16 +23,16 @@
 - 서버는 `requestId`를 생성하여 응답과 오류에 포함한다.
 - 계산 후보의 `matchLevel`은 `FULL`, `PARTIAL`, `CONFLICTED`, `INCOMPLETE` 중 하나이며, 전체 계산의 `recommendationStatus`와 구분한다.
 
-### 이번 단계의 Room API 범위
+### 현재 Room API 범위
 
-- Room과 HOST·MEMBER Participant를 영속화하고, HOST의 Candidate 등록과 참여자의 Candidate별 `ParticipantResponse` 제출·수정을 제공한다. MEMBER는 방 코드 입장 API로 생성한다.
-- 현재 계산·결정 vertical slice에서는 ScoreResult 계산 시작·polling·최신 결과 조회와 HOST의 Decision 확정·재검토, 모든 참여자의 Decision 조회 API를 제공한다. 참여자 개인 조건과 Candidate 수정·보관 API는 다음 범위로 남긴다.
+- Room과 HOST·MEMBER Participant를 영속화하고, HOST의 Candidate 등록과 참여자의 ParticipantCondition·Candidate별 `ParticipantResponse` 제출·수정을 제공한다. MEMBER는 방 코드 입장 API로 생성한다.
+- 현재 계산·결정 흐름에서는 ScoreResult 계산 시작·polling·최신 결과 조회와 HOST의 Decision 확정·재검토, 모든 참여자의 Decision 조회 API를 제공한다. Candidate 수정·보관 API는 아직 `docs/07-implementation-plan.md`의 P0 작업으로 남아 있다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
 - Room 조회 응답의 `currentParticipant`에는 Bearer token으로 인증·확인한 현재 Participant의 공개 정보만 반환한다.
 - Room 조회의 `participants`에는 현재 활성 상태(`JOINED` 또는 `RESPONDED`)인 HOST·MEMBER Participant의 공개 정보를 반환한다. `LEFT`·`REMOVED` Participant의 이력은 이 응답에 포함하지 않는다.
 - Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
 - Room 조회의 `myResponses`에는 Authorization 토큰으로 확인한 현재 참여자가 현재 방의 활성 Candidate에 저장한 응답만 `candidates` 순서로 반환한다. 저장된 응답이 없으면 빈 배열을 반환하며, 다른 참여자의 응답과 `ARCHIVED` Candidate의 과거 응답은 반환하지 않는다.
-- 현재 ParticipantCondition API가 없으므로 Candidate 응답 저장 후에도 `participantStatus`는 `JOINED`로 반환한다.
+- ParticipantCondition을 저장하고 모든 활성 Candidate에 응답하면 `participantStatus`를 `RESPONDED`로 반환한다. Candidate가 추가되면 새 응답이 필요하므로 다시 `JOINED`가 된다.
 - Participant lifecycle API는 MEMBER 본인의 leave와 HOST의 활성 MEMBER kick을 제공한다. 상태 변경 시 `LEFT`·`REMOVED` Participant는 활성 목록·계산 snapshot·coverage에서 제외하고 기존 Response와 계산·Decision 이력은 보존한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 - Decision 확정은 최신 `COMPLETED` ScoreResult만 사용하며, `STALE`·`FAILED` 결과와 100% 미만 응답 coverage는 거부한다. 서버는 점수·순위를 다시 계산하지 않고 snapshot의 ID·상태·응답 존재만 재검증한다.
@@ -167,6 +167,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
   ],
   "candidates": [],
   "myResponses": [],
+  "myCondition": null,
   "latestScoreResult": null,
   "decision": null
 }
@@ -440,6 +441,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
   "requestId": "req_20260813_007",
   "participantId": "participant_02",
   "condition": {
+    "participantId": "participant_02",
     "availabilityWindows": [
       {
         "startsAt": "2026-08-15T19:00:00+09:00",
@@ -451,19 +453,22 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
       "requiredTags": ["INDOOR"],
       "preferredTags": ["QUIET"],
       "avoidTags": ["SMOKING"]
-    }
+    },
+    "submittedAt": "2026-08-13T04:18:00Z",
+    "updatedAt": "2026-08-13T04:45:00Z"
   },
+  "participantStatus": "JOINED",
   "scoreResultStatus": "STALE"
 }
 ```
 
 #### 주요 실패 상태와 유효성 검사
 
-- `401 INVALID_TOKEN`, `403 PARTICIPANT_ONLY` 또는 다른 참여자 수정 시 `FORBIDDEN`
+- `401 MISSING_TOKEN`, `INVALID_TOKEN` 또는 `TOKEN_EXPIRED`; 다른 참여자 수정 시 `403 FORBIDDEN`
 - `404 RESOURCE_NOT_FOUND`: 다른 방의 참여자 ID 포함
 - `409 ROOM_STATE_CONFLICT`: 확정 방에서 재검토 없이 수정
-- `422 CONDITION_INCOMPLETE`: 시간 구간이 겹치지 않거나 예산이 음수, 중복 태그가 있음
-- 시간 구간은 1~10개, 예산은 `null` 또는 0 이상 정수다. 이동 부담은 일반 조건에 저장하지 않고 후보별 응답의 `travelBurden`으로만 받는다.
+- `422 CONDITION_INCOMPLETE`: 시간이 비어 있거나 종료 시각이 시작 시각보다 이르거나 같음, 예산이 음수, 태그가 중복되거나 허용 범위를 벗어남
+- 시간 구간은 1~10개, 각 태그 배열은 최대 10개·태그는 50자 이내이며 세 태그 배열 사이에도 중복을 허용하지 않는다. 예산은 `null` 또는 0~2,000,000원 정수다. 이동 부담은 일반 조건에 저장하지 않고 후보별 응답의 `travelBurden`으로만 받는다.
 
 ### 10. 참여자 후보별 응답 제출·수정
 
@@ -504,13 +509,13 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 
 #### 주요 실패 상태와 유효성 검사
 
-- `401 INVALID_TOKEN`, `403 PARTICIPANT_ONLY` 또는 본인 참여자 ID가 아니면 `FORBIDDEN`
+- `401 MISSING_TOKEN`, `INVALID_TOKEN` 또는 `TOKEN_EXPIRED`; 본인 참여자 ID가 아니면 `403 FORBIDDEN`
 - `404 RESOURCE_NOT_FOUND`: 방·참여자·후보 중 하나가 다른 방이거나 없음
 - `409 ROOM_STATE_CONFLICT`: 후보가 보관되었거나 확정 방에서 재검토 없이 변경
 - `400 VALIDATION_ERROR`: 상태가 세 값 중 하나가 아니거나 `travelBurden`이 `EASY`, `NORMAL`, `HARD` 중 하나가 아님
 - `travelBurden`은 모든 활성 후보에 필수다.
 - `note`는 선택 입력이며 0~300자다. Solver는 이 값을 점수·순위·충돌 판정에 사용하지 않는다.
-- `AVAILABLE` 응답과 ParticipantCondition의 시간 구간 비교는 조건 저장 API가 구현되는 단계에서 적용한다. 현재 단계에서는 enum과 응답 필드 형식만 검증한다.
+- `AVAILABLE` 응답은 후보 시간이 본인의 가능 시간 구간 안에 완전히 포함되는지 함께 검증한다. 조건 밖의 후보에는 `TIME_CONDITION_CONFLICT`를 반환한다.
 
 ### 11. 후보 점수 계산 요청
 
@@ -535,8 +540,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
     "id": "score_20260813_02",
     "roomId": "room_01",
     "status": "RUNNING",
-    "policyVersion": "mvp-1",
-    "scoringProfile": "MVP_NO_CONDITIONS",
+    "policyVersion": "condition-aware-1",
+    "scoringProfile": "CONDITION_AWARE",
     "createdAt": "2026-08-13T04:50:00Z"
   },
   "pollUrl": "/api/v1/rooms/room_01/calculations/score_20260813_02"
@@ -549,7 +554,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `409 CALCULATION_IN_PROGRESS`: 같은 방에 실행 중 계산이 있음
 - `422 PARTICIPANT_COUNT_OUT_OF_RANGE`: 활성 참가자가 3~6명이 아님
 - `422 NO_ACTIVE_CANDIDATES`: 활성 후보가 2개 미만이거나 5개 초과
-- `422 CONDITION_INCOMPLETE`: condition-aware profile에서 활성 참가자의 조건이 모두 제출되지 않음. 현재 `MVP_NO_CONDITIONS`에서는 발생하지 않는다.
+- `422 CONDITION_INCOMPLETE`: 활성 참가자 중 하나라도 조건을 제출하지 않음. 현재 Server 계산은 `condition-aware-1`/`CONDITION_AWARE` 프로필을 사용한다.
 - 후보별 응답 누락은 계산을 거부하지 않고 결과의 `coverage`와 `MISSING_RESPONSE`로 표시한다.
 - `clientRequestId`가 같은 재시도 요청은 동일 계산을 재사용하도록 설계하지만, 이 키의 보존 기간은 미결정이다.
 
@@ -566,7 +571,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
     "id": "score_20260813_02",
     "roomId": "room_01",
     "status": "COMPLETED",
-    "policyVersion": "mvp-1",
+    "policyVersion": "condition-aware-1",
     "inputSnapshotHash": "sha256:example",
     "recommendationStatus": "PARTIAL_MATCH",
     "recommendationWarnings": [],
@@ -635,7 +640,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
   "scoreResult": {
     "id": "score_20260813_02",
     "status": "COMPLETED",
-    "policyVersion": "mvp-1",
+    "policyVersion": "condition-aware-1",
     "ranking": ["candidate_01", "candidate_02"],
     "recommendationStatus": "PARTIAL_MATCH",
     "recommendationWarnings": []
@@ -822,12 +827,26 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 ```json
 {
   "requestId": "score_20260813_02",
-  "policyVersion": "mvp-1",
-  "scoringProfile": "MVP_NO_CONDITIONS",
+  "policyVersion": "condition-aware-1",
+  "scoringProfile": "CONDITION_AWARE",
   "roomId": "room_01",
   "participants": [
     {
       "participantId": "participant_02",
+      "condition": {
+        "availabilityWindows": [
+          {
+            "startsAt": "2026-08-15T18:00:00+09:00",
+            "endsAt": "2026-08-15T22:00:00+09:00"
+          }
+        ],
+        "maxBudgetKrw": 30000,
+        "preferences": {
+          "requiredTags": ["INDOOR"],
+          "preferredTags": ["QUIET"],
+          "avoidTags": ["SMOKING"]
+        }
+      },
       "responses": [
         {
           "candidateId": "candidate_01",
@@ -874,11 +893,11 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 ```json
 {
   "requestId": "score_20260813_02",
-  "policyVersion": "mvp-1",
-  "scoringProfile": "MVP_NO_CONDITIONS",
+  "policyVersion": "condition-aware-1",
+  "scoringProfile": "CONDITION_AWARE",
   "status": "COMPLETED",
   "metadata": {
-    "scoringProfile": "MVP_NO_CONDITIONS",
+    "scoringProfile": "CONDITION_AWARE",
     "weights": { "time": 40, "travelBurden": 25, "budget": 20, "preference": 15 }
   },
   "recommendationStatus": "PARTIAL_MATCH",
@@ -934,7 +953,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 ```json
 {
   "requestId": "score_20260813_03",
-  "policyVersion": "mvp-1",
+  "policyVersion": "condition-aware-1",
   "status": "FAILED",
   "error": {
     "code": "NO_CANDIDATES",
@@ -948,7 +967,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | HTTP 상태 | Solver 오류 코드 | 재시도 | 의미 |
 | --- | --- | --- | --- |
 | 400 | `INVALID_JSON`, `INVALID_SCHEMA` | 아니오 | JSON 또는 필드 구조 오류 |
-| 422 | `NO_PARTICIPANTS`, `NO_CANDIDATES`, `INVALID_TIME_RANGE`, `RESPONSE_FIELD_MISSING` | 아니오 | 입력 스냅샷으로 계산할 수 없음 |
+| 422 | `NO_PARTICIPANTS`, `NO_CANDIDATES`, `INVALID_TIME_RANGE`, `RESPONSE_FIELD_MISSING`, `CONDITION_MISSING`, `INVALID_CONDITION` | 아니오 | 입력 스냅샷으로 계산할 수 없음 |
 | 500 | `SOLVER_INTERNAL_ERROR` | 한 번 | 계산 내부 오류 |
 | 503 | `SOLVER_OVERLOADED` | 한 번 | 일시적으로 계산할 수 없음 |
 
@@ -958,6 +977,6 @@ NestJS는 Solver의 `requestId`와 오류 코드를 보존하여 외부 API의 `
 
 - **확정**: 외부 API의 책임은 NestJS가 가지며, Solver API는 계산 입력과 출력에만 집중한다.
 - **확정**: 결과에는 숫자 점수뿐 아니라 참가자별 breakdown, 근거, 충돌, 커버리지를 포함한다.
-- **확정**: 토큰은 불투명 난수이며 24시간 후 만료되고, MVP에는 토큰 갱신 API가 없다. 구현 시 원문 대신 해시만 저장한다.
+- **확정**: 토큰은 불투명 난수이며 24시간 후 만료되고, 현재 토큰 갱신 API가 없다. 구현 시 원문 대신 해시만 저장한다.
 - **확정**: Room 자체는 자동 만료되지 않으며 `TOKEN_EXPIRED`는 만료된 방 범위 토큰에만 적용한다.
 - **미결정**: 방 데이터 삭제·보존 기간, API 버전별 호환 기간, 계산 결과 페이지의 이력 조회 범위와 `If-Match-Version` 필수 여부는 추후 결정한다.

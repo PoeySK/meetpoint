@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   InternalServerErrorException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import {
   ParticipantRole,
@@ -17,6 +18,10 @@ import {
 } from '../../domain/participant-response/participant-response';
 import type { RoomRecord } from '../../domain/room/room-status';
 
+const MAX_CONDITION_WINDOWS = 10;
+const MAX_CONDITION_TAGS = 10;
+const MAX_CONDITION_TAG_LENGTH = 50;
+
 export type NormalizedCreateRoomInput = {
   title: string;
   timezone: string;
@@ -29,6 +34,16 @@ export type NormalizedCandidateInput = {
   place: CandidatePlace;
   estimatedCostPerPersonKrw: number;
   tags: string[];
+};
+
+export type NormalizedParticipantConditionInput = {
+  availabilityWindows: Array<{ startsAt: string; endsAt: string }>;
+  maxBudgetKrw: number | null;
+  preferences: {
+    requiredTags: string[];
+    preferredTags: string[];
+    avoidTags: string[];
+  };
 };
 
 export function validateCreateRoomInput(
@@ -221,6 +236,129 @@ export function validateParticipantResponseInput(input: unknown): {
     travelBurden: travelBurden as TravelBurden,
     note: typeof candidate?.note === 'string' ? candidate.note.trim() : null,
   };
+}
+
+export function validateParticipantConditionInput(
+  input: unknown
+): NormalizedParticipantConditionInput {
+  const candidate = input as
+    | {
+        availabilityWindows?: unknown;
+        maxBudgetKrw?: unknown;
+        preferences?: {
+          requiredTags?: unknown;
+          preferredTags?: unknown;
+          avoidTags?: unknown;
+        };
+      }
+    | null
+    | undefined;
+
+  const fail = (): never => {
+    throw new UnprocessableEntityException('CONDITION_INCOMPLETE');
+  };
+
+  if (
+    !Array.isArray(candidate?.availabilityWindows) ||
+    candidate.availabilityWindows.length < 1 ||
+    candidate.availabilityWindows.length > MAX_CONDITION_WINDOWS
+  ) {
+    return fail();
+  }
+
+  const availabilityWindows = candidate.availabilityWindows.map((window) => {
+    const value = window as {
+      startsAt?: unknown;
+      endsAt?: unknown;
+    };
+    if (
+      typeof value?.startsAt !== 'string' ||
+      typeof value.endsAt !== 'string'
+    ) {
+      return null;
+    }
+
+    const startsAt = value.startsAt.trim();
+    const endsAt = value.endsAt.trim();
+    const startsAtDate = new Date(startsAt);
+    const endsAtDate = new Date(endsAt);
+    if (
+      !startsAt ||
+      !endsAt ||
+      !hasIsoTimezone(startsAt) ||
+      !hasIsoTimezone(endsAt) ||
+      Number.isNaN(startsAtDate.getTime()) ||
+      Number.isNaN(endsAtDate.getTime()) ||
+      endsAtDate.getTime() <= startsAtDate.getTime()
+    ) {
+      return null;
+    }
+
+    return { startsAt, endsAt };
+  });
+
+  if (availabilityWindows.some((window) => window === null)) {
+    return fail();
+  }
+
+  if (
+    !Object.prototype.hasOwnProperty.call(candidate ?? {}, 'maxBudgetKrw') ||
+    (candidate?.maxBudgetKrw !== null &&
+      (typeof candidate?.maxBudgetKrw !== 'number' ||
+        !Number.isInteger(candidate.maxBudgetKrw) ||
+        candidate.maxBudgetKrw < 0 ||
+        candidate.maxBudgetKrw > 2_000_000))
+  ) {
+    return fail();
+  }
+
+  const preferences = candidate?.preferences;
+  if (!preferences || typeof preferences !== 'object') {
+    return fail();
+  }
+
+  const normalizeTags = (value: unknown): string[] | null => {
+    if (
+      !Array.isArray(value) ||
+      value.length > MAX_CONDITION_TAGS ||
+      value.some(
+        (tag) =>
+          typeof tag !== 'string' ||
+          tag.trim().length === 0 ||
+          tag.trim().length > MAX_CONDITION_TAG_LENGTH
+      )
+    ) {
+      return null;
+    }
+
+    const tags = value.map((tag) => (tag as string).trim().toUpperCase());
+    return new Set(tags).size === tags.length ? tags : null;
+  };
+
+  const requiredTags = normalizeTags(preferences.requiredTags);
+  const preferredTags = normalizeTags(preferences.preferredTags);
+  const avoidTags = normalizeTags(preferences.avoidTags);
+  if (!requiredTags || !preferredTags || !avoidTags) {
+    return fail();
+  }
+
+  const allTags = [...requiredTags, ...preferredTags, ...avoidTags];
+  if (new Set(allTags).size !== allTags.length) {
+    return fail();
+  }
+
+  return {
+    availabilityWindows: availabilityWindows as Array<{
+      startsAt: string;
+      endsAt: string;
+    }>,
+    maxBudgetKrw: candidate.maxBudgetKrw,
+    preferences: { requiredTags, preferredTags, avoidTags },
+  };
+}
+
+function hasIsoTimezone(value: string): boolean {
+  return /(?:Z|[+-]\d{2}:\d{2})$/i.test(value);
 }
 
 export function isDuplicateCandidate(

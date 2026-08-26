@@ -108,7 +108,7 @@ export class CreateRoomUseCase {
   }
 
   private createInviteUrl(roomCode: string): string {
-    const clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:3000';
+    const clientOrigin = process.env.CLIENT_ORIGIN ?? 'http://localhost:10081';
     return `${clientOrigin.replace(/\/$/, '')}/join/${roomCode}`;
   }
 

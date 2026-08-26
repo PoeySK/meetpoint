@@ -56,14 +56,22 @@ impl MatchLevel {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum ConflictCode {
     TimeUnavailable,
+    TimeConditionConflict,
     TravelBurdenHard,
+    BudgetLimitExceeded,
+    RequiredTagMissing,
+    AvoidTagPresent,
 }
 
 impl ConflictCode {
     pub(crate) fn as_str(self) -> &'static str {
         match self {
             Self::TimeUnavailable => "TIME_UNAVAILABLE",
+            Self::TimeConditionConflict => "TIME_CONDITION_CONFLICT",
             Self::TravelBurdenHard => "TRAVEL_BURDEN_HARD",
+            Self::BudgetLimitExceeded => "BUDGET_LIMIT_EXCEEDED",
+            Self::RequiredTagMissing => "REQUIRED_TAG_MISSING",
+            Self::AvoidTagPresent => "AVOID_TAG_PRESENT",
         }
     }
 }
@@ -88,6 +96,7 @@ pub(crate) enum ExplanationFlag {
     SelfReportedTravelBurden,
     MissingResponse,
     NoFullMatch,
+    NoBudgetConstraint,
 }
 
 impl ExplanationFlag {
@@ -98,6 +107,7 @@ impl ExplanationFlag {
             Self::SelfReportedTravelBurden => "SELF_REPORTED_TRAVEL_BURDEN",
             Self::MissingResponse => "MISSING_RESPONSE",
             Self::NoFullMatch => "NO_FULL_MATCH",
+            Self::NoBudgetConstraint => "NO_BUDGET_CONSTRAINT",
         }
     }
 }

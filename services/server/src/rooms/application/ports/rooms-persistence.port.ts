@@ -1,6 +1,7 @@
 import type { CandidateRecord } from '../../domain/candidate/candidate';
 import type { DecisionRecord } from '../../domain/decision/decision';
 import type { ParticipantRecord } from '../../domain/participant/participant';
+import type { ParticipantConditionRecord } from '../../domain/participant-condition/participant-condition';
 import type { ParticipantResponseRecord } from '../../domain/participant-response/participant-response';
 import type { RoomRecord } from '../../domain/room/room-status';
 import type { ScoreResultRecord } from '../../domain/calculation/score-result';
@@ -47,6 +48,17 @@ export interface ParticipantResponseRepositoryPort {
   save(response: ParticipantResponseRecord): Promise<ParticipantResponseRecord>;
 }
 
+export interface ParticipantConditionRepositoryPort {
+  findByParticipantId(
+    roomId: string,
+    participantId: string
+  ): Promise<ParticipantConditionRecord | null>;
+  findByRoomId(roomId: string): Promise<ParticipantConditionRecord[]>;
+  save(
+    condition: ParticipantConditionRecord
+  ): Promise<ParticipantConditionRecord>;
+}
+
 export interface ScoreResultRepositoryPort {
   findById(
     id: string,
@@ -71,6 +83,7 @@ export interface RoomsRepositories {
   participants: ParticipantRepositoryPort;
   candidates: CandidateRepositoryPort;
   responses: ParticipantResponseRepositoryPort;
+  conditions: ParticipantConditionRepositoryPort;
   scoreResults: ScoreResultRepositoryPort;
   decisions: DecisionRepositoryPort;
 }

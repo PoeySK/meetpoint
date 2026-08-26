@@ -41,6 +41,9 @@ function describeCalculationError(error: unknown) {
     if (error.code === 'NO_ACTIVE_CANDIDATES') {
       return '계산하려면 활성 후보가 2~5개여야 합니다.';
     }
+    if (error.code === 'CONDITION_INCOMPLETE') {
+      return '모든 참여자가 참여자 조건을 먼저 저장해야 계산할 수 있습니다.';
+    }
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '현재 방 상태에서는 계산을 시작할 수 없습니다.';
     }
@@ -143,8 +146,8 @@ export function CalculationResultPanel({
             후보 추천 계산
           </h2>
           <p className='text-sm leading-6 text-slate-500'>
-            참여자 응답과 이동 부담 자기 평가를 기준으로 계산합니다. 예산과
-            선호는 제한 없음으로 처리합니다.
+            참여자 조건과 후보별 응답을 함께 반영해 예산·시간·선호·이동 부담을
+            계산합니다.
           </p>
         </div>
         {isHost && (

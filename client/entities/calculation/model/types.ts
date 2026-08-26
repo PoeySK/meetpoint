@@ -10,7 +10,7 @@ export type RecommendationStatus =
   | "FULL_MATCH"
   | "PARTIAL_MATCH"
   | "NO_FULL_MATCH";
-export type ScoringProfile = "MVP_NO_CONDITIONS";
+export type ScoringProfile = "CONDITION_AWARE" | "MVP_NO_CONDITIONS";
 
 export type ScoreResultMetadata = {
   scoringProfile: ScoringProfile;

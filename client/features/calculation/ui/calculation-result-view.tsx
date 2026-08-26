@@ -21,7 +21,8 @@ const recommendationStatusLabels: Record<RecommendationStatus, string> = {
 };
 
 const scoringProfileLabels: Record<ScoringProfile, string> = {
-  MVP_NO_CONDITIONS: "조건 없는 MVP",
+  CONDITION_AWARE: "참여자 조건 반영 계산",
+  MVP_NO_CONDITIONS: "조건 없는 기본 계산",
 };
 
 const calculationCodeLabels: Record<string, string> = {
@@ -35,6 +36,11 @@ const calculationCodeLabels: Record<string, string> = {
   TIME_UNAVAILABLE: "시간 불가",
   TRAVEL_BURDEN_HARD: "이동 부담 높음",
   TRAVEL_BURDEN_UNCERTAIN: "이동 부담 불확실",
+  TIME_CONDITION_CONFLICT: "가능 시간과 후보 시간 충돌",
+  BUDGET_LIMIT_EXCEEDED: "예산 초과",
+  REQUIRED_TAG_MISSING: "필수 태그 누락",
+  AVOID_TAG_PRESENT: "피하고 싶은 태그 포함",
+  NO_BUDGET_CONSTRAINT: "예산 제한 없음",
 };
 
 export function getCalculationCodeLabel(code: string) {
@@ -161,7 +167,7 @@ export function CompletedResult({
                     {candidate.rank}순위
                   </p>
                   <h3 className="mt-1 text-lg font-semibold text-slate-950">
-                    {roomCandidate?.place.name ?? candidate.candidateId}
+                    {roomCandidate?.place.name ?? "후보 정보를 확인할 수 없습니다"}
                   </h3>
                 </div>
                 <div className="text-right">

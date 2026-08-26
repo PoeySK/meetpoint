@@ -4,10 +4,10 @@
 
 - **확정**: `Room`이 방 단위의 aggregate root다. 서버만 방 상태와 참여자·후보·응답·결정을 변경한다.
 - **확정**: Solver는 아래 도메인 객체를 데이터베이스에서 읽지 않는다. 서버가 한 번의 계산에 필요한 스냅샷을 만들어 Solver 입력으로 전달한다.
-- **확정**: 후보 시간과 후보 장소는 서로 다른 값 객체지만, MVP의 비교 단위인 `Candidate` 안에서 한 쌍으로 관리한다.
+- **확정**: 후보 시간과 후보 장소는 서로 다른 값 객체지만, 제품의 비교 단위인 `Candidate` 안에서 한 쌍으로 관리한다.
 - **확정**: Room 생성 시 HOST Participant를 함께 영속화하고, 방 코드 입장 시 MEMBER Participant를 생성한다. Room과 HOST Participant 생성은 하나의 트랜잭션으로 처리한다.
-- **확정**: 현재 vertical slice의 영속화 범위는 Room·HOST/MEMBER Participant, Candidate·ParticipantResponse, ScoreResult와 Decision이다. ParticipantCondition은 아직 구현하지 않는다.
-- **확정**: Room과 Participant는 논리적으로 양방향 관계를 갖지만, 이번 MVP의 DB 외래 키는 `Participant.roomId → Room.id`에만 둔다. `Room.hostParticipantId`의 유효성은 NestJS 서비스에서 검증한다.
+- **확정**: 현재 영속화 범위는 Room·HOST/MEMBER Participant, Candidate·ParticipantCondition·ParticipantResponse, ScoreResult와 Decision이다.
+- **확정**: Room과 Participant는 논리적으로 양방향 관계를 갖지만, 현재 DB 외래 키는 `Participant.roomId → Room.id`에만 둔다. `Room.hostParticipantId`의 유효성은 NestJS 서비스에서 검증한다.
 - **미결정**: 실제 ORM 엔티티명, 테이블 분할, ID 생성 방식(UUID·문자열 등)은 구현 단계에서 정한다. 문서의 ID는 API 예시용 문자열이다.
 
 ## 객체 관계
@@ -16,6 +16,7 @@
 Room 1 ─── N Participant
 Room 1 ─── N Candidate
 Participant 1 ─── N ParticipantResponse N ─── 1 Candidate
+Participant 1 ─── 1 ParticipantCondition
 Room 1 ─── N ScoreResult
 Room 1 ─── N Decision ─── 1 Candidate
 Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
@@ -53,7 +54,7 @@ Decision ─── 1 ScoreResult (확정 당시 사용한 계산 결과)
 - `latestScoreResultId`: 가장 최근 계산 결과를 가리키는 선택적 참조. 아직 계산 결과가 없으면 `null`이다.
 - `currentDecisionId`: 현재 확정 또는 재검토 중인 결정 참조. 아직 결정이 없으면 `null`이다.
 
-Room에는 `expiresAt`을 두지 않는다. Room 자체는 시간에 따라 자동 만료되거나 `CLOSED`로 전환되지 않으며, 이번 MVP에서 만료 대상은 Room이 아니라 방 범위 접근 토큰이다. 방 데이터 삭제와 보존 기간은 추후 결정한다.
+Room에는 `expiresAt`을 두지 않는다. Room 자체는 시간에 따라 자동 만료되거나 `CLOSED`로 전환되지 않으며, 현재 만료 대상은 Room이 아니라 방 범위 접근 토큰이다. 방 데이터 삭제와 보존 기간은 추후 결정한다.
 
 ### 상태값
 
@@ -62,7 +63,7 @@ Room에는 `expiresAt`을 두지 않는다. Room 자체는 시간에 따라 자�
 - `CALCULATING`: 최신 입력 스냅샷을 Solver가 처리 중이다.
 - `CALCULATED`: 유효한 계산 결과가 있고 아직 최종 확정하지 않았다.
 - `CONFIRMED`: 현재 최종 결정이 있다. 기본적으로 데이터 변경을 막는다.
-- `CLOSED`: 더 이상 입장·수정·계산하지 않는 종결 상태다. 이번 MVP에서는 자동 종결 로직을 구현하지 않는다.
+- `CLOSED`: 더 이상 입장·수정·계산하지 않는 종결 상태다. 현재 자동 종결 로직은 구현하지 않는다.
 
 Participant 입장은 `DRAFT`와 `OPEN` 상태에서만 허용한다. `CALCULATING`, `CALCULATED`, `CONFIRMED`, `CLOSED` 상태에서는 새 Participant를 생성하지 않는다.
 
@@ -84,7 +85,7 @@ Participant 입장은 `DRAFT`와 `OPEN` 상태에서만 허용한다. `CALCULATI
 
 하나의 `Room`은 여러 `Participant`, `Candidate`, `ScoreResult`, `Decision`을 가진다. 모든 하위 객체는 `roomId`로 소속을 확인하고 다른 방의 ID를 참조할 수 없다.
 
-Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`는 Room을 참조하는 실제 DB 외래 키로 설정한다. `Room.hostParticipantId`는 필수 UUID 컬럼으로 저장하지만 이번 MVP에서는 DB 외래 키를 설정하지 않는다. NestJS 서비스는 해당 Participant의 존재 여부, 현재 Room과의 `roomId` 일치 여부, `role=HOST` 여부를 검증한다. 추후 필요하면 DB 수준의 순환 참조 제약을 검토한다.
+Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`는 Room을 참조하는 실제 DB 외래 키로 설정한다. `Room.hostParticipantId`는 필수 UUID 컬럼으로 저장하지만 현재 DB 외래 키를 설정하지 않는다. NestJS 서비스는 해당 Participant의 존재 여부, 현재 Room과의 `roomId` 일치 여부, `role=HOST` 여부를 검증한다. 추후 필요하면 DB 수준의 순환 참조 제약을 검토한다.
 
 ### 생성 및 변경 시점
 
@@ -98,9 +99,9 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 해당 방에서 한 사람의 표시 이름, 역할, 참여 상태, 개인 조건을 나타낸다. 로그인 계정이 아니라 방에 한정된 참여자 기록이다.
 
-### 이번 단계의 최소 영속화 범위
+### 현재 구현된 Participant 영속화 범위
 
-이번 단계에서는 방 생성과 방 코드 입장에 필요한 HOST·MEMBER Participant를 저장한다. 다음 필드를 영속화한다.
+현재 구현에서는 방 생성과 방 코드 입장에 필요한 HOST·MEMBER Participant를 저장한다. 다음 필드를 영속화한다.
 
 - `id`
 - `roomId`
@@ -111,7 +112,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - `tokenExpiresAt`
 - `tokenRevokedAt` (초기값 `null`)
 
-참여자 조건 수정은 다음 단계에서 구현한다. 후보별 응답은 현재 단계에서 별도 `ParticipantResponse`로 저장·수정하며, 방 조회에서는 현재 방에 속한 HOST·MEMBER Participant와 활성 Candidate의 공개 정보만 반환한다.
+참여자 조건은 별도 `ParticipantCondition`으로 저장·수정하며, 후보별 응답은 별도 `ParticipantResponse`로 관리한다. 방 조회에서는 현재 방에 속한 HOST·MEMBER Participant와 활성 Candidate, 요청자 본인의 조건·응답만 반환한다.
 
 ### 주요 필드
 
@@ -141,7 +142,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 }
 ```
 
-접근 자격 메타데이터는 공개 Participant 응답과 분리해 서버 내부에 보관한다. 이번 단계에서는 별도 임의 테이블을 만들지 않고 최소 Participant 레코드의 내부 필드로 저장한다.
+접근 자격 메타데이터는 공개 Participant 응답과 분리해 서버 내부에 보관한다. 현재는 별도 임의 테이블을 만들지 않고 Participant 레코드의 내부 필드로 저장한다.
 
 ```json
 {
@@ -156,7 +157,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 ### `ParticipantCondition` 값 객체
 
-- `availabilityWindows`: 가능한 시간 구간. 후보 시간과 겹치지 않으면 `AVAILABLE` 응답을 제출할 수 없다.
+- `availabilityWindows`: 가능한 시간 구간. 후보 시간이 하나의 구간 안에 완전히 포함되지 않으면 `AVAILABLE` 응답을 제출할 수 없다.
 - `maxBudgetKrw`: 1인 예상 비용 상한. `null`이면 예산 제한 없음.
 - `requiredTags`: 반드시 후보 장소 태그에 포함되어야 하는 조건.
 - `preferredTags`: 포함되면 선호 점수를 받는 조건.
@@ -167,7 +168,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - `JOINED`: 방에 입장했지만 조건 또는 후보 응답이 완료되지 않았다.
 - `RESPONDED`: 조건이 저장되고 모든 활성 후보에 응답했다.
 
-현재 단계에는 `ParticipantCondition` 저장 API가 없으므로 후보 응답을 저장해도 참여자 상태는 `JOINED`로 유지한다. 조건 저장과 전체 응답 충족을 함께 지원하는 단계에서 `RESPONDED` 전환을 적용한다.
+조건이 없으면 후보 응답을 저장할 수 없다. 조건을 저장하고 모든 활성 후보에 응답하면 `RESPONDED`로 전환하며, 후보가 추가되면 새 응답이 필요하므로 `JOINED`로 되돌린다.
 
 `LEFT`는 MEMBER가 스스로 방을 나간 상태이고, `REMOVED`는 HOST가 MEMBER를 강제 제거한 상태다. 두 상태는 현재 활성 Participant, 새 계산 snapshot, coverage와 Decision 확정 검증에서 제외한다. Participant와 연결된 Response, 과거 ScoreResult·Decision은 물리 삭제하지 않는다.
 
@@ -179,13 +180,13 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 ### 관계
 
-하나의 참여자는 하나의 방에만 속하고 여러 `ParticipantResponse`를 가진다. 참여자의 조건은 후보별 응답과 별도로 저장된다.
+하나의 참여자는 하나의 방에만 속하고 하나의 `ParticipantCondition`과 여러 `ParticipantResponse`를 가진다. 조건은 후보별 응답과 별도로 저장되며 다른 참여자에게 공개하지 않는다.
 
 ### 생성 및 변경 시점
 
 - 방 생성 때 호스트 참여자를 생성한다.
 - 초대 링크 또는 코드로 입장할 때 멤버 참여자를 생성한다.
-- 참여자가 조건을 제출하거나 수정할 때 `condition`과 제출 시각을 갱신한다.
+- 참여자가 조건을 제출하거나 수정할 때 `participant_conditions`의 조건과 제출·수정 시각을 갱신한다.
 - Participant 이탈·강제 제거 mutation은 `ParticipantLifecycleService`가 소유하며, Room row lock을 포함한 짧은 transaction에서 상태 변경, token 폐기, 최신 완료 ScoreResult의 `STALE` 처리를 함께 수행한다. leave/kick 요청은 별도 입력 DTO 없이 Bearer token과 경로의 대상 ID를 사용한다.
 
 ## Candidate
@@ -225,8 +226,8 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 ### 시간과 장소의 구분
 
 - **후보 시간**은 `startsAt`, `endsAt`, `timezone`으로 표현되는 만남 시간 구간이다.
-- **후보 장소**는 `name`, `address`, `area`로 표현되는 만남 위치다. 장소 태그는 `Candidate.tags`에 저장한다. 주소와 area는 MVP에서 표시용이고, 태그만 선호 점수에 사용한다.
-- 둘은 각각 변경 가능한 값이지만 MVP의 후보 ID 하나 안에 함께 저장한다. 예를 들어 같은 식당의 금요일 19시와 토요일 18시는 서로 다른 `Candidate`다.
+- **후보 장소**는 `name`, `address`, `area`로 표현되는 만남 위치다. 장소 태그는 `Candidate.tags`에 저장한다. 주소와 area는 현재 표시용이고, 태그만 선호 점수에 사용한다.
+- 둘은 각각 변경 가능한 값이지만 제품의 후보 ID 하나 안에 함께 저장한다. 예를 들어 같은 식당의 금요일 19시와 토요일 18시는 서로 다른 `Candidate`다.
 - 지도 API가 없으므로 장소의 좌표나 실제 경로를 필수 필드로 두지 않는다. 이동 부담 계산에는 참가자가 후보별로 제출한 `travelBurden`을 사용한다.
 
 ### 상태값
@@ -302,7 +303,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
   "id": "score_20260813_01",
   "roomId": "room_01",
   "status": "COMPLETED",
-  "policyVersion": "mvp-1",
+  "policyVersion": "condition-aware-1",
   "inputSnapshotHash": "sha256:example",
   "participantCount": 4,
   "candidateCount": 3,
@@ -397,7 +398,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 ## 확정 사항과 미결정 사항 요약
 
 - **확정**: 도메인 변경의 기준은 `Room`이며, `ScoreResult`는 이력 보존형이고 `Decision`은 별도 확정 기록이다.
-- **확정**: 후보 시간과 장소를 각각 값 객체로 저장하되, MVP의 후보 비교 단위는 둘을 묶은 `Candidate`다.
-- **확정**: Room 자체 만료와 시간에 따른 자동 `CLOSED` 전환은 이번 MVP에서 구현하지 않는다. 24시간 만료 대상은 방 범위 접근 토큰이다.
+- **확정**: 후보 시간과 장소를 각각 값 객체로 저장하되, 제품의 후보 비교 단위는 둘을 묶은 `Candidate`다.
+- **확정**: Room 자체 만료와 시간에 따른 자동 `CLOSED` 전환은 현재 구현하지 않는다. 24시간 만료 대상은 방 범위 접근 토큰이다.
 - **확정**: Room과 Participant의 관계는 논리적으로 양방향이지만 DB 외래 키는 `Participant.roomId`에만 설정한다. `Room.hostParticipantId`는 서비스 검증으로 보장하며, 순환 FK는 추후 검토한다.
-- **미결정**: 방 데이터 삭제·보존 기간과 응답 변경 이력의 보존 수준은 추후 정한다. HOST 승계와 계정 기반 영구 차단은 MVP 범위 밖이다.
+- **미결정**: 방 데이터 삭제·보존 기간과 응답 변경 이력의 보존 수준은 추후 정한다. HOST 승계와 계정 기반 영구 차단은 별도 정책으로 다룬다.
