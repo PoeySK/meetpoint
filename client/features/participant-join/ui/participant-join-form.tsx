@@ -109,8 +109,8 @@ export function ParticipantJoinForm({
   }
 
   return (
-    <main className='min-h-screen bg-[#f6f7f3] px-4 py-8 font-sans text-slate-950 sm:px-6 sm:py-12'>
-      <div className='mx-auto flex w-full max-w-xl flex-col gap-8'>
+    <main className='mp-page px-4 py-5 font-sans text-slate-950 sm:px-6 sm:py-8'>
+      <div className='mx-auto flex w-full max-w-lg flex-col gap-5'>
         <div className='flex items-center justify-between gap-4'>
           <Link className='text-lg font-bold tracking-tight' href='/'>
             MeetPoint
@@ -118,10 +118,10 @@ export function ParticipantJoinForm({
           <span className='text-xs font-medium text-slate-400'>방 입장</span>
         </div>
 
-        <section className='rounded-4xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8'>
-          <div className='mb-8 space-y-2'>
+        <section className='mp-card mp-card-raised p-4 sm:p-6'>
+          <div className='mb-5 space-y-1.5'>
             <p className='text-sm font-semibold text-emerald-700'>참여자</p>
-            <h1 className='text-3xl font-semibold tracking-tight'>
+            <h1 className='text-2xl font-semibold tracking-tight'>
               초대받은 방에 입장하기
             </h1>
             <p className='text-sm leading-6 text-slate-500'>
@@ -129,7 +129,7 @@ export function ParticipantJoinForm({
             </p>
           </div>
 
-          <form className='space-y-5' onSubmit={handleSubmit} noValidate>
+          <form className='space-y-4' onSubmit={handleSubmit} noValidate>
             <div className='space-y-2'>
               <label
                 className='text-sm font-semibold text-slate-800'
@@ -144,7 +144,7 @@ export function ParticipantJoinForm({
                 aria-invalid={Boolean(fieldErrors.roomCode)}
                 autoCapitalize='characters'
                 autoComplete='off'
-                className='w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-lg font-semibold uppercase tracking-[0.2em] outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
+                className='mp-input text-lg font-semibold uppercase tracking-[0.2em] placeholder:normal-case placeholder:tracking-normal'
                 id='roomCode'
                 inputMode='text'
                 maxLength={6}
@@ -174,7 +174,7 @@ export function ParticipantJoinForm({
                 }
                 aria-invalid={Boolean(fieldErrors.displayName)}
                 autoComplete='nickname'
-                className='w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100'
+                className='mp-input'
                 id='displayName'
                 maxLength={30}
                 onChange={(event) => setDisplayName(event.target.value)}
@@ -191,14 +191,14 @@ export function ParticipantJoinForm({
             {formError && (
               <p
                 aria-live='polite'
-                className='rounded-xl bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700'
+                className='rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700'
               >
                 {formError}
               </p>
             )}
 
             <button
-              className='flex w-full items-center justify-center rounded-xl bg-slate-950 px-4 py-3.5 text-base font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-300'
+              className='mp-button mp-button-primary flex w-full items-center justify-center'
               disabled={isSubmitting}
               type='submit'
             >

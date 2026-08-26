@@ -29,6 +29,39 @@ pub struct SolverParticipant {
     pub participant_id: String,
     #[serde(default)]
     pub responses: Vec<SolverResponse>,
+    #[serde(default)]
+    pub condition: Option<SolverCondition>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct SolverCondition {
+    #[serde(default)]
+    pub availability_windows: Vec<AvailabilityWindow>,
+    #[serde(default)]
+    pub max_budget_krw: Option<i32>,
+    #[serde(default)]
+    pub preferences: SolverPreferences,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct AvailabilityWindow {
+    #[serde(default)]
+    pub starts_at: String,
+    #[serde(default)]
+    pub ends_at: String,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct SolverPreferences {
+    #[serde(default)]
+    pub required_tags: Vec<String>,
+    #[serde(default)]
+    pub preferred_tags: Vec<String>,
+    #[serde(default)]
+    pub avoid_tags: Vec<String>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]

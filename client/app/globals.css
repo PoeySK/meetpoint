@@ -1,26 +1,131 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f7f8f6;
+  --foreground: #0f172a;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: Arial, Helvetica, sans-serif;
+  --font-sans: "Pretendard", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-height: 100%;
+  background: var(--background);
 }
 
 body {
+  min-height: 100%;
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Pretendard", "Inter", ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+::selection {
+  background: #a7f3d0;
+  color: #064e3b;
+}
+
+@layer components {
+  .mp-page {
+    min-height: 100vh;
+    background:
+      radial-gradient(circle at 12% 0%, rgb(209 250 229 / 0.55), transparent 28rem),
+      linear-gradient(145deg, #f8faf8 0%, #f3f6f4 100%);
+  }
+
+  .mp-card {
+    border: 1px solid rgb(226 232 240 / 0.9);
+    border-radius: 1.25rem;
+    background: rgb(255 255 255 / 0.92);
+    box-shadow: 0 12px 32px -26px rgb(15 23 42 / 0.35);
+  }
+
+  .mp-card-raised {
+    box-shadow: 0 20px 48px -34px rgb(15 23 42 / 0.42);
+  }
+
+  .mp-input {
+    width: 100%;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.75rem;
+    background: rgb(255 255 255 / 0.95);
+    padding: 0.65rem 0.8rem;
+    font-size: 0.9375rem;
+    line-height: 1.25rem;
+    outline: none;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+
+  .mp-input::placeholder {
+    color: #94a3b8;
+  }
+
+  .mp-input:focus {
+    border-color: #10b981;
+    box-shadow: 0 0 0 3px rgb(167 243 208 / 0.55);
+  }
+
+  .mp-button {
+    border-radius: 0.75rem;
+    padding: 0.65rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 600;
+    line-height: 1.25rem;
+    transition: background-color 150ms ease, border-color 150ms ease,
+      color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+  }
+
+  .mp-button:active:not(:disabled) {
+    transform: translateY(1px);
+  }
+
+  .mp-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+  }
+
+  .mp-button:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(167 243 208 / 0.7);
+  }
+
+  .mp-button-primary {
+    background: #0f172a;
+    color: white;
+  }
+
+  .mp-button-primary:hover:not(:disabled) {
+    background: #047857;
+  }
+
+  .mp-button-primary:disabled {
+    cursor: not-allowed;
+    background: #cbd5e1;
+  }
+
+  .mp-button-secondary {
+    border: 1px solid #cbd5e1;
+    background: rgb(255 255 255 / 0.8);
+    color: #475569;
+  }
+
+  .mp-button-secondary:hover:not(:disabled) {
+    border-color: #10b981;
+    color: #047857;
+  }
 }

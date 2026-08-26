@@ -5,9 +5,9 @@
 - **확정**: `client`는 화면과 입력을 담당하고, `services/server`는 유일한 외부 REST API·데이터 소유자이며, `services/solver`는 독립적인 계산 HTTP 서비스다.
 - **확정**: PostgreSQL은 Docker로 실행하고 NestJS 서버만 접근한다. Solver와 브라우저는 PostgreSQL에 직접 연결하지 않는다.
 - **확정**: 외부 AI API를 도입할 때는 NestJS 서버에서 직접 호출한다. GPT는 구조화·설명 보조에만 사용하고 수치 계산은 Rust Solver가 한다.
-- **권장 기준**: 로컬 포트는 client `3000`, server `3001`, solver `4000`, PostgreSQL `5432`를 기준으로 문서화한다.
-- **확정**: NestJS의 PostgreSQL 접근은 `@nestjs/typeorm` + TypeORM + `pg`로 구성하고 `synchronize=false`, `migrationsRun=false`로 시작한다. 도메인 엔티티와 migration은 다음 단계에서 추가한다.
-- **확정**: Rust Solver의 HTTP 서버는 Axum + Tokio로 구성한다. 이번 단계에는 `/health`만 둔다.
+- **권장 기준**: 로컬 포트는 client `10081`, server `3001`, solver `4000`, PostgreSQL `5432`를 기준으로 문서화한다.
+- **확정**: NestJS의 PostgreSQL 접근은 `@nestjs/typeorm` + TypeORM + `pg`로 구성하고 `synchronize=false`, `migrationsRun=false`로 시작한다. 도메인 엔티티와 migration은 `services/server/src/database/migrations`에서 관리한다.
+- **확정**: Rust Solver의 HTTP 서버는 Axum + Tokio로 구성하며 `/health`와 `/v1/solve`를 제공한다.
 - **미결정**: 실제 배포 플랫폼, TLS 종료 위치, 데이터베이스 백업·보존 기간, Solver의 인증 방식은 구현·배포 준비 때 확정한다.
 
 ## 1. 전체 시스템 구성
@@ -17,14 +17,15 @@
       │
       │ HTTP/JSON
       ▼
-Next.js Client (client :3000)
+Next.js Client (client :10081)
       │
       │ /api/v1 REST, room-scoped token
       ▼
 NestJS Server (services/server :3001)
       ├────────────── PostgreSQL (:5432, Docker)
       │                  └─ Room, Participant, Candidate,
-      │                     Response, ScoreResult, Decision
+      │                     ParticipantCondition, Response,
+      │                     ScoreResult, Decision
       │
       └────────────── Rust Solver (services/solver :4000)
                          └─ 후보별 점수·순위·근거 계산
@@ -64,16 +65,16 @@ Client는 `overallScore`를 다시 계산하거나 후보 순위를 자체적으
 - 최종 Decision의 호스트 권한 검사와 확정 이력 보존
 - 추후 OpenAI 호출과 외부 응답의 구조화
 
-NestJS 내부 서비스도 기능 단위로 책임을 나눈다. `RoomService`는 방 생성·입장을, `RoomQueryService`는 Room 조회 projection을, `CandidateService`는 후보 등록을, `ParticipantResponseService`는 참가자 응답 저장을, `RoomCalculationService`는 계산 접수·조회·Solver 완료 전이를, `ParticipantLifecycleService`는 MEMBER leave·HOST kick의 Participant 상태·token 폐기·최신 ScoreResult 무효화를 담당한다. `DecisionService`는 Decision 확정·재검토·조회와 그 transaction을 담당한다. HTTP 진입점도 `RoomsController`, `CandidateController`, `ParticipantResponseController`, `CalculationController`, `DecisionController`, `ParticipantLifecycleController`로 나누며, 각 Controller는 경로·헤더·본문을 해당 서비스로 전달하는 얇은 어댑터로 유지한다.
+NestJS 내부 서비스도 기능 단위로 책임을 나눈다. `RoomService`는 방 생성·입장을, `RoomQueryService`는 Room 조회 projection을, `CandidateService`는 후보 등록을, `ParticipantConditionService`는 본인 조건 저장과 상태 전이를, `ParticipantResponseService`는 참가자 응답 저장을, `RoomCalculationService`는 계산 접수·조회·Solver 완료 전이를, `ParticipantLifecycleService`는 MEMBER leave·HOST kick의 Participant 상태·token 폐기·최신 ScoreResult 무효화를 담당한다. `DecisionService`는 Decision 확정·재검토·조회와 그 transaction을 담당한다. HTTP 진입점도 `RoomsController`, `CandidateController`, `ParticipantConditionController`, `ParticipantResponseController`, `CalculationController`, `DecisionController`, `ParticipantLifecycleController`로 나누며, 각 Controller는 경로·헤더·본문을 해당 서비스로 전달하는 얇은 어댑터로 유지한다.
 
 브라우저가 직접 Solver를 호출하지 않으므로 계산 입력에 방 토큰이나 내부 서비스 주소가 노출되지 않는다.
 
 ### 통신 규칙
 
 - 로컬 개발에서 client는 `http://localhost:3001/api/v1`를 호출한다.
-- Server는 `http://localhost:3000`을 허용 origin으로 설정한다. 실제 CORS 설정값은 환경 변수로 둔다.
-- 브라우저가 보내는 Origin은 사용자가 접속한 주소이므로 Docker 내부 서비스명(`client`)을 CORS origin으로 임의 지정하지 않는다. 호스트 실행에서는 `http://localhost:3000`, 배포에서는 실제 공개 Client origin을 사용한다.
-- MVP는 쿠키 세션을 사용하지 않고 Bearer 토큰을 사용하므로 CORS 요청에 `credentials`를 요구하지 않는다.
+- Server는 `http://localhost:10081`을 허용 origin으로 설정한다. 실제 CORS 설정값은 환경 변수로 둔다.
+- 브라우저가 보내는 Origin은 사용자가 접속한 주소이므로 Docker 내부 서비스명(`client`)을 CORS origin으로 임의 지정하지 않는다. 호스트 실행에서는 `http://localhost:10081`, 배포에서는 실제 공개 Client origin을 사용한다.
+- 현재 인증은 쿠키 세션이 아닌 Bearer 토큰이므로 CORS 요청에 `credentials`를 요구하지 않는다.
 - API 오류는 `docs/04-api-contract.md`의 공통 오류 envelope와 `requestId`를 사용한다.
 - 서버는 계산 요청을 받은 뒤 `calculationId`를 반환하고, Client는 계산 상태·결과 API를 조회한다.
 
@@ -116,7 +117,7 @@ Solver 호출 자체는 DB 트랜잭션을 오래 잠그지 않는다. 서버는
   → Server가 상태·후보·조건·응답 검증
   → 계산 ID와 입력 snapshot 저장
   → POST /v1/solve
-  → Solver가 mvp-1 규칙으로 계산
+  → Solver가 condition-aware-1 규칙으로 계산
   → 결과 또는 구조화된 오류 반환
   → Server가 결과 저장
   → Client가 최신 결과 조회
@@ -161,7 +162,7 @@ OpenAI API가 할 수 없는 역할은 다음과 같다.
 - 방장 대신 최종 후보 확정
 - Client에서 API 키를 직접 사용하는 것
 
-OpenAI 응답은 Server에서 schema 검증·수정 이력·실패 처리를 거친다. AI 호출은 현재 MVP 경로에 포함하지 않는다.
+OpenAI 응답은 Server에서 schema 검증·수정 이력·실패 처리를 거친다. AI 호출은 현재 제품 경로에 포함하지 않는다.
 
 ## 6. 서비스별 책임 범위
 
@@ -198,7 +199,7 @@ OpenAI 응답은 Server에서 schema 검증·수정 이력·실패 처리를 거
 
 ## 8. 타임아웃 및 재시도 정책
 
-### MVP 권장값
+### 기본 권장값
 
 - 연결 타임아웃: 1초
 - Solver 응답 타임아웃: 3초
@@ -206,7 +207,7 @@ OpenAI 응답은 Server에서 schema 검증·수정 이력·실패 처리를 거
 - 재시도 간격: 짧은 고정 지연 또는 지수 지연 중 구현 단계에서 선택
 - 400·422 입력 오류와 409 상태 충돌은 재시도하지 않음
 
-재시도는 최초 요청과 같은 `calculationId`/`requestId` 또는 멱등 키를 사용한다. 첫 번째 호출이 성공했지만 응답만 유실된 경우 중복 ScoreResult가 만들어지지 않아야 한다. Solver 계산은 MVP 입력 크기에서 3초 안에 끝나는 것을 목표로 하며, 실제 기준은 부하 테스트 후 조정한다.
+재시도는 최초 요청과 같은 `calculationId`/`requestId` 또는 멱등 키를 사용한다. 첫 번째 호출이 성공했지만 응답만 유실된 경우 중복 ScoreResult가 만들어지지 않아야 한다. Solver 계산은 현재 입력 크기에서 3초 안에 끝나는 것을 목표로 하며, 실제 기준은 부하 테스트 후 조정한다.
 
 ## 9. 환경 변수 관리 방식
 
@@ -222,7 +223,7 @@ DATABASE_URL=postgresql://meetpoint:meetpoint-local@localhost:5432/meetpoint
 SOLVER_BASE_URL=http://localhost:4000
 SOLVER_CONNECT_TIMEOUT_MS=1000
 SOLVER_RESPONSE_TIMEOUT_MS=3000
-CLIENT_ORIGIN=http://localhost:3000
+CLIENT_ORIGIN=http://localhost:10081
 OPENAI_API_KEY=  # 추후 사용, 현재 비워 둠
 
 # PostgreSQL Docker
@@ -242,7 +243,7 @@ SOLVER_BASE_URL=http://meetpoint-solver:4000
 
 # 브라우저가 호스트에서 접근하는 Client의 API 주소는 계속 공개 주소를 사용
 NEXT_PUBLIC_SERVER_BASE_URL=http://localhost:3001
-CLIENT_ORIGIN=http://localhost:3000
+CLIENT_ORIGIN=http://localhost:10081
 ```
 
 `meetpoint-postgres`와 `meetpoint-solver`는 MeetPoint Docker 리소스의 역할 기반 이름이다. 추후 Server와 Client를 컨테이너화할 때도 `meetpoint-server`, `meetpoint-client` 규칙을 사용한다. `NEXT_PUBLIC_SERVER_BASE_URL`은 브라우저가 해석하므로 `http://meetpoint-server:3001` 같은 Docker 내부 이름을 넣지 않는다. 호스트 실행과 Docker 실행을 동시에 지원하려면 위 두 환경 세트를 별도 파일·프로파일로 관리한다.
@@ -258,7 +259,7 @@ CLIENT_ORIGIN=http://localhost:3000
 
 | 항목 | 로컬 개발 | 배포 목표 |
 | --- | --- | --- |
-| Client | 호스트에서 Next.js, `localhost:3000` | Client 컨테이너 또는 정적/Node 런타임, 공개 HTTPS 도메인 |
+| Client | 호스트에서 Next.js, `localhost:10081` | Client 컨테이너 또는 정적/Node 런타임, 공개 HTTPS 도메인 |
 | Server | 호스트에서 NestJS, 목표 `localhost:3001` | 내부 서비스 포트와 외부 reverse proxy 경로 분리 |
 | Solver | 호스트에서 Rust HTTP, 목표 `localhost:4000` | Server만 접근 가능한 내부 네트워크 서비스 |
 | PostgreSQL | `infra`의 Docker 컨테이너, `localhost:5432` | 영속 볼륨을 가진 PostgreSQL 컨테이너 또는 별도 운영 환경. 최종 선택 미결정 |
@@ -270,7 +271,7 @@ CLIENT_ORIGIN=http://localhost:3000
 
 실행 환경 구성 이후의 저장소는 다음 포트 정책을 사용한다.
 
-- Next.js Client는 3000을 유지한다.
+- Next.js Client는 10081을 사용한다.
 - NestJS Server는 `SERVER_PORT` 우선, `PORT` fallback이며 기본값은 3001이다.
 - Rust Solver는 `SOLVER_PORT` 우선, `PORT` fallback이며 기본값은 4000이다.
 - `infra/docker-compose.yml`은 PostgreSQL을 호스트 5432에 공개하고 `meetpoint-postgres-data` named volume, `meetpoint-network`, healthcheck를 사용한다.

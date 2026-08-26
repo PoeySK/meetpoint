@@ -1,11 +1,15 @@
 use crate::domain::{
-    policy::{ScoringPolicy, ScoringWeights},
+    policy::ScoringPolicy,
     scoring::{
         BlockingIssue, CandidateCoverage, Conflict, ConflictCode, ExplanationFlag, MatchLevel,
         ParticipantBreakdown, ScoreComponents, ScoredCandidate, push_unique, round_score,
     },
-    types::{AvailabilityStatus, Candidate, Participant, ParticipantResponse, TravelBurden},
+    types::{
+        AvailabilityStatus, Candidate, Participant, ParticipantCondition, ParticipantResponse,
+        TravelBurden,
+    },
 };
+use std::collections::HashSet;
 
 pub(super) fn score_candidate(
     candidate: &Candidate,
@@ -23,7 +27,8 @@ pub(super) fn score_candidate(
             .responses
             .iter()
             .find(|response| response.candidate_id == candidate.id);
-        let breakdown = score_participant(response, policy.weights);
+        let breakdown =
+            score_participant(response, participant.condition.as_ref(), candidate, policy);
 
         if response.is_some() {
             submitted_responses += 1;
@@ -60,6 +65,8 @@ pub(super) fn score_candidate(
             && participant.hard_conflicts.is_empty()
             && participant.components.time == policy.weights.time
             && participant.components.travel_burden == policy.weights.travel_burden
+            && participant.components.budget == policy.weights.budget
+            && participant.components.preference == policy.weights.preference
     });
     let match_level = if has_missing_response {
         MatchLevel::Incomplete
@@ -126,14 +133,29 @@ impl ParticipantScore {
 
 fn score_participant(
     response: Option<&ParticipantResponse>,
-    weights: ScoringWeights,
+    condition: Option<&ParticipantCondition>,
+    candidate: &Candidate,
+    policy: ScoringPolicy,
 ) -> ParticipantScore {
+    let weights = policy.weights;
     let mut hard_conflicts = Vec::new();
     let mut blocking_issues = Vec::new();
     let mut explanation_flags = Vec::new();
     let (time, travel_burden, availability_reason, travel_reason) = match response {
         Some(response) => {
             let (time, availability) = match response.availability {
+                AvailabilityStatus::Available
+                    if policy.condition_aware
+                        && condition.is_some_and(|condition| {
+                            !condition.availability_windows.iter().any(|window| {
+                                candidate.starts_at >= window.starts_at
+                                    && candidate.ends_at <= window.ends_at
+                            })
+                        }) =>
+                {
+                    hard_conflicts.push(ConflictCode::TimeConditionConflict);
+                    (0.0, "AVAILABLE_OUTSIDE_CONDITION")
+                }
                 AvailabilityStatus::Available => (weights.time, "AVAILABLE"),
                 AvailabilityStatus::Maybe => {
                     push_unique(&mut explanation_flags, ExplanationFlag::MaybeResponse);
@@ -171,26 +193,38 @@ fn score_participant(
         }
     };
 
-    let (budget, preference) = if response.is_some() {
-        (weights.budget, weights.preference)
-    } else {
-        (0.0, 0.0)
+    let (budget, budget_reason) = match (response, condition) {
+        (None, _) => (0.0, "MISSING".to_string()),
+        (Some(_), None) => (weights.budget, "NO_BUDGET_CONSTRAINT".to_string()),
+        (Some(_), Some(condition)) => score_budget(
+            condition.max_budget_krw,
+            candidate.estimated_cost_per_person_krw,
+            weights.budget,
+            &mut hard_conflicts,
+            &mut explanation_flags,
+        ),
+    };
+    let (preference, preference_reason) = match (response, condition) {
+        (None, _) => (0.0, "PREFERENCE_UNEVALUATED".to_string()),
+        (Some(_), None) => (weights.preference, "PREFERENCE_UNEVALUATED".to_string()),
+        (Some(_), Some(condition)) => score_preferences(
+            condition,
+            &candidate.tags,
+            weights.preference,
+            &mut hard_conflicts,
+        ),
     };
 
-    let reasons = if availability_reason == "MISSING" {
-        vec![
-            "response: MISSING".to_string(),
-            "budget: NO_BUDGET_CONSTRAINT".to_string(),
-            "preference: PREFERENCE_UNEVALUATED".to_string(),
-        ]
+    let mut reasons = if availability_reason == "MISSING" {
+        vec!["response: MISSING".to_string()]
     } else {
         vec![
             format!("availability: {availability_reason}"),
             format!("travelBurden: {travel_reason}"),
-            "budget: NO_BUDGET_CONSTRAINT".to_string(),
-            "preference: PREFERENCE_UNEVALUATED".to_string(),
         ]
     };
+    reasons.push(format!("budget: {budget_reason}"));
+    reasons.push(format!("preference: {preference_reason}"));
 
     ParticipantScore {
         score: time + travel_burden + budget + preference,
@@ -205,6 +239,90 @@ fn score_participant(
         explanation_flags,
         reasons,
     }
+}
+
+fn score_budget(
+    max_budget_krw: Option<i32>,
+    cost: i32,
+    weight: f64,
+    hard_conflicts: &mut Vec<ConflictCode>,
+    explanation_flags: &mut Vec<ExplanationFlag>,
+) -> (f64, String) {
+    let Some(max_budget_krw) = max_budget_krw else {
+        push_unique(explanation_flags, ExplanationFlag::NoBudgetConstraint);
+        return (weight, "NO_BUDGET_CONSTRAINT".to_string());
+    };
+
+    let budget = max_budget_krw as f64;
+    let cost = cost as f64;
+    if cost <= budget {
+        return (weight, "WITHIN_LIMIT".to_string());
+    }
+
+    hard_conflicts.push(ConflictCode::BudgetLimitExceeded);
+    if budget == 0.0 {
+        return (0.0, "OVER_LIMIT".to_string());
+    }
+
+    if cost <= budget * 2.0 {
+        (
+            weight * (2.0 - cost / budget),
+            "ABOVE_LIMIT_WITHIN_TWICE".to_string(),
+        )
+    } else {
+        (0.0, "OVER_TWICE_LIMIT".to_string())
+    }
+}
+
+fn score_preferences(
+    condition: &ParticipantCondition,
+    candidate_tags: &[String],
+    weight: f64,
+    hard_conflicts: &mut Vec<ConflictCode>,
+) -> (f64, String) {
+    let candidate_tags = candidate_tags.iter().collect::<HashSet<_>>();
+    let required_missing = condition
+        .required_tags
+        .iter()
+        .any(|tag| !candidate_tags.contains(tag));
+    let avoid_present = condition
+        .avoid_tags
+        .iter()
+        .any(|tag| candidate_tags.contains(tag));
+    if required_missing {
+        hard_conflicts.push(ConflictCode::RequiredTagMissing);
+    }
+    if avoid_present {
+        hard_conflicts.push(ConflictCode::AvoidTagPresent);
+    }
+
+    let required_score = if !required_missing && !avoid_present {
+        weight * 2.0 / 3.0
+    } else {
+        0.0
+    };
+    let preferred_score = if condition.preferred_tags.is_empty() {
+        weight / 3.0
+    } else {
+        let matched = condition
+            .preferred_tags
+            .iter()
+            .filter(|tag| candidate_tags.contains(tag))
+            .count();
+        weight / 3.0 * matched as f64 / condition.preferred_tags.len() as f64
+    };
+
+    let reason = if required_missing || avoid_present {
+        format!(
+            "REQUIRED_MATCH={};PREFERRED_MATCH={};AVOID_MATCH={}",
+            !required_missing,
+            preferred_score > 0.0,
+            avoid_present
+        )
+    } else {
+        format!("REQUIRED_MATCH=true;PREFERRED_SCORE={:.1}", preferred_score)
+    };
+    (required_score + preferred_score, reason)
 }
 
 fn candidate_reasons(submitted_responses: usize, expected_responses: usize) -> Vec<String> {

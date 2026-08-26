@@ -1,5 +1,6 @@
 import type { Candidate } from "@/entities/candidate";
 import type { ParticipantResponsePayload } from "@/entities/participant-response";
+import type { ParticipantCondition } from "@/entities/participant-condition";
 
 export type RoomStatus =
   | "DRAFT"
@@ -86,6 +87,7 @@ export type RoomDetailsResponse = {
   participants: PublicParticipant[];
   candidates: Candidate[];
   myResponses: ParticipantResponsePayload[];
+  myCondition: ParticipantCondition | null;
   latestScoreResult: null;
   decision: null;
 };

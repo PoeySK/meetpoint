@@ -4,6 +4,7 @@ import {
   createRoomsTestContext,
   expectRoomError,
   validCandidatePayload,
+  validConditionPayload,
   validPayload,
   type RoomsTestContext,
 } from '../../../test/rooms-http-test-harness';
@@ -42,6 +43,13 @@ describe('Participant response HTTP contract', () => {
       .set('Authorization', `Bearer ${created.body.access.hostToken}`)
       .send(validCandidatePayload())
       .expect(201);
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/conditions`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validConditionPayload())
+      .expect(200);
     database.rooms.get(created.body.room.id)!.status = RoomStatus.CALCULATED;
 
     const first = await request(app.getHttpServer())
@@ -64,7 +72,7 @@ describe('Participant response HTTP contract', () => {
       note: 'Near the station',
       status: ParticipantResponseStatus.SUBMITTED,
     });
-    expect(first.body.participantStatus).toBe(ParticipantStatus.JOINED);
+    expect(first.body.participantStatus).toBe(ParticipantStatus.RESPONDED);
     expect(first.body.scoreResultStatus).toBe('STALE');
     expect(database.rooms.get(created.body.room.id)?.status).toBe(
       RoomStatus.OPEN
@@ -106,6 +114,13 @@ describe('Participant response HTTP contract', () => {
       .set('Authorization', `Bearer ${created.body.access.hostToken}`)
       .send(validCandidatePayload())
       .expect(201);
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/conditions`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validConditionPayload())
+      .expect(200);
     const path = `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`;
     const validResponse = {
       availabilityStatus: AvailabilityStatus.AVAILABLE,
@@ -176,6 +191,13 @@ describe('Participant response HTTP contract', () => {
       .set('Authorization', `Bearer ${created.body.access.hostToken}`)
       .send(validCandidatePayload())
       .expect(201);
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/conditions`
+      )
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validConditionPayload())
+      .expect(200);
     database.failResponseSave = true;
 
     const response = await request(app.getHttpServer())

@@ -35,7 +35,7 @@ export function QuickResponsePanel({
   return (
     <section
       aria-labelledby="quick-response-heading"
-      className="rounded-2xl border border-emerald-100 bg-emerald-50/60 p-5 sm:p-6"
+      className="rounded-xl border border-emerald-100 bg-emerald-50/55 p-4 sm:p-5"
     >
       <div className="space-y-2">
         <h3
@@ -50,7 +50,7 @@ export function QuickResponsePanel({
         </p>
       </div>
 
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-slate-800">
             전체 가능 여부
@@ -59,7 +59,7 @@ export function QuickResponsePanel({
             {availabilityOptions.map((option) => (
               <button
                 aria-pressed={availabilityStatus === option.value}
-                className={`rounded-xl border px-2 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
                   availabilityStatus === option.value
                     ? "border-emerald-600 bg-emerald-600 text-white"
                     : "border-white bg-white text-slate-600 hover:border-emerald-300"
@@ -83,7 +83,7 @@ export function QuickResponsePanel({
             {travelOptions.map((option) => (
               <button
                 aria-pressed={travelBurden === option.value}
-                className={`rounded-xl border px-2 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
                   travelBurden === option.value
                     ? "border-slate-950 bg-slate-950 text-white"
                     : "border-white bg-white text-slate-600 hover:border-slate-400"
@@ -102,7 +102,7 @@ export function QuickResponsePanel({
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <button
-          className="rounded-xl border border-emerald-700 bg-white px-4 py-3 text-sm font-semibold text-emerald-800 transition hover:bg-emerald-100 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-60"
+          className="mp-button mp-button-secondary border-emerald-700 px-3 py-2 text-sm text-emerald-800 hover:border-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
           disabled={isDisabled}
           onClick={onApply}
           type="button"
@@ -110,7 +110,7 @@ export function QuickResponsePanel({
           전체 후보에 적용
         </button>
         <button
-          className="rounded-xl bg-emerald-700 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-emerald-300"
+          className="mp-button w-full bg-emerald-700 px-3 py-2 text-sm text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300 sm:w-auto"
           disabled={isDisabled}
           onClick={onSave}
           type="button"

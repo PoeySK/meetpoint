@@ -42,7 +42,7 @@ Client·Server·DB 연결
 
 이 과정에서 AI는 요구사항을 구조화하고, 경계와 예외를 발견하고, 검증 시나리오를 확장하는 데 사용됩니다. 결과는 API 계약, 도메인 문서, 실행 코드, 데이터베이스 상태, 자동 테스트로 이어져 다음 작업의 기준이 됩니다.
 
-제품 내부 기능도 같은 구성으로 확장합니다. 자연어 조건은 구조화된 데이터로 정리하고, Rust Solver는 입력 snapshot을 바탕으로 결정적인 점수와 근거를 계산하며, NestJS는 전체 흐름과 데이터 계약을 관리합니다. 현재는 Room과 HOST Participant vertical slice를 기반으로 다음 기능을 연결하고 있습니다.
+제품 내부 기능도 같은 구성으로 확장합니다. 자연어 조건은 구조화된 데이터로 정리하고, Rust Solver는 입력 snapshot을 바탕으로 결정적인 점수와 근거를 계산하며, NestJS는 전체 흐름과 데이터 계약을 관리합니다. 현재는 방 생성·입장·후보 등록·참여자 응답·계산·확정 흐름이 연결되어 있으며, 개인 조건과 후보 lifecycle을 다음 작업으로 완성합니다.
 
 ## 프로젝트 구조
 
@@ -86,13 +86,13 @@ NestJS Server
   └─ Rust Solver
 ```
 
-현재는 각 프로젝트의 기본 실행 환경을 구성하는 단계이며, 이후 기능을 개발하면서 프로젝트 간 통신과 데이터 구조를 확장합니다.
+현재 저장소에는 방 생성부터 계산·확정까지의 실행 코드가 있으며, 제품 정의와 실제 구현이 어긋난 개인 조건·후보 lifecycle·운영 내구성을 우선 보강합니다. 구체적인 작업 순서는 [현재 작업 계획](docs/07-implementation-plan.md)에 기록합니다.
 
 ## 권장 로컬 포트
 
 | 구성 요소         | 목표 포트 | 현재 상태                                        |
 | ----------------- | --------: | ------------------------------------------------ |
-| `client`          |      3000 | Next.js 기본 포트                                |
+| `client`          |     10081 | Next.js 기본 포트                                |
 | `services/server` |      3001 | `SERVER_PORT` 또는 `PORT`가 없으면 3001으로 실행 |
 | `services/solver` |      4000 | `SOLVER_PORT`가 없으면 4000으로 실행             |
 | PostgreSQL        |      5432 | `infra/docker-compose.yml`의 PostgreSQL 컨테이너 |
@@ -107,7 +107,7 @@ NestJS Server
 | ----------------- | ----------------------------------------------------------------- | ----------------------------- |
 | `SERVER_PORT`     | `3001`                                                            | NestJS Server 포트            |
 | `SOLVER_PORT`     | `4000`                                                            | Rust Solver 포트              |
-| `CLIENT_ORIGIN`   | `http://localhost:3000`                                           | Server CORS 허용 origin       |
+| `CLIENT_ORIGIN`   | `http://localhost:10081`                                          | Server CORS 허용 origin       |
 | `DATABASE_URL`    | `postgresql://meetpoint:meetpoint-local@localhost:5432/meetpoint` | Server의 PostgreSQL 연결 주소 |
 | `SOLVER_BASE_URL` | `http://localhost:4000`                                           | Server의 Solver 연결 주소     |
 
@@ -133,7 +133,7 @@ pnpm dev
 
 | 서비스        | 주소                    | 확인 경로          |
 | ------------- | ----------------------- | ------------------ |
-| Client        | `http://localhost:3000` | Next.js 화면       |
+| Client        | `http://localhost:10081` | Next.js 화면       |
 | NestJS Server | `http://localhost:3001` | `GET /health`      |
 | Rust Solver   | `http://localhost:4000` | `GET /health`      |
 | PostgreSQL    | `localhost:5432`        | Docker healthcheck |

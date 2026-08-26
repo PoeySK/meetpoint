@@ -8,6 +8,7 @@ import { DataSource } from 'typeorm';
 import { Participant } from '../../infrastructure/persistence/typeorm/entities/participant.entity';
 import { Candidate } from '../../infrastructure/persistence/typeorm/entities/candidate.entity';
 import { ParticipantResponse } from '../../infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { ParticipantCondition } from '../../infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { ScoreResult } from '../../infrastructure/persistence/typeorm/entities/score-result.entity';
 import { Room } from '../../infrastructure/persistence/typeorm/entities/room.entity';
 import {
@@ -44,6 +45,7 @@ type CalculationStore = {
   participants: Map<string, Participant>;
   candidates: Map<string, Candidate>;
   responses: Map<string, ParticipantResponse>;
+  conditions: Map<string, ParticipantCondition>;
   scoreResults: Map<string, ScoreResult>;
 };
 
@@ -80,6 +82,9 @@ function createCalculationDataSource(store: CalculationStore) {
     }
     if (entity === ParticipantResponse) {
       return createRepository(store.responses);
+    }
+    if (entity === ParticipantCondition) {
+      return createConditionRepository(store.conditions);
     }
     if (entity === ScoreResult) {
       return createRepository(store.scoreResults);
@@ -166,12 +171,39 @@ function createRepository<T extends { id: string }>(store: Map<string, T>) {
   };
 }
 
+function createConditionRepository(store: Map<string, ParticipantCondition>) {
+  return {
+    findOne(options: { where?: Record<string, unknown> }) {
+      const where = options?.where ?? {};
+      return [...store.values()].find((value) =>
+        matches(value as unknown as Record<string, unknown>, where)
+      );
+    },
+    findOneBy(where: Record<string, unknown>) {
+      return [...store.values()].find((value) =>
+        matches(value as unknown as Record<string, unknown>, where)
+      );
+    },
+    find(options: { where?: Record<string, unknown> }) {
+      const where = options?.where ?? {};
+      return [...store.values()].filter((value) =>
+        matches(value as unknown as Record<string, unknown>, where)
+      );
+    },
+    save(value: ParticipantCondition) {
+      store.set(value.participantId, value);
+      return value;
+    },
+  };
+}
+
 function createSeed() {
   const store: CalculationStore = {
     rooms: new Map(),
     participants: new Map(),
     candidates: new Map(),
     responses: new Map(),
+    conditions: new Map(),
     scoreResults: new Map(),
   };
   const roomId = 'room-calculation';
@@ -209,6 +241,28 @@ function createSeed() {
         tokenExpiresAt: new Date(Date.now() + 60_000),
         tokenRevokedAt: null,
         joinedAt: new Date(),
+        updatedAt: new Date(),
+      })
+    );
+  }
+
+  for (const participantId of store.participants.keys()) {
+    store.conditions.set(
+      participantId,
+      Object.assign(new ParticipantCondition(), {
+        participantId,
+        roomId,
+        availabilityWindows: [
+          {
+            startsAt: '2026-09-01T09:00:00.000Z',
+            endsAt: '2026-09-01T18:00:00.000Z',
+          },
+        ],
+        maxBudgetKrw: null,
+        requiredTags: [],
+        preferredTags: [],
+        avoidTags: [],
+        submittedAt: new Date(),
         updatedAt: new Date(),
       })
     );
@@ -331,7 +385,7 @@ function solverResponseFromSnapshot(
     scoringProfile: snapshot.scoringProfile,
     status: 'COMPLETED',
     metadata: {
-      scoringProfile: 'MVP_NO_CONDITIONS',
+      scoringProfile: snapshot.scoringProfile,
       weights: { time: 40, travelBurden: 25, budget: 20, preference: 15 },
     },
     recommendationStatus: candidateResults.some(
@@ -415,7 +469,7 @@ describe('StartCalculationUseCase flow', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('sends the conditionless profile and uses a completed result transition', async () => {
+  it('sends participant conditions and uses a completed result transition', async () => {
     const seed = createSeed();
     let solverInput!: SolverSnapshot;
     globalThis.fetch = jest.fn((_input, init) => {
@@ -443,13 +497,20 @@ describe('StartCalculationUseCase flow', () => {
       ScoreResultStatus.COMPLETED
     );
 
-    expect(solverInput.scoringProfile).toBe('MVP_NO_CONDITIONS');
-    expect(solverInput.participants[0].condition).toBeUndefined();
+    expect(solverInput.scoringProfile).toBe('CONDITION_AWARE');
+    expect(solverInput.participants[0].condition).toMatchObject({
+      maxBudgetKrw: null,
+      preferences: {
+        requiredTags: [],
+        preferredTags: [],
+        avoidTags: [],
+      },
+    });
     expect(solverInput.participants[0].responses[0]).toMatchObject({
       availabilityStatus: 'AVAILABLE',
       travelBurden: 'EASY',
     });
-    expect(completed.metadata.scoringProfile).toBe('MVP_NO_CONDITIONS');
+    expect(completed.metadata.scoringProfile).toBe('CONDITION_AWARE');
     expect(completed.candidates[0].participantBreakdown[0].components).toEqual({
       time: 40,
       travelBurden: 25,

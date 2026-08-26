@@ -27,6 +27,7 @@ type ParticipantResponsePanelProps = {
   participantId: string;
   candidates: Candidate[];
   responses: ParticipantResponsePayload[];
+  hasCondition?: boolean;
   isReadOnly?: boolean;
   onRoomRefresh: () => Promise<void>;
 };
@@ -42,6 +43,12 @@ function describeResponseError(error: unknown) {
     if (error.code === "RESOURCE_NOT_FOUND") {
       return "응답 대상 후보를 찾을 수 없습니다.";
     }
+    if (error.code === "CONDITION_INCOMPLETE") {
+      return "먼저 참여자 조건을 저장한 뒤 후보 응답을 입력해 주세요.";
+    }
+    if (error.code === "TIME_CONDITION_CONFLICT") {
+      return "가능 시간에 포함되지 않는 후보입니다. 참석 가능 여부를 다시 확인해 주세요.";
+    }
     if (error.code === "VALIDATION_ERROR") {
       return "응답 입력을 다시 확인해 주세요.";
     }
@@ -56,6 +63,7 @@ export function ParticipantResponsePanel({
   participantId,
   candidates,
   responses,
+  hasCondition = true,
   isReadOnly = false,
   onRoomRefresh,
 }: ParticipantResponsePanelProps) {
@@ -76,7 +84,7 @@ export function ParticipantResponsePanel({
     (form) => form.isSubmitting,
   );
   const isInteractionDisabled =
-    isReadOnly || isBulkSubmitting || hasSubmittingForm;
+    isReadOnly || !hasCondition || isBulkSubmitting || hasSubmittingForm;
 
   useEffect(() => {
     const incomingResponsesByCandidateId = new Map(
@@ -175,7 +183,7 @@ export function ParticipantResponsePanel({
   }
 
   async function saveResponse(candidateId: string) {
-    if (isBulkSubmitting) {
+    if (isBulkSubmitting || !hasCondition) {
       return;
     }
 
@@ -257,7 +265,7 @@ export function ParticipantResponsePanel({
   }
 
   async function saveAllResponses() {
-    if (isInteractionDisabled || candidates.length === 0) {
+    if (isInteractionDisabled || candidates.length === 0 || !hasCondition) {
       return;
     }
 
@@ -363,7 +371,7 @@ export function ParticipantResponsePanel({
     <section className="space-y-4">
       <div className="space-y-2">
         <p className="text-sm font-semibold text-emerald-700">참여자 응답</p>
-        <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+        <h2 className="text-xl font-semibold tracking-tight text-slate-950">
           후보별 응답
         </h2>
         <p className="text-sm leading-6 text-slate-500">
@@ -371,15 +379,20 @@ export function ParticipantResponsePanel({
           반영되지 않습니다.
         </p>
         {isReadOnly && (
-          <p className="rounded-xl bg-slate-100 px-4 py-3 text-sm leading-6 text-slate-600">
+          <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600">
             방이 확정되어 응답을 읽기 전용으로 표시합니다. 다시 변경하려면 호스트가
             먼저 재검토를 시작해야 합니다.
+          </p>
+        )}
+        {!isReadOnly && !hasCondition && (
+          <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800">
+            후보 응답을 시작하려면 위의 참여자 조건을 먼저 저장해 주세요.
           </p>
         )}
       </div>
 
       {candidates.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-6 text-sm leading-6 text-slate-500">
+        <div className="rounded-xl border border-dashed border-slate-300 bg-white/65 p-4 text-sm leading-5 text-slate-500">
           호스트가 후보를 등록하면 이곳에서 응답할 수 있습니다.
         </div>
       ) : (
@@ -395,13 +408,13 @@ export function ParticipantResponsePanel({
             travelBurden={fastTravelBurden}
           />
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-3 lg:grid-cols-2">
             {candidates.map((candidate) => (
               <CandidateResponseCard
                 candidate={candidate}
                 form={getForm(candidate.id)}
                 isBulkSubmitting={isBulkSubmitting}
-                isReadOnly={isReadOnly}
+                isReadOnly={isReadOnly || !hasCondition}
                 key={candidate.id}
                 onSave={() => void saveResponse(candidate.id)}
                 onUpdate={(update) => updateForm(candidate.id, update)}

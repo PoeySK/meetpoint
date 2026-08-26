@@ -41,6 +41,9 @@ function describeCalculationError(error: unknown) {
     if (error.code === 'NO_ACTIVE_CANDIDATES') {
       return '계산하려면 활성 후보가 2~5개여야 합니다.';
     }
+    if (error.code === 'CONDITION_INCOMPLETE') {
+      return '모든 참여자가 참여자 조건을 먼저 저장해야 계산할 수 있습니다.';
+    }
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '현재 방 상태에서는 계산을 시작할 수 없습니다.';
     }
@@ -135,21 +138,21 @@ export function CalculationResultPanel({
   }
 
   return (
-    <section className='rounded-4xl border border-slate-200 bg-white p-5 shadow-xl shadow-slate-200/50 sm:p-8'>
-      <div className='flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
-        <div className='space-y-2'>
+    <section className='mp-card mp-card-raised p-4 sm:p-6'>
+      <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+        <div className='space-y-1.5'>
           <p className='text-sm font-semibold text-emerald-700'>계산 결과</p>
-          <h2 className='text-2xl font-semibold tracking-tight text-slate-950'>
+          <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
             후보 추천 계산
           </h2>
           <p className='text-sm leading-6 text-slate-500'>
-            참여자 응답과 이동 부담 자기 평가를 기준으로 계산합니다. 예산과
-            선호는 제한 없음으로 처리합니다.
+            참여자 조건과 후보별 응답을 함께 반영해 예산·시간·선호·이동 부담을
+            계산합니다.
           </p>
         </div>
         {isHost && (
           <button
-            className='rounded-xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-4 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:bg-slate-300'
+            className='mp-button mp-button-primary'
             disabled={
               isStarting ||
               isRunning(calculation?.status) ||
@@ -167,11 +170,11 @@ export function CalculationResultPanel({
       </div>
 
       {error && (
-        <div className='mt-5 flex flex-col gap-3 rounded-xl bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700 sm:flex-row sm:items-center sm:justify-between'>
+        <div className='mt-4 flex flex-col gap-2 rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700 sm:flex-row sm:items-center sm:justify-between'>
           <span>{error}</span>
           {isHost && (
             <button
-              className='self-start rounded-lg border border-rose-200 px-3 py-1.5 font-semibold text-rose-700 hover:bg-white sm:self-auto'
+              className='mp-button mp-button-secondary self-start border-rose-200 px-3 py-1.5 text-xs text-rose-700 hover:border-rose-300 hover:bg-white sm:self-auto'
               onClick={() => void handleStart()}
               type='button'
             >
@@ -210,21 +213,21 @@ export function CalculationResultPanel({
       />
 
       {isLoadingResult && !calculation && (
-        <div className='mt-5 flex items-center gap-3 rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-600'>
+        <div className='mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600'>
           <span className='h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600' />
           계산 결과를 불러오는 중입니다.
         </div>
       )}
 
       {!room.room.latestScoreResultId && !isLoadingResult && !error && (
-        <p className='mt-5 rounded-xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600'>
+        <p className='mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-600'>
           아직 계산 결과가 없습니다. 참여자가 3명 이상이고 후보가 2개 이상이면
           호스트가 계산을 시작할 수 있습니다.
         </p>
       )}
 
       {calculation && (
-        <div className='mt-5 space-y-5'>
+        <div className='mt-4 space-y-4'>
           <CalculationStatus calculation={calculation} />
           <CompletedResult
             calculation={calculation}

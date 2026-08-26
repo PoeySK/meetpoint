@@ -7,6 +7,7 @@ import { Participant } from '../infrastructure/persistence/typeorm/entities/part
 import { Candidate } from '../infrastructure/persistence/typeorm/entities/candidate.entity';
 import { Decision } from '../infrastructure/persistence/typeorm/entities/decision.entity';
 import { ParticipantResponse } from '../infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { ParticipantCondition } from '../infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from '../infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from '../infrastructure/persistence/typeorm/entities/score-result.entity';
 import { ScoreResultStatus } from '../domain/calculation/score-result';
@@ -16,10 +17,12 @@ import { CalculationController } from '../presentation/http/controllers/calculat
 import { RoomsController } from '../presentation/http/controllers/rooms.controller';
 import { ParticipantLifecycleController } from '../presentation/http/controllers/participant-lifecycle.controller';
 import { ParticipantResponseController } from '../presentation/http/controllers/participant-response.controller';
+import { ParticipantConditionController } from '../presentation/http/controllers/participant-condition.controller';
 import { CreateRoomUseCase } from '../application/commands/create-room.use-case';
 import { JoinParticipantUseCase } from '../application/commands/join-participant.use-case';
 import { CreateCandidateUseCase } from '../application/commands/create-candidate.use-case';
 import { UpsertParticipantResponseUseCase } from '../application/commands/upsert-participant-response.use-case';
+import { UpsertParticipantConditionUseCase } from '../application/commands/upsert-participant-condition.use-case';
 import { LeaveRoomUseCase } from '../application/commands/leave-room.use-case';
 import { KickParticipantUseCase } from '../application/commands/kick-participant.use-case';
 import { StartCalculationUseCase } from '../application/commands/start-calculation.use-case';
@@ -55,6 +58,7 @@ type CandidateStore = Map<string, Candidate>;
 type ParticipantResponseStore = Map<string, ParticipantResponse>;
 type DecisionStore = Map<string, Decision>;
 type ScoreResultStore = Map<string, ScoreResult>;
+type ParticipantConditionStore = Map<string, ParticipantCondition>;
 
 export type MockDatabase = {
   dataSource: DataSource;
@@ -64,6 +68,7 @@ export type MockDatabase = {
   responses: ParticipantResponseStore;
   decisions: DecisionStore;
   scoreResults: ScoreResultStore;
+  conditions: ParticipantConditionStore;
   roomRepository: {
     create: jest.Mock;
     save: jest.Mock;
@@ -88,11 +93,16 @@ export type MockDatabase = {
     save: jest.Mock;
     findOneBy: jest.Mock;
   };
+  conditionRepository: {
+    create: jest.Mock;
+    save: jest.Mock;
+  };
   failRoomSave: boolean;
   failParticipantSave: boolean;
   failCandidateSave: boolean;
   failResponseSave: boolean;
   failScoreResultSave: boolean;
+  failConditionSave: boolean;
 };
 
 export function createMockDatabase(): MockDatabase {
@@ -102,12 +112,14 @@ export function createMockDatabase(): MockDatabase {
   const responses: ParticipantResponseStore = new Map();
   const decisions: DecisionStore = new Map();
   const scoreResults: ScoreResultStore = new Map();
+  const conditions: ParticipantConditionStore = new Map();
   const state = {
     failRoomSave: false,
     failParticipantSave: false,
     failCandidateSave: false,
     failResponseSave: false,
     failScoreResultSave: false,
+    failConditionSave: false,
   };
   let transactionTail = Promise.resolve();
 
@@ -348,6 +360,41 @@ export function createMockDatabase(): MockDatabase {
     }),
   };
 
+  const conditionRepository = {
+    create: jest.fn((attributes: Partial<ParticipantCondition>) => ({
+      ...attributes,
+      submittedAt: attributes.submittedAt ?? new Date(),
+      updatedAt: attributes.updatedAt ?? new Date(),
+    })),
+    save: jest.fn((condition: ParticipantCondition) => {
+      if (state.failConditionSave) {
+        throw new Error('condition save failed');
+      }
+
+      conditions.set(condition.participantId, condition);
+      return condition;
+    }),
+    findOneBy: jest.fn((criteria: Partial<ParticipantCondition>) => {
+      return (
+        [...conditions.values()].find((condition) =>
+          Object.entries(criteria).every(
+            ([key, value]) =>
+              condition[key as keyof ParticipantCondition] === value
+          )
+        ) ?? null
+      );
+    }),
+    find: jest.fn((options: { where?: Partial<ParticipantCondition> }) => {
+      const where = options.where ?? {};
+      return [...conditions.values()].filter((condition) =>
+        Object.entries(where).every(
+          ([key, value]) =>
+            condition[key as keyof ParticipantCondition] === value
+        )
+      );
+    }),
+  };
+
   const manager = {
     getRepository: jest.fn((entity: unknown) => {
       if (entity === Room) {
@@ -364,6 +411,9 @@ export function createMockDatabase(): MockDatabase {
       }
       if (entity === ScoreResult) {
         return scoreResultRepository;
+      }
+      if (entity === ParticipantCondition) {
+        return conditionRepository;
       }
       return responseRepository;
     }),
@@ -389,6 +439,7 @@ export function createMockDatabase(): MockDatabase {
         const responsesBeforeTransaction = cloneStore(responses);
         const decisionsBeforeTransaction = cloneStore(decisions);
         const scoreResultsBeforeTransaction = cloneStore(scoreResults);
+        const conditionsBeforeTransaction = cloneStore(conditions);
 
         try {
           return await callback(manager);
@@ -423,6 +474,11 @@ export function createMockDatabase(): MockDatabase {
             scoreResults.set(id, scoreResult);
           }
 
+          conditions.clear();
+          for (const [id, condition] of conditionsBeforeTransaction) {
+            conditions.set(id, condition);
+          }
+
           throw error;
         } finally {
           releaseTransaction?.();
@@ -445,6 +501,9 @@ export function createMockDatabase(): MockDatabase {
       if (entity === ScoreResult) {
         return scoreResultRepository;
       }
+      if (entity === ParticipantCondition) {
+        return conditionRepository;
+      }
       return responseRepository;
     }),
   } as unknown as DataSource;
@@ -457,7 +516,9 @@ export function createMockDatabase(): MockDatabase {
     responses,
     decisions,
     scoreResults,
+    conditions,
     scoreResultRepository,
+    conditionRepository,
     roomRepository,
     participantRepository,
     candidateRepository,
@@ -493,6 +554,12 @@ export function createMockDatabase(): MockDatabase {
     set failScoreResultSave(value: boolean) {
       state.failScoreResultSave = value;
     },
+    get failConditionSave() {
+      return state.failConditionSave;
+    },
+    set failConditionSave(value: boolean) {
+      state.failConditionSave = value;
+    },
   };
 }
 
@@ -521,6 +588,24 @@ export function validCandidatePayload(overrides: Record<string, unknown> = {}) {
     },
     estimatedCostPerPersonKrw: 15000,
     tags: ['QUIET', 'COFFEE'],
+    ...overrides,
+  };
+}
+
+export function validConditionPayload(overrides: Record<string, unknown> = {}) {
+  return {
+    availabilityWindows: [
+      {
+        startsAt: '2026-09-01T09:00:00.000Z',
+        endsAt: '2026-09-01T18:00:00.000Z',
+      },
+    ],
+    maxBudgetKrw: null,
+    preferences: {
+      requiredTags: [],
+      preferredTags: [],
+      avoidTags: [],
+    },
     ...overrides,
   };
 }
@@ -582,6 +667,7 @@ export async function createRoomsTestContext(): Promise<RoomsTestContext> {
       RoomsController,
       CandidateController,
       ParticipantResponseController,
+      ParticipantConditionController,
       CalculationController,
       DecisionController,
       ParticipantLifecycleController,
@@ -591,6 +677,7 @@ export async function createRoomsTestContext(): Promise<RoomsTestContext> {
       JoinParticipantUseCase,
       CreateCandidateUseCase,
       UpsertParticipantResponseUseCase,
+      UpsertParticipantConditionUseCase,
       LeaveRoomUseCase,
       KickParticipantUseCase,
       StartCalculationUseCase,
@@ -639,5 +726,6 @@ export async function closeRoomsTestContext(
   database.responses.clear();
   database.decisions.clear();
   database.scoreResults.clear();
+  database.conditions.clear();
   await app.close();
 }

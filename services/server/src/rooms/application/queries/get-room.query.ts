@@ -24,7 +24,7 @@ export class GetRoomQuery {
       await this.access.authorize(roomId, accessToken);
 
     return this.persistence.transaction(
-      async ({ participants, candidates, responses }) => {
+      async ({ participants, candidates, responses, conditions }) => {
         const activeParticipants = (
           await participants.findByRoomId(room.id)
         ).filter(isActiveParticipant);
@@ -52,6 +52,10 @@ export class GetRoomQuery {
           const response = responseByCandidateId.get(candidate.id);
           return response ? [response] : [];
         });
+        const myCondition = await conditions.findByParticipantId(
+          room.id,
+          currentParticipant.id
+        );
         const hostParticipant = activeParticipants.find(
           (candidate) => candidate.id === room.hostParticipantId
         );
@@ -70,6 +74,7 @@ export class GetRoomQuery {
           participants: activeParticipants,
           candidates: activeCandidates,
           myResponses,
+          myCondition,
         };
       }
     );

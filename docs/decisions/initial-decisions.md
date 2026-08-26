@@ -2,7 +2,7 @@
 
 ## 결정 기록의 범위
 
-- **확정**은 현재 MVP의 기본 방향으로 취급한다.
+- **확정**은 현재 제품의 기본 방향으로 취급한다.
 - **미결정**은 구현자가 임의로 확정하지 않고, 해당 단계에서 별도 합의를 남긴다.
 - 이 기록은 현재 저장소의 `client`, `services/server`, `services/solver`, `infra` 디렉터리와 `meetpoint-{역할}` Docker 리소스 이름을 기준으로 한다.
 
@@ -16,8 +16,8 @@
 
 - Client가 Next.js·React·TypeScript이고, 서버도 TypeScript로 맞추면 요청·응답 타입과 검증 모델을 한 언어로 공유하기 쉽다.
 - 현재 저장소에 이미 `services/server` NestJS 프로젝트가 생성되어 있다.
-- MeetPoint MVP에서 Server의 핵심 역할은 REST API, PostgreSQL 조정, Rust Solver 호출, 추후 OpenAI 호출이다. NestJS의 모듈·가드·서비스 구조가 이 경계를 표현하기에 충분하다.
-- Java 런타임과 별도의 빌드·배포·팀 기술 스택을 추가하지 않아 2~3일 프로토타입의 변경 범위를 줄인다.
+- MeetPoint에서 Server의 핵심 역할은 REST API, PostgreSQL 조정, Rust Solver 호출, 추후 OpenAI 호출이다. NestJS의 모듈·가드·서비스 구조가 이 경계를 표현하기에 충분하다.
+- Java 런타임과 별도의 빌드·배포·팀 기술 스택을 추가하지 않고 현재 서비스 경계를 유지한다.
 
 ### 영향
 
@@ -33,8 +33,8 @@ FastAPI를 별도의 API 서버로 추가하지 않는다.
 
 - 이미 REST API의 주체는 NestJS이고 계산 서비스의 주체는 Rust Solver로 확정되어 있다.
 - FastAPI를 추가하면 같은 도메인 API를 두 프레임워크가 나누거나, Python 서버와 Rust Solver 사이에 불필요한 중간 계층이 생긴다.
-- MVP에 Python 기반 자연어 처리 서버가 필요한 것도 아니다. 추후 AI API가 필요해도 NestJS가 직접 OpenAI API를 호출한다.
-- 서비스 수를 늘리면 인증·환경 변수·배포·오류 처리 경계가 늘어나 2~3일 범위를 벗어난다.
+- 현재 Python 기반 자연어 처리 서버는 필요하지 않다. 추후 AI API가 필요해도 NestJS가 직접 OpenAI API를 호출한다.
+- 서비스 수를 늘리면 인증·환경 변수·배포·오류 처리 경계가 늘어나므로, 별도 서비스가 필요한 근거가 생길 때 결정한다.
 
 ### 영향
 
@@ -49,8 +49,8 @@ FastAPI를 별도의 API 서버로 추가하지 않는다.
 ### 이유
 
 - MeetPoint의 원본 상태와 변경 규칙은 NestJS 서버가 소유해야 한다. 방 상태, 계산 이력, 결정 이력을 API 서비스의 트랜잭션으로 명확히 관리할 수 있다.
-- 로컬 프로토타입에서 PostgreSQL을 Docker로 재현하면 특정 BaaS 계정이나 클라우드 프로젝트 없이 동일한 데이터베이스를 실행할 수 있다.
-- Supabase가 제공하는 인증·자동 REST·실시간 기능은 이번 MVP에서 제외한 로그인·실시간 기능과 중복된다.
+- 로컬 환경에서 PostgreSQL을 Docker로 재현하면 특정 BaaS 계정이나 클라우드 프로젝트 없이 동일한 데이터베이스를 실행할 수 있다.
+- Supabase가 제공하는 인증·자동 REST·실시간 기능은 현재 도입하지 않은 로그인·실시간 기능과 중복된다.
 - 향후 배포 환경이나 PostgreSQL 운영 방식을 바꾸더라도 애플리케이션과 데이터베이스 소유권의 경계를 유지할 수 있다.
 
 ### 영향
@@ -111,35 +111,35 @@ NestJS가 매 계산마다 완전한 입력 스냅샷을 만든다. 데이터 �
 
 최종 구조화 결과는 사용자 확인을 받고, 최종 수치는 계속 Solver가 만든다.
 
-## 7. MVP에서 로그인과 지도 API를 제외하는 이유
+## 7. 로그인과 지도 API를 현재 도입하지 않는 이유
 
 ### 결정
 
-MVP에는 계정 로그인과 실제 지도·이동시간 API를 넣지 않는다.
+현재 제품에는 계정 로그인과 실제 지도·이동시간 API를 넣지 않는다.
 
 ### 로그인 제외 이유
 
 - 첫 번째 검증 목표는 “방 생성 → 조건 입력 → 설명 가능한 결과 → 확정” 흐름이다. 계정·비밀번호·소셜 연동은 이 가설을 검증하는 데 필수적이지 않다.
 - 방 코드와 방 범위 임시 토큰으로 친구 그룹이 빠르게 입장할 수 있다.
-- 계정 복구, 사용자 개인정보, 친구 목록, 권한 정책을 추가하면 프로토타입의 위험 범위가 커진다.
-- 임시 토큰은 MVP 편의를 위한 것이며 운영 수준의 계정 보안을 제공하지 않는다는 점을 명시한다.
+- 계정 복구, 사용자 개인정보, 친구 목록, 권한 정책을 추가하면 보안·운영 범위가 커진다.
+- 임시 토큰은 계정 인증이 아니며 운영 수준의 계정 보안을 제공하지 않는다는 점을 명시한다.
 
 ### 지도 API 제외 이유
 
 - API 비용·쿼터·주소 정규화·교통수단별 계산·장애 대체 정책을 먼저 결정해야 한다.
-- 후보 장소는 직접 입력하고 참가자가 후보별 이동 부담을 `EASY/NORMAL/HARD`로 입력하면, MVP의 조건 기반 계산 흐름을 검증할 수 있다.
+- 후보 장소는 직접 입력하고 참가자가 후보별 이동 부담을 `EASY/NORMAL/HARD`로 입력하면, 조건 기반 계산 흐름을 검증할 수 있다.
 - 자기 기입 값은 `SELF_REPORTED_TRAVEL_BURDEN`으로 표시하여 실제 이동시간으로 과장하지 않는다.
 
-### MVP 장소 점수 방식 비교
+### 장소 점수 방식 비교
 
-| 방식 | 구현 난이도 | 결과 신뢰성 | MVP 결정 |
+| 방식 | 구현 난이도 | 결과 신뢰성 | 현재 결정 |
 | --- | --- | --- | --- |
 | 참가자가 후보별 `EASY/NORMAL/HARD` 직접 입력 | 낮음. 응답 enum과 고정 배점만 구현하면 됨 | 실제 이동시간은 아니지만 사용자의 체감 부담을 그대로 반영하고 가짜 수치를 만들지 않음 | **채택** |
-| 출발 위치·후보 좌표로 직선거리 계산 | 중간. 위치 입력·좌표 검증·거리 계산이 필요함 | 직선거리는 교통수단·도로·환승을 반영하지 않아 실제 이동 부담과 차이가 큼 | MVP 이후 검토 |
-| 지도·실제 이동시간 API 호출 | 높음. 주소 정규화·API 키·쿼터·장애·교통수단 정책이 필요함 | 가장 현실적인 이동시간을 제공할 수 있으나 외부 API 상태와 시점에 의존함 | MVP 이후 도입 |
+| 출발 위치·후보 좌표로 직선거리 계산 | 중간. 위치 입력·좌표 검증·거리 계산이 필요함 | 직선거리는 교통수단·도로·환승을 반영하지 않아 실제 이동 부담과 차이가 큼 | 향후 검토 |
+| 지도·실제 이동시간 API 호출 | 높음. 주소 정규화·API 키·쿼터·장애·교통수단 정책이 필요함 | 가장 현실적인 이동시간을 제공할 수 있으나 외부 API 상태와 시점에 의존함 | 향후 도입 |
 | 장소 점수 자체를 제외 | 가장 낮음 | 장소가 MeetPoint의 핵심 판단 요소인데 반영하지 못함 | 채택하지 않음 |
 
-따라서 MVP에서 Rust Solver는 주소로 거리나 이동시간을 계산하지 않고, `ParticipantResponse.travelBurden`을 `EASY=25`, `NORMAL=12.5`, `HARD=0`으로 변환한다.
+따라서 현재 Rust Solver는 주소로 거리나 이동시간을 계산하지 않고, `ParticipantResponse.travelBurden`을 `EASY=25`, `NORMAL=12.5`, `HARD=0`으로 변환한다.
 
 ## 8. 현재 폴더 구조를 유지하는 이유
 
@@ -164,7 +164,7 @@ meetpoint/
 
 - 루트 README가 이미 Client, NestJS Server, Rust Solver, Infra의 역할과 통신 방향을 정의한다.
 - 각 서비스가 독립적인 실행·빌드 도구를 갖고 있어 현재 구조만으로 책임 분리와 로컬 실행을 설명할 수 있다.
-- Turborepo 도입은 workspace·캐시·공통 패키지·빌드 파이프라인을 새로 결정하게 하며, 현재 MVP 문제 해결과 직접 관련이 없다.
+- Turborepo 도입은 workspace·캐시·공통 패키지·빌드 파이프라인을 새로 결정하게 하며, 현재 제품 과제와 직접 관련이 없다.
 - 폴더 이동은 기존 Next.js·NestJS·Cargo 설정과 경로, 문서 링크를 동시에 바꿀 위험이 있다.
 
 ### 영향
@@ -175,7 +175,7 @@ meetpoint/
 
 ### 결정
 
-NestJS의 PostgreSQL 접근에는 `@nestjs/typeorm`, TypeORM, `pg`를 사용한다. `synchronize=false`, `migrationsRun=false`를 유지하고, Room 단계부터 명시적인 TypeORM `DataSource`와 migration으로 스키마를 관리한다. 이번 단계에서는 Room과 방 생성에 필요한 최소 HOST Participant 엔티티·migration을 추가한다.
+NestJS의 PostgreSQL 접근에는 `@nestjs/typeorm`, TypeORM, `pg`를 사용한다. `synchronize=false`, `migrationsRun=false`를 유지하고, 명시적인 TypeORM `DataSource`와 migration으로 스키마를 관리한다. Room·Participant·Candidate·ParticipantCondition·ParticipantResponse·ScoreResult·Decision 엔티티와 migration을 이 방식으로 관리한다.
 
 ### 이유
 
@@ -186,11 +186,11 @@ NestJS의 PostgreSQL 접근에는 `@nestjs/typeorm`, TypeORM, `pg`를 사용한�
 
 ### 영향
 
-Room 단계에서는 Room과 최소 HOST Participant의 entity, repository, API, migration을 제공한다. Candidate, ParticipantResponse, ScoreResult, Decision과 일반 참여자 입장·입력 API는 이후 단계에서 추가한다. 애플리케이션 시작 시 schema 자동 동기화와 migration 자동 실행은 사용하지 않는다.
+현재 Server는 Room과 Participant의 생성·입장·lifecycle, Candidate 등록, ParticipantCondition·ParticipantResponse 저장, ScoreResult 계산, Decision 확정·재검토 API를 제공한다. 애플리케이션 시작 시 schema 자동 동기화와 migration 자동 실행은 사용하지 않는다.
 
 ### Room과 Participant 관계 제약
 
-Room과 Participant는 논리적으로 양방향 관계를 갖는다. DB 외래 키는 `Participant.roomId`에서 `Room.id`를 참조하도록 설정한다. `Room.hostParticipantId`는 필수 UUID 컬럼으로 저장하지만 이번 MVP에서는 DB 외래 키를 설정하지 않는다.
+Room과 Participant는 논리적으로 양방향 관계를 갖는다. DB 외래 키는 `Participant.roomId`에서 `Room.id`를 참조하도록 설정한다. `Room.hostParticipantId`는 필수 UUID 컬럼으로 저장하지만 현재 DB 외래 키를 설정하지 않는다.
 
 NestJS 서비스는 `hostParticipantId`에 해당하는 Participant가 존재하는지, 현재 Room과 같은 `roomId`인지, `role=HOST`인지 검증한다. Room ID와 Participant ID를 먼저 생성한 뒤 하나의 트랜잭션에서 Room과 HOST Participant를 저장하고, 검증 실패 시 전체를 rollback한다. PostgreSQL `DEFERRABLE` 또는 `INITIALLY DEFERRED` 외래 키는 사용하지 않으며, 추후 필요하면 DB 수준의 순환 참조 제약을 검토한다.
 
@@ -210,7 +210,7 @@ Rust Solver의 HTTP 서버에는 Axum과 Tokio를 사용한다. 기본 포트는
 
 ### 영향
 
-이번 단계에는 `GET /health`와 서비스 상태·현재 시각 JSON만 구현한다. 장소 검색, 이동시간 조회, 점수 계산은 추가하지 않는다.
+현재 Solver에는 `GET /health`와 `POST /v1/solve`가 구현되어 있다. 장소 검색·이동시간 조회는 하지 않으며, Server가 전달한 후보·참여자 응답 snapshot을 기준으로 점수와 근거를 계산한다.
 
 ## 11. 관련 미결정 사항
 
@@ -218,7 +218,7 @@ Rust Solver의 HTTP 서버에는 Axum과 Tokio를 사용한다. 기본 포트는
 
 - Docker에서 Server·Solver까지 함께 실행하는 Compose 구성
 - TypeORM migration 파일의 생성·실행 명령과 CI 적용 방식
-- Room 자체의 자동 만료·자동 `CLOSED` 전환은 MVP에서 구현하지 않는다. 익명 room-scoped token 자체는 24시간 유효하고, 서버에는 원문이 아닌 해시와 만료 정보만 저장하며, Client에는 방별 `sessionStorage`에 저장한다. 방 데이터 삭제·보존 기간은 추후 결정한다.
+- Room 자체의 자동 만료·자동 `CLOSED` 전환은 현재 구현하지 않는다. 익명 room-scoped token 자체는 24시간 유효하고, 서버에는 원문이 아닌 해시와 만료 정보만 저장하며, Client에는 방별 `sessionStorage`에 저장한다. 방 데이터 삭제·보존 기간은 추후 결정한다.
 - 배포 환경에서 PostgreSQL을 계속 컨테이너로 운영할지, 별도 운영 PostgreSQL을 사용할지
 - 방과 계산 이력의 보존 기간 및 삭제 요청 정책
 
@@ -232,10 +232,10 @@ Rust Solver의 HTTP 서버에는 Axum과 Tokio를 사용한다. 기본 포트는
 | Rust HTTP | Axum + Tokio, Solver 기본 포트 4000 |
 | AI | 추후 NestJS에서 직접 OpenAI 호출, 점수 계산에는 사용하지 않음 |
 | Frontend API | Next.js API Route/Server Action 없이 NestJS REST 호출 |
-| 인증 | MVP는 로그인 없이 방 코드·방 범위 토큰, 24시간 유효·해시 저장·방별 `sessionStorage` |
-| Room 단계 데이터 | Room과 최소 HOST Participant를 하나의 트랜잭션으로 생성, Candidate 등은 이후 단계 |
+| 인증 | 현재는 로그인 없이 방 코드·방 범위 토큰, 24시간 유효·해시 저장·방별 `sessionStorage` |
+| 초기 저장 경계 | Room과 HOST Participant를 하나의 트랜잭션으로 생성하고, 이후 도메인 객체를 명시적 migration으로 확장 |
 | Room-Participant FK | 실제 DB FK는 `Participant.roomId`에만 설정, `Room.hostParticipantId`는 NestJS 서비스에서 검증 |
 | Room 만료 | Room 자동 만료 없음, 24시간 만료는 접근 토큰에만 적용 |
-| 지도 | MVP 제외, 자기 기입 이동 부담(`EASY/NORMAL/HARD`) |
+| 지도 | 현재 제외, 자기 기입 이동 부담(`EASY/NORMAL/HARD`) |
 | 저장소 구조 | 현재 `client/services/server/services/solver/infra` 유지 |
 | 모노레포 도구 | Turborepo 사용하지 않음 |

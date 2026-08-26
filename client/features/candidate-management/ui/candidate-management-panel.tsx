@@ -239,11 +239,11 @@ export function CandidateManagementPanel({
   }
 
   return (
-    <section className='rounded-4xl border border-emerald-100 bg-emerald-50/60 p-5 sm:p-8'>
-      <div className='mb-6 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between'>
-        <div className='space-y-2'>
+    <section className='mp-card border-emerald-100 bg-emerald-50/55 p-4 sm:p-6'>
+      <div className='mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+        <div className='space-y-1.5'>
           <p className='text-sm font-semibold text-emerald-700'>호스트</p>
-          <h2 className='text-2xl font-semibold tracking-tight text-slate-950'>
+          <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
             장소 후보 등록
           </h2>
           <p className='text-sm leading-6 text-slate-600'>
@@ -251,13 +251,13 @@ export function CandidateManagementPanel({
             있습니다.
           </p>
         </div>
-        <span className='w-fit rounded-full bg-white px-3 py-1.5 text-sm font-semibold text-slate-600'>
+        <span className='w-fit rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600'>
           {room.candidates.length} / 5개
         </span>
       </div>
 
-      <div className='mb-5 rounded-2xl border border-emerald-100 bg-white/80 p-4'>
-        <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+      <div className='mb-4 rounded-xl border border-emerald-100 bg-white/75 p-3'>
+        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
           <div>
             <p className='text-sm font-semibold text-slate-950'>빠른 입력</p>
             <p className='mt-1 text-xs leading-5 text-slate-500'>
@@ -267,7 +267,7 @@ export function CandidateManagementPanel({
           </div>
           <div className='flex flex-wrap gap-2'>
             <button
-              className='rounded-lg bg-emerald-700 px-3 py-2 text-xs font-semibold text-white transition hover:bg-emerald-800 focus:outline-none focus:ring-2 focus:ring-emerald-200'
+              className='mp-button rounded-lg bg-emerald-700 px-3 py-1.5 text-xs text-white hover:bg-emerald-800'
               onClick={fillExample}
               disabled={isRoomClosed || isSubmitting}
               type='button'
@@ -275,7 +275,7 @@ export function CandidateManagementPanel({
               예시로 채우기
             </button>
             <button
-              className='rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600 transition hover:border-slate-500 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-emerald-200'
+              className='mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs'
               onClick={clearCandidateForm}
               disabled={isRoomClosed || isSubmitting}
               type='button'
@@ -287,11 +287,11 @@ export function CandidateManagementPanel({
       </div>
 
       {isRoomClosed ? (
-        <p className='rounded-xl bg-white px-4 py-3 text-sm leading-6 text-slate-600'>
+        <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
           확정되거나 종료된 방에서는 후보를 등록할 수 없습니다.
         </p>
       ) : hasReachedCandidateLimit ? (
-        <p className='rounded-xl bg-white px-4 py-3 text-sm leading-6 text-slate-600'>
+        <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
           활성 후보 5개가 등록되어 더 추가할 수 없습니다.
         </p>
       ) : (

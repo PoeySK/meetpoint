@@ -5,7 +5,6 @@ use crate::{
         ScoreComponents, ScoringMetadata, ScoringWeights, SolveRequest, SolveResponse,
     },
     domain::{
-        policy::MVP_POLICY,
         scoring::{self, ScoringResult},
         types::SolveInput,
     },
@@ -15,7 +14,7 @@ use super::error::SolveError;
 
 pub fn solve(request: SolveRequest) -> Result<SolveResponse, SolveError> {
     let input = validate_request(&request)?;
-    let result = scoring::score(&input, MVP_POLICY);
+    let result = scoring::score(&input, input.policy);
     Ok(to_contract_response(input, result))
 }
 
@@ -68,12 +67,12 @@ fn to_contract_response(input: SolveInput, result: ScoringResult) -> SolveRespon
         scoring_profile: input.scoring_profile,
         status: "COMPLETED",
         metadata: ScoringMetadata {
-            scoring_profile: MVP_POLICY.scoring_profile,
+            scoring_profile: input.policy.scoring_profile,
             weights: ScoringWeights {
-                time: MVP_POLICY.weights.time,
-                travel_burden: MVP_POLICY.weights.travel_burden,
-                budget: MVP_POLICY.weights.budget,
-                preference: MVP_POLICY.weights.preference,
+                time: input.policy.weights.time,
+                travel_burden: input.policy.weights.travel_burden,
+                budget: input.policy.weights.budget,
+                preference: input.policy.weights.preference,
             },
         },
         recommendation_status: result.recommendation_status.as_str().to_string(),

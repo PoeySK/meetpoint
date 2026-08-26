@@ -11,6 +11,7 @@ import { Participant } from '../../infrastructure/persistence/typeorm/entities/p
 import { Candidate } from '../../infrastructure/persistence/typeorm/entities/candidate.entity';
 import { Decision } from '../../infrastructure/persistence/typeorm/entities/decision.entity';
 import { ParticipantResponse } from '../../infrastructure/persistence/typeorm/entities/participant-response.entity';
+import { ParticipantCondition } from '../../infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from '../../infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from '../../infrastructure/persistence/typeorm/entities/score-result.entity';
 import {
@@ -43,6 +44,7 @@ type DecisionStore = {
   participants: Map<string, Participant>;
   candidates: Map<string, Candidate>;
   responses: Map<string, ParticipantResponse>;
+  conditions: Map<string, ParticipantCondition>;
   scoreResults: Map<string, ScoreResult>;
   decisions: Map<string, Decision>;
   failDecisionSave: boolean;
@@ -140,6 +142,9 @@ function createDecisionDataSource(store: DecisionStore) {
           Object.assign(new ParticipantResponse(), attributes),
       });
     }
+    if (entity === ParticipantCondition) {
+      return createConditionRepository(store.conditions);
+    }
     if (entity === ScoreResult) {
       return createRepository(store.scoreResults, {
         createValue: (attributes) =>
@@ -196,6 +201,32 @@ function createDecisionDataSource(store: DecisionStore) {
   return dataSource as unknown as DataSource;
 }
 
+function createConditionRepository(store: Map<string, ParticipantCondition>) {
+  return {
+    findOne(options: { where?: Record<string, unknown> }) {
+      const where = options?.where ?? {};
+      return [...store.values()].find((value) =>
+        matches(value as unknown as Record<string, unknown>, where)
+      );
+    },
+    findOneBy(where: Record<string, unknown>) {
+      return [...store.values()].find((value) =>
+        matches(value as unknown as Record<string, unknown>, where)
+      );
+    },
+    find(options: { where?: Record<string, unknown> }) {
+      const where = options?.where ?? {};
+      return [...store.values()].filter((value) =>
+        matches(value as unknown as Record<string, unknown>, where)
+      );
+    },
+    save(value: ParticipantCondition) {
+      store.set(value.participantId, value);
+      return value;
+    },
+  };
+}
+
 function createDecisionService(store: DecisionStore) {
   const dataSource = createDecisionDataSource(store);
   const persistence = new TypeOrmRoomsPersistenceAdapter(dataSource);
@@ -236,6 +267,7 @@ function createSeed(): {
     participants: new Map(),
     candidates: new Map(),
     responses: new Map(),
+    conditions: new Map(),
     scoreResults: new Map(),
     decisions: new Map(),
     failDecisionSave: false,

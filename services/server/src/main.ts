@@ -6,7 +6,7 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
   const clientOrigins = (
-    configService.get<string>('CLIENT_ORIGIN') ?? 'http://localhost:3000'
+    configService.get<string>('CLIENT_ORIGIN') ?? 'http://localhost:10081'
   )
     .split(',')
     .map((origin) => origin.trim())

@@ -1,5 +1,6 @@
 import type { CandidateRecord } from '../../domain/candidate/candidate';
 import type { ParticipantRecord } from '../../domain/participant/participant';
+import type { ParticipantConditionRecord } from '../../domain/participant-condition/participant-condition';
 import type { ParticipantResponseRecord } from '../../domain/participant-response/participant-response';
 import type { ScoreResultCoverage } from '../../domain/calculation/score-result';
 import type { RoomRecord } from '../../domain/room/room-status';
@@ -14,10 +15,14 @@ export function createSolverSnapshot(
   participants: ParticipantRecord[],
   candidates: CandidateRecord[],
   responses: ParticipantResponseRecord[],
+  conditions: ParticipantConditionRecord[],
   policyVersion: string,
   scoringProfile: string
 ): SolverSnapshot {
   const candidateIds = new Set(candidates.map((candidate) => candidate.id));
+  const conditionByParticipantId = new Map(
+    conditions.map((condition) => [condition.participantId, condition])
+  );
 
   return {
     requestId,
@@ -26,6 +31,23 @@ export function createSolverSnapshot(
     roomId: room.id,
     participants: participants.map((participant) => ({
       participantId: participant.id,
+      condition: (() => {
+        const condition = conditionByParticipantId.get(participant.id);
+        if (!condition) {
+          throw new Error('Participant condition is missing from snapshot.');
+        }
+        return {
+          availabilityWindows: condition.availabilityWindows.map((window) => ({
+            ...window,
+          })),
+          maxBudgetKrw: condition.maxBudgetKrw,
+          preferences: {
+            requiredTags: [...condition.preferences.requiredTags],
+            preferredTags: [...condition.preferences.preferredTags],
+            avoidTags: [...condition.preferences.avoidTags],
+          },
+        };
+      })(),
       responses: responses
         .filter((response) =>
           isCandidateResponseForSnapshot(response, participant.id, candidateIds)

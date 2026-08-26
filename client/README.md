@@ -9,4 +9,4 @@ pnpm install
 pnpm dev
 ```
 
-브라우저에서 http://localhost:3000 으로 접속합니다.
+브라우저에서 http://localhost:10081 으로 접속합니다.
