@@ -42,7 +42,7 @@ function describeCalculationError(error: unknown) {
       return '계산하려면 활성 후보가 2~5개여야 합니다.';
     }
     if (error.code === 'CONDITION_INCOMPLETE') {
-      return '모든 참여자가 참여자 조건을 먼저 저장해야 계산할 수 있습니다.';
+      return '모든 참여자가 참여 가능 조건을 먼저 저장해야 계산할 수 있습니다.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '현재 방 상태에서는 계산을 시작할 수 없습니다.';
@@ -146,7 +146,7 @@ export function CalculationResultPanel({
             후보 추천 계산
           </h2>
           <p className='text-sm leading-6 text-slate-500'>
-            참여자 조건과 후보별 응답을 함께 반영해 예산·시간·선호·이동 부담을
+            각자의 기준과 후보별 응답을 함께 반영해 예산·시간·선호·이동 부담을
             계산합니다.
           </p>
         </div>

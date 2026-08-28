@@ -21,7 +21,7 @@ const recommendationStatusLabels: Record<RecommendationStatus, string> = {
 };
 
 const scoringProfileLabels: Record<ScoringProfile, string> = {
-  CONDITION_AWARE: "참여자 조건 반영 계산",
+  CONDITION_AWARE: "개인 기준 반영 계산",
   MVP_NO_CONDITIONS: "조건 없는 기본 계산",
 };
 

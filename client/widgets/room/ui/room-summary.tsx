@@ -107,24 +107,6 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
         </div>
       </section>
 
-      <section className='grid gap-3 md:grid-cols-2'>
-        <div className='rounded-xl border border-dashed border-slate-300 bg-white/65 p-4'>
-          <p className='text-sm font-semibold text-slate-950'>후보 장소</p>
-          <p className='mt-3 text-sm leading-6 text-slate-500'>
-            {room.candidates.length === 0
-              ? '아직 등록된 후보가 없습니다. 참여자와 후보를 준비하면 이곳에 표시됩니다.'
-              : `${room.candidates.length}개의 후보가 등록되어 있습니다.`}
-          </p>
-        </div>
-        <div className='rounded-xl border border-dashed border-slate-300 bg-white/65 p-4'>
-          <p className='text-sm font-semibold text-slate-950'>계산 결과</p>
-          <p className='mt-3 text-sm leading-6 text-slate-500'>
-            {!room.room.latestScoreResultId
-              ? '아직 계산 결과가 없습니다. 모든 준비가 끝나면 결과가 여기에 표시됩니다.'
-              : '최신 계산 결과를 확인할 수 있습니다.'}
-          </p>
-        </div>
-      </section>
     </>
   );
 }
