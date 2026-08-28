@@ -72,6 +72,12 @@ export interface CreatedCandidateResponse {
   candidate: CandidatePayload;
 }
 
+export interface CandidateMutationResponse {
+  requestId: string;
+  candidate: CandidatePayload;
+  scoreResultStatus: 'STALE';
+}
+
 export interface ParticipantResponsePayload {
   id: string;
   participantId: string;
@@ -185,6 +191,11 @@ export type RoomDetailsResult = {
 
 export type CreatedCandidateResult = {
   candidate: CandidateRecord;
+};
+
+export type CandidateMutationResult = {
+  candidate: CandidateRecord;
+  scoreResultStatus: 'STALE';
 };
 
 export type UpsertedParticipantResponseResult = {
@@ -376,6 +387,26 @@ export function toCreatedCandidateResponse(
   return {
     requestId: createRequestId(),
     candidate: toCandidatePayload(result.candidate),
+  };
+}
+
+export function toUpdatedCandidateResponse(
+  result: CandidateMutationResult
+): CandidateMutationResponse {
+  return {
+    requestId: createRequestId(),
+    candidate: toCandidatePayload(result.candidate),
+    scoreResultStatus: result.scoreResultStatus,
+  };
+}
+
+export function toArchivedCandidateResponse(
+  result: CandidateMutationResult
+): CandidateMutationResponse {
+  return {
+    requestId: createRequestId(),
+    candidate: toCandidatePayload(result.candidate),
+    scoreResultStatus: result.scoreResultStatus,
   };
 }
 

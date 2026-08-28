@@ -122,11 +122,47 @@ export function buildKstDateTime(date: string, time: string) {
   return `${date}T${time}:00+09:00`;
 }
 
+export function getDateTimeInputValues(
+  value: string,
+  timezone = MEETPOINT_TIMEZONE,
+) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return { date: "", time: "" };
+  }
+
+  const parts = new Intl.DateTimeFormat("en-US", {
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+    minute: "2-digit",
+    month: "2-digit",
+    timeZone: timezone,
+    year: "numeric",
+  }).formatToParts(date);
+  const values = Object.fromEntries(
+    parts
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+
+  if (!values.year || !values.month || !values.day || !values.hour || !values.minute) {
+    return { date: "", time: "" };
+  }
+
+  return {
+    date: `${values.year}-${values.month}-${values.day}`,
+    time: `${values.hour}:${values.minute}`,
+  };
+}
+
 export function CandidateDatePicker({
+  disabled = false,
   error,
   onChange,
   value,
 }: {
+  disabled?: boolean;
   error?: string;
   onChange: (value: string) => void;
   value: string;
@@ -166,6 +202,7 @@ export function CandidateDatePicker({
             : "border-slate-300 focus:border-emerald-500"
         }`}
         onClick={() => (isOpen ? setIsOpen(false) : openCalendar())}
+        disabled={disabled}
         type="button"
       >
         <span className={selectedDate ? "text-slate-950" : "text-slate-400"}>

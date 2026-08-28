@@ -2,7 +2,6 @@ import { CandidateManagementPanel } from "@/features/candidate-management";
 import { CalculationResultPanel } from "@/features/calculation";
 import { ParticipantResponsePanel } from "@/features/participant-response";
 import { ParticipantConditionPanel } from "@/features/participant-condition";
-import type { Candidate } from "@/entities/candidate";
 import type { CalculationPayload } from "@/entities/calculation";
 import type { DecisionPayload } from "@/entities/decision";
 import type { RoomDetailsResponse } from "@/entities/room";
@@ -14,7 +13,6 @@ type RoomWorkspaceWidgetProps = {
   room: RoomDetailsResponse;
   onRoomReload: () => Promise<void>;
   onRoomRefresh: () => Promise<void>;
-  onCandidateCreated: (candidate: Candidate) => void;
   latestScoreResult: CalculationPayload | null;
   decision: DecisionPayload | null;
 };
@@ -26,14 +24,13 @@ export function RoomWorkspaceWidget({
   room,
   onRoomReload,
   onRoomRefresh,
-  onCandidateCreated,
   latestScoreResult,
   decision,
 }: RoomWorkspaceWidgetProps) {
   return (
     <>
       <CandidateManagementPanel
-        onCandidateCreated={onCandidateCreated}
+        onRoomRefresh={onRoomRefresh}
         participantId={participantId}
         room={room}
         roomId={roomId}

@@ -29,7 +29,15 @@ export type CreateCandidateInput = {
   tags: string[];
 };
 
+export type UpdateCandidateInput = Partial<CreateCandidateInput>;
+
 export type CreatedCandidateResponse = {
   requestId: string;
   candidate: Candidate;
+};
+
+export type CandidateMutationResponse = {
+  requestId: string;
+  candidate: Candidate;
+  scoreResultStatus: "STALE";
 };

@@ -17,6 +17,7 @@ export type CandidateFieldErrors = {
 
 type CandidateFormProps = {
   nextCandidateNumber: number;
+  mode?: "create" | "edit";
   date: string;
   startTime: string;
   endTime: string;
@@ -28,6 +29,7 @@ type CandidateFormProps = {
   fieldErrors: CandidateFieldErrors;
   formError: string;
   isSubmitting: boolean;
+  onCancel?: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onDateChange: (value: string) => void;
   onTimePreset: (start: string, end: string) => void;
@@ -48,6 +50,7 @@ const TIME_PRESETS = [
 
 export function CandidateForm({
   nextCandidateNumber,
+  mode = "create",
   date,
   startTime,
   endTime,
@@ -59,6 +62,7 @@ export function CandidateForm({
   fieldErrors,
   formError,
   isSubmitting,
+  onCancel,
   onSubmit,
   onDateChange,
   onTimePreset,
@@ -73,8 +77,10 @@ export function CandidateForm({
   return (
     <form className="space-y-4" onSubmit={onSubmit} noValidate>
       <div className="rounded-xl border border-emerald-100 bg-white/70 px-3 py-2.5 text-xs text-emerald-800">
-        후보 {nextCandidateNumber}번으로 저장됩니다. 모든 시간은 한국 시간
-        기준입니다.
+        {mode === "edit"
+          ? `후보 ${nextCandidateNumber}번을 수정합니다.`
+          : `후보 ${nextCandidateNumber}번으로 저장됩니다.`} 모든 시간은 한국
+        시간 기준입니다.
       </div>
 
       <fieldset className="space-y-2">
@@ -85,6 +91,7 @@ export function CandidateForm({
           <button
             className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
             onClick={() => onDateChange(getKstDateValue())}
+            disabled={isSubmitting}
             type="button"
           >
             오늘
@@ -92,6 +99,7 @@ export function CandidateForm({
           <button
             className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
             onClick={() => onDateChange(getKstDateValue(1))}
+            disabled={isSubmitting}
             type="button"
           >
             내일
@@ -99,12 +107,14 @@ export function CandidateForm({
           <button
             className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
             onClick={() => onDateChange(getKstWeekdayDate(6))}
+            disabled={isSubmitting}
             type="button"
           >
             이번 토요일
           </button>
         </div>
         <CandidateDatePicker
+          disabled={isSubmitting}
           error={fieldErrors.date}
           onChange={onDateChange}
           value={date}
@@ -117,6 +127,7 @@ export function CandidateForm({
           {TIME_PRESETS.map((preset) => (
             <button
               className="mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs hover:border-emerald-400"
+              disabled={isSubmitting}
               key={preset.label}
               onClick={() => onTimePreset(preset.start, preset.end)}
               type="button"
@@ -131,6 +142,7 @@ export function CandidateForm({
             <input
               aria-invalid={Boolean(fieldErrors.time)}
               className="mp-input"
+              disabled={isSubmitting}
               onChange={(event) => onStartTimeChange(event.target.value)}
               type="time"
               value={startTime}
@@ -141,6 +153,7 @@ export function CandidateForm({
             <input
               aria-invalid={Boolean(fieldErrors.time)}
               className="mp-input"
+              disabled={isSubmitting}
               onChange={(event) => onEndTimeChange(event.target.value)}
               type="time"
               value={endTime}
@@ -159,6 +172,7 @@ export function CandidateForm({
           장소명
           <input
             className="mp-input"
+            disabled={isSubmitting}
             maxLength={120}
             onChange={(event) => onPlaceNameChange(event.target.value)}
             placeholder="예: MeetPoint Cafe"
@@ -169,6 +183,7 @@ export function CandidateForm({
           지역
           <input
             className="mp-input"
+            disabled={isSubmitting}
             onChange={(event) => onAreaChange(event.target.value)}
             placeholder="예: 중구"
             value={area}
@@ -179,6 +194,7 @@ export function CandidateForm({
         주소
         <input
           className="mp-input"
+          disabled={isSubmitting}
           maxLength={120}
           onChange={(event) => onAddressChange(event.target.value)}
           placeholder="예: 서울 중구 1"
@@ -194,6 +210,7 @@ export function CandidateForm({
           1인 예상 비용 (원)
           <input
             className="mp-input"
+            disabled={isSubmitting}
             inputMode="numeric"
             min="0"
             onChange={(event) => onCostChange(event.target.value)}
@@ -210,6 +227,7 @@ export function CandidateForm({
           태그
           <input
             className="mp-input"
+            disabled={isSubmitting}
             onChange={(event) => onTagsChange(event.target.value)}
             placeholder="쉼표로 구분 (예: 조용함, 커피)"
             value={tags}
@@ -231,13 +249,31 @@ export function CandidateForm({
         </p>
       )}
 
-      <button
-        className="mp-button mp-button-primary w-full bg-emerald-700 hover:bg-emerald-800"
-        disabled={isSubmitting}
-        type="submit"
-      >
-        {isSubmitting ? "후보 등록 중..." : "후보 등록"}
-      </button>
+      <div className="flex flex-col gap-2 sm:flex-row-reverse">
+        <button
+          className="mp-button mp-button-primary w-full bg-emerald-700 hover:bg-emerald-800"
+          disabled={isSubmitting}
+          type="submit"
+        >
+          {isSubmitting
+            ? mode === "edit"
+              ? "후보 저장 중..."
+              : "후보 등록 중..."
+            : mode === "edit"
+              ? "수정 내용 저장"
+              : "후보 등록"}
+        </button>
+        {mode === "edit" && onCancel && (
+          <button
+            className="mp-button mp-button-secondary w-full"
+            disabled={isSubmitting}
+            onClick={onCancel}
+            type="button"
+          >
+            수정 취소
+          </button>
+        )}
+      </div>
     </form>
   );
 }

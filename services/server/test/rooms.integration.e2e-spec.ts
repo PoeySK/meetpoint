@@ -215,6 +215,89 @@ describe('Room Candidate and ParticipantResponse integration', () => {
     );
   });
 
+  it('updates and archives Candidates with PostgreSQL version conditions', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send({
+        title: 'Candidate lifecycle integration room',
+        timezone: 'Asia/Seoul',
+        host: { displayName: 'Candidate lifecycle host' },
+      })
+      .expect(201);
+    roomId = created.body.room.id;
+
+    const first = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(candidatePayload())
+      .expect(201);
+    const second = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send({
+        ...candidatePayload(),
+        displayOrder: 2,
+        time: {
+          startsAt: '2026-09-01T14:00:00.000Z',
+          endsAt: '2026-09-01T16:00:00.000Z',
+          timezone: 'Asia/Seoul',
+        },
+      })
+      .expect(201);
+
+    const candidatePath = `/api/v1/rooms/${roomId}/candidates/${first.body.candidate.id}`;
+    const updated = await request(app.getHttpServer())
+      .patch(candidatePath)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .set('If-Match-Version', '1')
+      .send({ estimatedCostPerPersonKrw: 22000 })
+      .expect(200);
+    expect(updated.body.candidate).toMatchObject({
+      id: first.body.candidate.id,
+      version: 2,
+      estimatedCostPerPersonKrw: 22000,
+      status: CandidateStatus.ACTIVE,
+    });
+
+    const staleUpdate = await request(app.getHttpServer())
+      .patch(candidatePath)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .set('If-Match-Version', '1')
+      .send({ estimatedCostPerPersonKrw: 23000 })
+      .expect(409);
+    expect(staleUpdate.body.error.code).toBe('CANDIDATE_VERSION_CONFLICT');
+
+    const archived = await request(app.getHttpServer())
+      .delete(`/api/v1/rooms/${roomId}/candidates/${second.body.candidate.id}`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .set('If-Match-Version', '1')
+      .expect(200);
+    expect(archived.body.candidate).toMatchObject({
+      id: second.body.candidate.id,
+      status: CandidateStatus.ARCHIVED,
+      version: 2,
+    });
+
+    const persistedArchived = await dataSource
+      .getRepository(Candidate)
+      .findOneBy({ id: second.body.candidate.id });
+    expect(persistedArchived).toMatchObject({
+      status: CandidateStatus.ARCHIVED,
+      version: 2,
+    });
+
+    const room = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${roomId}`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+    expect(room.body.candidates).toHaveLength(1);
+    expect(room.body.candidates[0]).toMatchObject({
+      id: first.body.candidate.id,
+      estimatedCostPerPersonKrw: 22000,
+      version: 2,
+    });
+  });
+
   it('supports MEMBER leave, HOST kick, token revocation, and active roster filtering', async () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/rooms')

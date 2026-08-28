@@ -65,7 +65,7 @@ Client는 `overallScore`를 다시 계산하거나 후보 순위를 자체적으
 - 최종 Decision의 호스트 권한 검사와 확정 이력 보존
 - 추후 OpenAI 호출과 외부 응답의 구조화
 
-NestJS 내부 서비스도 기능 단위로 책임을 나눈다. `RoomService`는 방 생성·입장을, `RoomQueryService`는 Room 조회 projection을, `CandidateService`는 후보 등록을, `ParticipantConditionService`는 본인 조건 저장과 상태 전이를, `ParticipantResponseService`는 참가자 응답 저장을, `RoomCalculationService`는 계산 접수·조회·Solver 완료 전이를, `ParticipantLifecycleService`는 MEMBER leave·HOST kick의 Participant 상태·token 폐기·최신 ScoreResult 무효화를 담당한다. `DecisionService`는 Decision 확정·재검토·조회와 그 transaction을 담당한다. HTTP 진입점도 `RoomsController`, `CandidateController`, `ParticipantConditionController`, `ParticipantResponseController`, `CalculationController`, `DecisionController`, `ParticipantLifecycleController`로 나누며, 각 Controller는 경로·헤더·본문을 해당 서비스로 전달하는 얇은 어댑터로 유지한다.
+NestJS 내부 서비스도 기능 단위로 책임을 나눈다. `RoomService`는 방 생성·입장을, `RoomQueryService`는 Room 조회 projection을, `CandidateService`는 후보 생성·수정·보관과 활성 목록 lifecycle을, `ParticipantConditionService`는 본인 조건 저장과 상태 전이를, `ParticipantResponseService`는 참가자 응답 저장을, `RoomCalculationService`는 계산 접수·조회·Solver 완료 전이를, `ParticipantLifecycleService`는 MEMBER leave·HOST kick의 Participant 상태·token 폐기·최신 ScoreResult 무효화를 담당한다. `DecisionService`는 Decision 확정·재검토·조회와 그 transaction을 담당한다. HTTP 진입점도 `RoomsController`, `CandidateController`, `ParticipantConditionController`, `ParticipantResponseController`, `CalculationController`, `DecisionController`, `ParticipantLifecycleController`로 나누며, 각 Controller는 경로·헤더·본문을 해당 서비스로 전달하는 얇은 어댑터로 유지한다.
 
 브라우저가 직접 Solver를 호출하지 않으므로 계산 입력에 방 토큰이나 내부 서비스 주소가 노출되지 않는다.
 
@@ -93,6 +93,7 @@ NestJS 내부 서비스도 기능 단위로 책임을 나눈다. `RoomService`�
 
 - PostgreSQL 연결·트랜잭션·마이그레이션은 NestJS 서버가 소유한다.
 - 후보·조건·응답 변경과 최신 계산 무효화는 하나의 일관된 서버 작업으로 처리해야 한다.
+- Candidate 수정·보관은 Room row lock과 Candidate `version` 조건부 update를 함께 사용하여 오래된 Client의 덮어쓰기를 막는다.
 - 계산 결과는 현재 데이터로 덮어쓰지 않고 `ScoreResult` 이력으로 저장한다.
 - `Decision`은 확정 시 사용한 `scoreResultId`를 참조하여 당시 점수와 현재 입력을 구분한다.
 - 방 범위 ID 검증은 SQL 쿼리와 서비스 로직 양쪽에서 확인하여 다른 방의 데이터를 섞지 않는다.

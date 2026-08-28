@@ -146,6 +146,35 @@ export class TypeOrmRoomsPersistenceAdapter implements RoomsPersistencePort {
           await repository.save(toCandidateEntity(candidate))
         );
       },
+      async saveIfVersion(candidate, expectedVersion) {
+        const result = await repository.update(
+          {
+            id: candidate.id,
+            roomId: candidate.roomId,
+            version: expectedVersion,
+          },
+          {
+            displayOrder: candidate.displayOrder,
+            time: candidate.time,
+            place: candidate.place,
+            estimatedCostPerPersonKrw: candidate.estimatedCostPerPersonKrw,
+            tags: candidate.tags,
+            status: candidate.status,
+            version: candidate.version,
+            archivedAt: candidate.archivedAt,
+            updatedAt: candidate.updatedAt,
+          }
+        );
+        if (!result.affected) {
+          return null;
+        }
+
+        const saved = await repository.findOneBy({
+          id: candidate.id,
+          roomId: candidate.roomId,
+        });
+        return saved ? toCandidateRecord(saved) : null;
+      },
     };
   }
 
