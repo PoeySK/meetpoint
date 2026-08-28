@@ -53,7 +53,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
 
   return (
     <main className="mp-page px-3 py-4 font-sans text-slate-950 sm:px-6 sm:py-6">
-      <div className="mx-auto w-full max-w-5xl">
+      <div className="mx-auto w-full max-w-7xl">
         <div className="mb-5 flex items-center justify-between gap-4">
           <Link className="text-base font-bold tracking-tight" href="/">
             MeetPoint
@@ -68,16 +68,6 @@ export function RoomWidget({ roomId }: { roomId: string }) {
         {!isLoading && !error && room && (
           <div className="space-y-4">
             <RoomSummary room={room} />
-            <RoomParticipantsWidget
-              actionError={lifecycleError}
-              actionNotice={lifecycleNotice}
-              currentParticipant={room.currentParticipant}
-              isLeaving={isLeaving}
-              onKick={handleKick}
-              onLeave={handleLeave}
-              removingParticipantId={removingParticipantId}
-              room={room}
-            />
             {refreshError && (
               <p
                 aria-live="polite"
@@ -103,6 +93,16 @@ export function RoomWidget({ roomId }: { roomId: string }) {
                 없습니다. 방 코드로 다시 입장하면 계속할 수 있습니다.
               </section>
             )}
+            <RoomParticipantsWidget
+              actionError={lifecycleError}
+              actionNotice={lifecycleNotice}
+              currentParticipant={room.currentParticipant}
+              isLeaving={isLeaving}
+              onKick={handleKick}
+              onLeave={handleLeave}
+              removingParticipantId={removingParticipantId}
+              room={room}
+            />
           </div>
         )}
       </div>

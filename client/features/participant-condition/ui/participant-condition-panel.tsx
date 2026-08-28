@@ -130,17 +130,17 @@ function validateDraft(
 function describeConditionError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === 'CONDITION_INCOMPLETE') {
-      return '시간·예산·태그 입력을 다시 확인해 주세요.';
+      return '가능 시간·예산·태그 입력을 다시 확인해 주세요.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
-      return '확정되거나 종료된 방에서는 조건을 수정할 수 없습니다.';
+      return '확정되거나 종료된 방에서는 내 기준을 수정할 수 없습니다.';
     }
     if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
       return '방 입장 정보가 만료되었습니다. 방에 다시 입장해 주세요.';
     }
   }
 
-  return '조건을 저장하지 못했습니다. 입력을 유지했으니 잠시 후 다시 시도해 주세요.';
+  return '내 기준을 저장하지 못했습니다. 입력을 유지했으니 잠시 후 다시 시도해 주세요.';
 }
 
 export function ParticipantConditionPanel({
@@ -250,7 +250,7 @@ export function ParticipantConditionPanel({
     setIsSubmitting(true);
     void upsertParticipantCondition(roomId, participantId, token, input)
       .then(async () => {
-        setFormMessage('조건을 저장했습니다. 후보 응답을 입력해 주세요.');
+        setFormMessage('내 기준을 저장했습니다. 후보 응답을 입력해 주세요.');
         await onRoomRefresh();
       })
       .catch((error: unknown) => {
@@ -264,9 +264,9 @@ export function ParticipantConditionPanel({
   return (
     <section className='mp-card border-sky-100 bg-sky-50/55 p-4 sm:p-6'>
       <div className='space-y-1.5'>
-        <p className='text-sm font-semibold text-sky-700'>참여자 조건</p>
+        <p className='text-sm font-semibold text-sky-700'>내 기준</p>
         <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-          내가 가능한 기준을 먼저 알려주세요
+          가능한 조건을 알려주세요
         </h2>
         <p className='text-sm leading-6 text-slate-600'>
           가능한 시간, 1인 예산, 선호 태그를 저장하면 후보별 응답과 계산 결과에
@@ -276,7 +276,7 @@ export function ParticipantConditionPanel({
 
       {isReadOnly ? (
         <p className='mt-4 rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          확정되거나 종료된 방에서는 조건을 수정할 수 없습니다.
+          확정되거나 종료된 방에서는 내 기준을 수정할 수 없습니다.
         </p>
       ) : (
         <form className='mt-5 space-y-5' onSubmit={handleSubmit}>
@@ -450,14 +450,18 @@ export function ParticipantConditionPanel({
             disabled={isSubmitting}
             type='submit'
           >
-            {isSubmitting ? '조건 저장 중...' : condition ? '조건 수정 저장' : '조건 저장'}
+            {isSubmitting
+              ? '내 기준 저장 중...'
+              : condition
+                ? '내 기준 수정 저장'
+                : '내 기준 저장'}
           </button>
         </form>
       )}
 
       {!isReadOnly && !condition && !formMessage && (
         <p className='mt-4 text-xs leading-5 text-slate-500'>
-          조건을 저장해야 후보별 참석 가능 여부를 입력할 수 있습니다.
+          내 기준을 저장해야 후보별 참석 가능 여부를 입력할 수 있습니다.
         </p>
       )}
     </section>
