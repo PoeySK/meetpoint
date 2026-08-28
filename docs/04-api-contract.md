@@ -26,7 +26,7 @@
 ### 현재 Room API 범위
 
 - Room과 HOST·MEMBER Participant를 영속화하고, HOST의 Candidate 등록과 참여자의 ParticipantCondition·Candidate별 `ParticipantResponse` 제출·수정을 제공한다. MEMBER는 방 코드 입장 API로 생성한다.
-- 현재 계산·결정 흐름에서는 ScoreResult 계산 시작·polling·최신 결과 조회와 HOST의 Decision 확정·재검토, 모든 참여자의 Decision 조회 API를 제공한다. Candidate 수정·보관 API는 아직 `docs/07-implementation-plan.md`의 P0 작업으로 남아 있다.
+- 현재 계산·결정 흐름에서는 ScoreResult 계산 시작·polling·최신 결과 조회와 HOST의 Decision 확정·재검토, 모든 참여자의 Decision 조회 API를 제공한다. Candidate는 HOST의 생성·수정·보관 API를 제공하며, 보관은 물리 삭제가 아닌 `ARCHIVED` 전환으로 처리한다.
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
 - Room 조회 응답의 `currentParticipant`에는 Bearer token으로 인증·확인한 현재 Participant의 공개 정보만 반환한다.
 - Room 조회의 `participants`에는 현재 활성 상태(`JOINED` 또는 `RESPONDED`)인 HOST·MEMBER Participant의 공개 정보를 반환한다. `LEFT`·`REMOVED` Participant의 이력은 이 응답에 포함하지 않는다.
@@ -66,7 +66,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | 401 | `MISSING_TOKEN`, `INVALID_TOKEN`, `TOKEN_EXPIRED` | 방 범위 토큰이 없거나 유효하지 않거나 만료됨 |
 | 403 | `HOST_ONLY`, `PARTICIPANT_ONLY`, `FORBIDDEN` | 역할 또는 본인 범위를 벗어난 요청 |
 | 404 | `ROOM_NOT_FOUND_OR_INVALID_CODE`, `RESOURCE_NOT_FOUND`, `SCORE_RESULT_NOT_FOUND`, `DECISION_NOT_FOUND` | 방 또는 하위 객체가 없음 |
-| 409 | `ROOM_STATE_CONFLICT`, `CALCULATION_IN_PROGRESS`, `STALE_RESULT`, `DUPLICATE_RESPONSE` | 현재 상태와 충돌 |
+| 409 | `ROOM_STATE_CONFLICT`, `CALCULATION_IN_PROGRESS`, `STALE_RESULT`, `DUPLICATE_RESPONSE`, `CANDIDATE_VERSION_CONFLICT` | 현재 상태 또는 오래된 Candidate 버전과 충돌 |
 | 422 | `BUSINESS_RULE_VIOLATION`, `NO_ACTIVE_CANDIDATES`, `CANDIDATE_LIMIT_EXCEEDED`, `CONDITION_INCOMPLETE`, `PARTICIPANT_COUNT_OUT_OF_RANGE`, `TIME_CONDITION_CONFLICT`, `RESPONSE_FIELD_MISSING` | JSON은 맞지만 MeetPoint 규칙 위반 |
 | 502 | `SOLVER_ERROR` | Solver가 계산 실패를 반환함 |
 | 503 | `SOLVER_UNAVAILABLE` | Solver에 연결할 수 없음 또는 타임아웃 |
@@ -348,6 +348,11 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 
 `PATCH /api/v1/rooms/{roomId}/candidates/{candidateId}`
 
+#### 요청 헤더
+
+- `Authorization: Bearer <host-token>`
+- `If-Match-Version: <현재 Candidate version>` (필수)
+
 #### 요청 JSON
 
 변경할 필드만 보낸다.
@@ -370,9 +375,23 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
   "requestId": "req_20260813_005",
   "candidate": {
     "id": "candidate_01",
+    "roomId": "room_01",
+    "displayOrder": 1,
     "status": "ACTIVE",
+    "time": {
+      "startsAt": "2026-08-15T19:30:00+09:00",
+      "endsAt": "2026-08-15T21:30:00+09:00",
+      "timezone": "Asia/Seoul"
+    },
+    "place": {
+      "name": "역삼 조용한 식당",
+      "address": "서울 강남구 테헤란로 1",
+      "area": "강남"
+    },
+    "estimatedCostPerPersonKrw": 30000,
+    "tags": ["INDOOR", "QUIET"],
     "version": 2,
-    "updatedAt": "2026-08-13T04:40:00Z"
+    "archivedAt": null
   },
   "scoreResultStatus": "STALE"
 }
@@ -382,12 +401,18 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 
 - `401 INVALID_TOKEN`, `403 HOST_ONLY`, `404 RESOURCE_NOT_FOUND`
 - `409 ROOM_STATE_CONFLICT`: 후보가 `ARCHIVED`이거나 방이 확정·종결 상태
-- `400 VALIDATION_ERROR`: 부분 요청의 시간 구간, 주소, 비용 형식 오류
-- 수정 직전에 읽은 `version`을 `If-Match-Version` 헤더로 보낼 경우 버전 불일치에는 409를 반환한다. 이 헤더를 필수로 할지는 구현 전에 정한다.
+- `400 VALIDATION_ERROR`: 부분 요청의 시간 구간, 주소, 비용 형식 또는 `If-Match-Version` 헤더 오류
+- `409 CANDIDATE_VERSION_CONFLICT`: 요청 헤더의 버전이 현재 Candidate 버전과 다름
+- 성공하면 Candidate `version`이 1 증가하고, 기존 완료 결과는 `STALE`이 된다.
 
 ### 8. 후보 삭제(보관)
 
 `DELETE /api/v1/rooms/{roomId}/candidates/{candidateId}`
+
+#### 요청 헤더
+
+- `Authorization: Bearer <host-token>`
+- `If-Match-Version: <현재 Candidate version>` (필수)
 
 실제 행을 즉시 삭제하지 않고 `ARCHIVED`로 바꾸어 과거 계산 결과가 참조한 후보를 보존한다.
 
@@ -398,7 +423,22 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
   "requestId": "req_20260813_006",
   "candidate": {
     "id": "candidate_01",
+    "roomId": "room_01",
+    "displayOrder": 1,
     "status": "ARCHIVED",
+    "time": {
+      "startsAt": "2026-08-15T19:00:00+09:00",
+      "endsAt": "2026-08-15T21:00:00+09:00",
+      "timezone": "Asia/Seoul"
+    },
+    "place": {
+      "name": "역삼 조용한 식당",
+      "address": "서울 강남구 테헤란로 1",
+      "area": "강남"
+    },
+    "estimatedCostPerPersonKrw": 28000,
+    "tags": ["INDOOR", "QUIET"],
+    "version": 2,
     "archivedAt": "2026-08-13T04:42:00Z"
   },
   "scoreResultStatus": "STALE"
@@ -409,6 +449,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 
 - `401 INVALID_TOKEN`, `403 HOST_ONLY`, `404 RESOURCE_NOT_FOUND`
 - `409 ROOM_STATE_CONFLICT`: 확정·종결 방, 이미 보관된 후보
+- `400 VALIDATION_ERROR`: `If-Match-Version` 헤더가 없거나 올바른 양의 정수가 아님
+- `409 CANDIDATE_VERSION_CONFLICT`: 요청 헤더의 버전이 현재 Candidate 버전과 다름
 - 활성 후보가 1개가 되는 삭제는 저장할 수 있지만, 다음 계산·확정은 후보 2개 이상이 될 때까지 거부한다.
 
 ### 9. 참여자 개인 조건 제출·수정
@@ -979,4 +1021,5 @@ NestJS는 Solver의 `requestId`와 오류 코드를 보존하여 외부 API의 `
 - **확정**: 결과에는 숫자 점수뿐 아니라 참가자별 breakdown, 근거, 충돌, 커버리지를 포함한다.
 - **확정**: 토큰은 불투명 난수이며 24시간 후 만료되고, 현재 토큰 갱신 API가 없다. 구현 시 원문 대신 해시만 저장한다.
 - **확정**: Room 자체는 자동 만료되지 않으며 `TOKEN_EXPIRED`는 만료된 방 범위 토큰에만 적용한다.
-- **미결정**: 방 데이터 삭제·보존 기간, API 버전별 호환 기간, 계산 결과 페이지의 이력 조회 범위와 `If-Match-Version` 필수 여부는 추후 결정한다.
+- **미결정**: 방 데이터 삭제·보존 기간, API 버전별 호환 기간, 계산 결과 페이지의 이력 조회 범위
+- **확정**: Candidate 수정·보관에는 `If-Match-Version`을 필수로 사용하며, 버전이 다르면 `CANDIDATE_VERSION_CONFLICT`를 반환한다.

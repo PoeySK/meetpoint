@@ -22,6 +22,8 @@ const ERROR_MESSAGES = {
   RESOURCE_NOT_FOUND: '요청한 Room 리소스를 찾을 수 없습니다.',
   ROOM_STATE_CONFLICT: '현재 Room 상태에서는 요청을 처리할 수 없습니다.',
   CANDIDATE_LIMIT_EXCEEDED: '활성 후보는 최대 5개까지 등록할 수 있습니다.',
+  CANDIDATE_VERSION_CONFLICT:
+    '다른 사람이 먼저 변경했습니다. 최신 정보를 확인한 뒤 다시 저장해 주세요.',
   INTERNAL_ERROR: '서버 내부 오류가 발생했습니다.',
   CALCULATION_IN_PROGRESS: 'A calculation is already running for this Room.',
   PARTICIPANT_COUNT_OUT_OF_RANGE:

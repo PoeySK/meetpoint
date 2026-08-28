@@ -21,6 +21,8 @@ import { ParticipantConditionController } from '../presentation/http/controllers
 import { CreateRoomUseCase } from '../application/commands/create-room.use-case';
 import { JoinParticipantUseCase } from '../application/commands/join-participant.use-case';
 import { CreateCandidateUseCase } from '../application/commands/create-candidate.use-case';
+import { UpdateCandidateUseCase } from '../application/commands/update-candidate.use-case';
+import { ArchiveCandidateUseCase } from '../application/commands/archive-candidate.use-case';
 import { UpsertParticipantResponseUseCase } from '../application/commands/upsert-participant-response.use-case';
 import { UpsertParticipantConditionUseCase } from '../application/commands/upsert-participant-condition.use-case';
 import { LeaveRoomUseCase } from '../application/commands/leave-room.use-case';
@@ -216,6 +218,28 @@ export function createMockDatabase(): MockDatabase {
       candidates.set(candidate.id, candidate);
       return candidate;
     }),
+    update: jest.fn(
+      (
+        criteria: Partial<Candidate>,
+        partial: Partial<Candidate>
+      ): { affected: number } => {
+        const current = [...candidates.values()].find((candidate) =>
+          Object.entries(criteria).every(
+            ([key, value]) => candidate[key as keyof Candidate] === value
+          )
+        );
+        if (!current) {
+          return { affected: 0 };
+        }
+        if (state.failCandidateSave) {
+          throw new Error('candidate save failed');
+        }
+
+        Object.assign(current, partial);
+        candidates.set(current.id, current);
+        return { affected: 1 };
+      }
+    ),
     find: jest.fn((options: { where?: Partial<Candidate> }) => {
       const where = options.where ?? {};
 
@@ -676,6 +700,8 @@ export async function createRoomsTestContext(): Promise<RoomsTestContext> {
       CreateRoomUseCase,
       JoinParticipantUseCase,
       CreateCandidateUseCase,
+      UpdateCandidateUseCase,
+      ArchiveCandidateUseCase,
       UpsertParticipantResponseUseCase,
       UpsertParticipantConditionUseCase,
       LeaveRoomUseCase,

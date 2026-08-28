@@ -245,6 +245,8 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - 호스트가 시간·장소·비용·태그·표시 순서를 수정할 때 갱신한다.
 - 호스트가 삭제할 때 물리 삭제가 아닌 `ARCHIVED`로 변경한다.
 - 활성 후보의 변경은 해당 방의 최신 계산과 결정 가능 여부를 무효화한다.
+- 수정·보관은 `version`을 조건으로 저장하여 오래된 Client가 최신 변경을 덮어쓰지 못하게 한다. 성공한 변경은 `version`을 1 증가시킨다.
+- 보관된 후보와 연결된 ParticipantResponse는 이력으로 보존하지만 활성 후보·새 계산·coverage에서는 제외한다.
 
 ## ParticipantResponse
 

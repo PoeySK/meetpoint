@@ -88,7 +88,6 @@ export function RoomWidget({ roomId }: { roomId: string }) {
             )}
             {accessToken && participantId ? (
               <RoomWorkspaceWidget
-                onCandidateCreated={() => void refreshRoom()}
                 onRoomReload={refreshRoom}
                 onRoomRefresh={refreshRoom}
                 participantId={participantId}

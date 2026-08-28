@@ -17,6 +17,8 @@ import { ParticipantLifecycleController } from './presentation/http/controllers/
 import { CreateRoomUseCase } from './application/commands/create-room.use-case';
 import { JoinParticipantUseCase } from './application/commands/join-participant.use-case';
 import { CreateCandidateUseCase } from './application/commands/create-candidate.use-case';
+import { UpdateCandidateUseCase } from './application/commands/update-candidate.use-case';
+import { ArchiveCandidateUseCase } from './application/commands/archive-candidate.use-case';
 import { UpsertParticipantResponseUseCase } from './application/commands/upsert-participant-response.use-case';
 import { UpsertParticipantConditionUseCase } from './application/commands/upsert-participant-condition.use-case';
 import { LeaveRoomUseCase } from './application/commands/leave-room.use-case';
@@ -65,6 +67,8 @@ import { SOLVER } from './application/ports/solver.port';
     CreateRoomUseCase,
     JoinParticipantUseCase,
     CreateCandidateUseCase,
+    UpdateCandidateUseCase,
+    ArchiveCandidateUseCase,
     UpsertParticipantResponseUseCase,
     UpsertParticipantConditionUseCase,
     LeaveRoomUseCase,

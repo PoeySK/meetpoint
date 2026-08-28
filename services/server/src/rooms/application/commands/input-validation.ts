@@ -199,6 +199,62 @@ export function validateCandidateInput(
   };
 }
 
+export function validateCandidateUpdateInput(
+  input: unknown,
+  existing: CandidateRecord
+): NormalizedCandidateInput {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    throw new BadRequestException('VALIDATION_ERROR');
+  }
+
+  const patch = input as Record<string, unknown>;
+  const allowedFields = new Set([
+    'displayOrder',
+    'time',
+    'place',
+    'estimatedCostPerPersonKrw',
+    'tags',
+  ]);
+  const keys = Object.keys(patch);
+  if (keys.length === 0 || keys.some((key) => !allowedFields.has(key))) {
+    throw new BadRequestException('VALIDATION_ERROR');
+  }
+
+  return validateCandidateInput({
+    displayOrder: Object.prototype.hasOwnProperty.call(patch, 'displayOrder')
+      ? patch.displayOrder
+      : existing.displayOrder,
+    time: Object.prototype.hasOwnProperty.call(patch, 'time')
+      ? patch.time
+      : existing.time,
+    place: Object.prototype.hasOwnProperty.call(patch, 'place')
+      ? patch.place
+      : existing.place,
+    estimatedCostPerPersonKrw: Object.prototype.hasOwnProperty.call(
+      patch,
+      'estimatedCostPerPersonKrw'
+    )
+      ? patch.estimatedCostPerPersonKrw
+      : existing.estimatedCostPerPersonKrw,
+    tags: Object.prototype.hasOwnProperty.call(patch, 'tags')
+      ? patch.tags
+      : existing.tags,
+  });
+}
+
+export function validateCandidateVersion(value: unknown): number {
+  if (typeof value !== 'string' || !/^[1-9]\d*$/.test(value.trim())) {
+    throw new BadRequestException('VALIDATION_ERROR');
+  }
+
+  const version = Number(value.trim());
+  if (!Number.isSafeInteger(version) || version < 1) {
+    throw new BadRequestException('VALIDATION_ERROR');
+  }
+
+  return version;
+}
+
 export function validateParticipantResponseInput(input: unknown): {
   availabilityStatus: AvailabilityStatus;
   travelBurden: TravelBurden;

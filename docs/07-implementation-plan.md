@@ -34,13 +34,13 @@ NestJS Server :3001
 | --- | --- | --- |
 | Room 생성·조회 | 완료 | Room과 HOST Participant를 transaction으로 생성하고 room-scoped token으로 조회한다. |
 | Participant 입장·lifecycle | 완료 | 방 코드 입장, MEMBER leave, HOST kick, token 폐기, 활성 목록 반영을 제공한다. |
-| Candidate | 부분 완료 | HOST의 생성과 `ACTIVE` 목록 조회만 제공한다. 수정·`ARCHIVED` 전환 API와 Client UI는 없다. |
+| Candidate | 완료(P0-2 범위) | HOST의 생성·수정과 `ARCHIVED` 전환, version 조건부 저장, 활성 목록·과거 이력 분리, Client 관리 UI를 제공한다. |
 | ParticipantCondition·ParticipantResponse | 완료 | 참여자 본인 조건 저장·수정, 조건 기반 응답 검증, 모든 활성 후보 응답 완료 시 `RESPONDED` 전환과 최신 결과 무효화를 제공한다. |
 | 계산 | 부분 완료 | Server가 조건·응답 snapshot을 만들어 조건-aware Solver를 호출하고 결과·coverage·충돌·경고를 저장한다. 계산 실행 복구는 남아 있다. |
 | Decision | 완료 | HOST의 최신 완료 결과 선택, 이슈 확인, 확정·재검토와 이력 보존을 제공한다. |
-| Client 화면 | 부분 완료 | 생성·입장·방 작업공간·조건 입력·후보 생성·응답·계산 결과·확정·참여자 lifecycle을 제공한다. 후보 수정·보관은 없다. |
-| 계약·문서 | 완료(P0-1 범위) | 조건 API, Room의 `myCondition`, condition-aware Solver snapshot·결과와 현재 구현을 정렬했다. |
-| 검증 | 부분 완료 | 조건 HTTP 계약, PostgreSQL 통합 흐름, Solver 점수·HTTP 단위 검증을 추가했다. Client 자동 테스트와 CI 고정은 남아 있다. |
+| Client 화면 | 부분 완료 | 생성·입장·방 작업공간·조건 입력·후보 생성·수정·보관·응답·계산 결과·확정·참여자 lifecycle을 제공한다. Client 자동 테스트는 남아 있다. |
+| 계약·문서 | 완료(P0-2 범위) | 조건 API, Candidate lifecycle, Room의 `myCondition`, condition-aware Solver snapshot·결과와 현재 구현을 정렬했다. |
+| 검증 | 부분 완료 | 조건·Candidate HTTP 계약, PostgreSQL 통합 흐름, Solver 점수·HTTP 단위 검증을 추가했다. Client 자동 테스트와 CI 고정은 남아 있다. |
 
 ## 우선순위 작업
 
@@ -91,6 +91,10 @@ Client 조건 입력 및 저장·수정·새로고침 상태를 구현했다.
 완료 조건: 후보 수정·보관 뒤 활성 목록, 응답 입력, coverage, 최신 결과가
   일관되게 갱신된다. 확정 결과가 과거 후보를 계속 조회할 수 있고, 동시 수정과
   Room 상태별 거부가 테스트된다.
+
+상태: 완료. HOST 전용 Candidate 수정·보관 API, `If-Match-Version` 조건부 저장,
+`ARCHIVED` 보존, 최신 결과 `STALE` 전환, Room 재오픈, 활성 응답·coverage 반영,
+Client 수정·보관·실패 복구 UI와 관련 HTTP·PostgreSQL 통합 테스트를 구현했다.
 
 #### 3. API 계약과 실제 구현 정렬
 

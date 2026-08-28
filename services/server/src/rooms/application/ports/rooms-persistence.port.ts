@@ -36,6 +36,10 @@ export interface CandidateRepositoryPort {
     options?: { activeOnly?: boolean; ordered?: boolean }
   ): Promise<CandidateRecord[]>;
   save(candidate: CandidateRecord): Promise<CandidateRecord>;
+  saveIfVersion(
+    candidate: CandidateRecord,
+    expectedVersion: number
+  ): Promise<CandidateRecord | null>;
 }
 
 export interface ParticipantResponseRepositoryPort {
