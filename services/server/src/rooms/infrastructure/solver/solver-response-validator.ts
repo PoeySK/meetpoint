@@ -43,6 +43,7 @@ const VALID_EXPLANATION_FLAGS = new Set([
   'NO_FULL_MATCH',
   'NO_BUDGET_CONSTRAINT',
   'PREFERENCE_UNEVALUATED',
+  'CONDITION_NOT_PROVIDED',
 ]);
 
 export function validateSolverResponse(

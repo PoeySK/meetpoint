@@ -58,7 +58,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
           <Link className="text-base font-bold tracking-tight" href="/">
             MeetPoint
           </Link>
-          <span className="text-xs font-medium text-slate-400">방 대기</span>
+          <span className="text-xs font-medium text-slate-400">모임 진행</span>
         </div>
 
         {isLoading && <LoadingView />}
@@ -73,7 +73,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
                 aria-live="polite"
                 className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800"
               >
-                자동 갱신에 실패했습니다. {refreshError.message}
+                최신 내용을 자동으로 불러오지 못했습니다. {refreshError.message}
               </p>
             )}
             {accessToken && participantId ? (
@@ -89,8 +89,8 @@ export function RoomWidget({ roomId }: { roomId: string }) {
               />
             ) : (
               <section className="mp-card border-amber-100 bg-amber-50/80 p-4 text-sm leading-5 text-amber-800">
-                이 브라우저에서 참여자 정보를 찾을 수 없어 후보 등록과 응답을 사용할 수
-                없습니다. 방 코드로 다시 입장하면 계속할 수 있습니다.
+                이 브라우저에서 방 입장 정보를 찾을 수 없어 후보 등록과 의견 작성을
+                사용할 수 없습니다. 방 코드로 다시 입장하면 계속할 수 있습니다.
               </section>
             )}
             <RoomParticipantsWidget

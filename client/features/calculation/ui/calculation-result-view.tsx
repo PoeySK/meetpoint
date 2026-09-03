@@ -10,41 +10,61 @@ const matchLevelLabels: Record<MatchLevel, string> = {
   FULL: "완전 일치",
   PARTIAL: "부분 일치",
   CONFLICTED: "충돌 있음",
-  INCOMPLETE: "응답 부족",
+  INCOMPLETE: "의견 부족",
 };
 
 const recommendationStatusLabels: Record<RecommendationStatus, string> = {
-  INCOMPLETE: "응답 부족",
-  FULL_MATCH: "완전 일치 후보 있음",
-  PARTIAL_MATCH: "부분 일치 후보 있음",
-  NO_FULL_MATCH: "완전 일치 후보 없음",
+  INCOMPLETE: "의견 부족",
+  FULL_MATCH: "딱 맞는 후보 있음",
+  PARTIAL_MATCH: "비슷한 후보 있음",
+  NO_FULL_MATCH: "딱 맞는 후보 없음",
 };
 
 const scoringProfileLabels: Record<ScoringProfile, string> = {
-  CONDITION_AWARE: "개인 기준 반영 계산",
-  MVP_NO_CONDITIONS: "조건 없는 기본 계산",
+  CONDITION_AWARE: "입력한 기준 반영",
+  MVP_NO_CONDITIONS: "기본 추천",
 };
 
 const calculationCodeLabels: Record<string, string> = {
-  LOW_SCORE: "낮은 점수",
-  MISSING_RESPONSE: "미응답",
-  MAYBE_RESPONSE: "가능 여부 불확실",
-  NO_FULL_MATCH: "완전 일치 후보 없음",
-  SELF_REPORTED_TRAVEL_BURDEN: "참여자 자기 평가 이동 부담",
-  SOLVER_ERROR: "계산 서버 오류",
-  SOLVER_UNAVAILABLE: "계산 서버 연결 실패",
-  TIME_UNAVAILABLE: "시간 불가",
-  TRAVEL_BURDEN_HARD: "이동 부담 높음",
-  TRAVEL_BURDEN_UNCERTAIN: "이동 부담 불확실",
+  LOW_SCORE: "점수가 낮음",
+  MISSING_RESPONSE: "의견 미작성",
+  MAYBE_RESPONSE: "참석 여부가 불확실",
+  NO_FULL_MATCH: "딱 맞는 후보 없음",
+  SELF_REPORTED_TRAVEL_BURDEN: "본인이 느끼는 이동 부담",
+  SOLVER_ERROR: "추천 결과를 만드는 중 오류가 발생했어요",
+  SOLVER_UNAVAILABLE: "추천 서비스를 잠시 사용할 수 없어요",
+  TIME_UNAVAILABLE: "참석하기 어려운 시간",
+  TRAVEL_BURDEN_HARD: "이동이 많이 불편함",
+  TRAVEL_BURDEN_UNCERTAIN: "이동 부담이 아직 정해지지 않음",
   TIME_CONDITION_CONFLICT: "가능 시간과 후보 시간 충돌",
   BUDGET_LIMIT_EXCEEDED: "예산 초과",
-  REQUIRED_TAG_MISSING: "필수 태그 누락",
-  AVOID_TAG_PRESENT: "피하고 싶은 태그 포함",
+  REQUIRED_TAG_MISSING: "필요한 특징 부족",
+  AVOID_TAG_PRESENT: "피하고 싶은 특징 포함",
   NO_BUDGET_CONSTRAINT: "예산 제한 없음",
+  CONDITION_NOT_PROVIDED: "내 기준 미입력",
 };
 
 export function getCalculationCodeLabel(code: string) {
-  return calculationCodeLabels[code] ?? "추가 확인 필요";
+  return calculationCodeLabels[code] ?? "확인할 내용이 있어요";
+}
+
+export function getCalculationReasonLabel(reason: string) {
+  const normalizedReason = reason.trim();
+  const partialMatch = /^(\d+)\/(\d+) responses submitted$/.exec(
+    normalizedReason,
+  );
+  if (partialMatch) {
+    return `전체 ${partialMatch[2]}명 중 ${partialMatch[1]}명이 의견을 남겼습니다.`;
+  }
+
+  const completeMatch = /^(\d+) responses submitted$/.exec(normalizedReason);
+  if (completeMatch) {
+    return `${completeMatch[1]}명이 모두 의견을 남겼습니다.`;
+  }
+
+  return /[A-Za-z]/.test(normalizedReason)
+    ? "추천 결과를 만드는 데 참고한 내용입니다."
+    : normalizedReason;
 }
 
 export function isCalculationRunning(
@@ -62,7 +82,7 @@ export function CalculationStatus({
     return (
       <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
         <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-200 border-t-amber-700" />
-        계산 중입니다. 완료되면 자동으로 갱신합니다.
+        추천 결과를 만드는 중입니다. 끝나면 자동으로 보여드릴게요.
       </div>
     );
   }
@@ -72,8 +92,8 @@ export function CalculationStatus({
       <div className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700">
         {calculation.error
           ? getCalculationCodeLabel(calculation.error.code)
-          : "계산이 완료되지 않았습니다."}
-        {calculation.error?.retryable && " 다시 계산할 수 있습니다."}
+          : "추천 결과를 만들지 못했습니다."}
+        {calculation.error?.retryable && " 다시 만들 수 있습니다."}
       </div>
     );
   }
@@ -81,7 +101,7 @@ export function CalculationStatus({
   if (calculation.status === "STALE") {
     return (
       <div className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-700">
-        방 정보가 변경되어 이 결과는 최신 상태가 아닙니다. 다시 계산해 주세요.
+        방 정보가 바뀌어 이 결과는 최신 내용이 아닙니다. 다시 추천 결과를 만들어 주세요.
       </div>
     );
   }
@@ -121,16 +141,16 @@ export function CompletedResult({
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            응답 현황
+            의견 작성 현황
           </p>
           <p className="mt-1 font-semibold text-slate-950">
-            {calculation.coverage.submittedResponses}/
-            {calculation.coverage.expectedResponses}
+            {calculation.coverage.submittedResponses}개 /
+            {calculation.coverage.expectedResponses}개
           </p>
         </div>
         <div className="rounded-xl bg-slate-50 p-3">
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            계산 프로필
+            반영한 기준
           </p>
           <p className="mt-1 font-semibold text-slate-950">
             {scoringProfileLabels[calculation.metadata.scoringProfile]}
@@ -201,8 +221,8 @@ export function CompletedResult({
               </div>
 
               <p className="mt-4 text-sm text-slate-600">
-                후보 응답 coverage: {candidate.coverage.submittedResponses}/
-                {candidate.coverage.expectedResponses}
+                이 후보에 의견을 남긴 사람: {candidate.coverage.submittedResponses}명 /
+                {candidate.coverage.expectedResponses}명
               </p>
 
               {candidate.blockingIssues.length > 0 && (
@@ -221,7 +241,7 @@ export function CompletedResult({
               {candidate.reasons.length > 0 && (
                 <ul className="mt-3 space-y-1 text-sm leading-6 text-slate-600">
                   {candidate.reasons.map((reason) => (
-                    <li key={reason}>· {reason}</li>
+                    <li key={reason}>· {getCalculationReasonLabel(reason)}</li>
                   ))}
                 </ul>
               )}
@@ -251,7 +271,7 @@ export function CompletedResult({
                   onClick={() => onSelectCandidate(candidate.candidateId)}
                   type="button"
                 >
-                  {isSelected ? "선택된 후보" : "이 후보 선택"}
+                  {isSelected ? "고른 후보" : "이 후보 고르기"}
                 </button>
               )}
             </article>

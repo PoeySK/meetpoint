@@ -98,7 +98,6 @@ fn error_status(code: SolveErrorCode) -> StatusCode {
         | SolveErrorCode::NoCandidates
         | SolveErrorCode::InvalidTimeRange
         | SolveErrorCode::ResponseFieldMissing
-        | SolveErrorCode::ConditionMissing
         | SolveErrorCode::InvalidCondition => StatusCode::UNPROCESSABLE_ENTITY,
     }
 }

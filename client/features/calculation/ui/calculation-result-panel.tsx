@@ -30,29 +30,26 @@ type CalculationResultPanelProps = {
 function describeCalculationError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === 'HOST_ONLY') {
-      return '호스트만 계산을 시작할 수 있습니다.';
+      return '방장만 추천 결과를 만들 수 있습니다.';
     }
     if (error.code === 'CALCULATION_IN_PROGRESS') {
-      return '이미 계산이 진행 중입니다. 완료되면 결과를 표시합니다.';
+      return '추천 결과를 만드는 중입니다. 끝나면 결과를 보여드릴게요.';
     }
     if (error.code === 'PARTICIPANT_COUNT_OUT_OF_RANGE') {
-      return '계산하려면 활성 참여자가 3~6명이어야 합니다.';
+      return '추천 결과를 만들려면 현재 참여자가 3~6명이어야 합니다.';
     }
     if (error.code === 'NO_ACTIVE_CANDIDATES') {
-      return '계산하려면 활성 후보가 2~5개여야 합니다.';
-    }
-    if (error.code === 'CONDITION_INCOMPLETE') {
-      return '모든 참여자가 참여 가능 조건을 먼저 저장해야 계산할 수 있습니다.';
+      return '추천 결과를 만들려면 후보가 2~5개 필요합니다.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
-      return '현재 방 상태에서는 계산을 시작할 수 없습니다.';
+      return '지금은 추천 결과를 만들 수 없습니다.';
     }
     if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-      return '방 접근 토큰이 유효하지 않습니다. 방에 다시 입장해 주세요.';
+      return '방 입장 정보가 만료되었습니다. 방에 다시 입장해 주세요.';
     }
   }
 
-  return '계산 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  return '추천 결과를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
 }
 
 const isRunning = isCalculationRunning;
@@ -77,7 +74,11 @@ export function CalculationResultPanel({
   const calculationVersion = calculation
     ? `${calculation.id}:${calculation.status}`
     : null;
-  const previousCalculationVersion = useRef(calculationVersion);
+  const defaultCandidateId =
+    calculation?.status === 'COMPLETED'
+      ? calculation.ranking[0] ?? calculation.candidates[0]?.candidateId ?? null
+      : null;
+  const previousCalculationVersion = useRef<string | null>(null);
   const isHost = participantId === room.room.hostParticipantId;
 
   const {
@@ -110,11 +111,11 @@ export function CalculationResultPanel({
 
   useEffect(() => {
     if (previousCalculationVersion.current !== calculationVersion) {
-      setSelectedCandidateId(null);
+      setSelectedCandidateId(defaultCandidateId);
       resetDecisionDraft();
     }
     previousCalculationVersion.current = calculationVersion;
-  }, [calculationVersion, resetDecisionDraft]);
+  }, [calculationVersion, defaultCandidateId, resetDecisionDraft]);
 
   async function handleStart() {
     setIsStarting(true);
@@ -141,13 +142,13 @@ export function CalculationResultPanel({
     <section className='mp-card mp-card-raised p-4 sm:p-6'>
       <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
         <div className='space-y-1.5'>
-          <p className='text-sm font-semibold text-emerald-700'>계산 결과</p>
+          <p className='text-sm font-semibold text-emerald-700'>추천 결과</p>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-            후보 추천 계산
+            모임 추천 결과
           </h2>
           <p className='text-sm leading-6 text-slate-500'>
-            각자의 기준과 후보별 응답을 함께 반영해 예산·시간·선호·이동 부담을
-            계산합니다.
+            입력한 기준과 후보별 의견을 함께 살펴 예산·시간·선호·이동 부담을
+            비교합니다. 기준을 입력하지 않은 사람도 의견을 남길 수 있습니다.
           </p>
         </div>
         {isHost && (
@@ -163,8 +164,8 @@ export function CalculationResultPanel({
             type='button'
           >
             {isStarting || isRunning(calculation?.status)
-              ? '계산 중...'
-              : '계산 시작'}
+              ? '결과 만드는 중...'
+              : '추천 결과 만들기'}
           </button>
         )}
       </div>
@@ -183,6 +184,33 @@ export function CalculationResultPanel({
           )}
         </div>
       )}
+      {isLoadingResult && !calculation && (
+        <div className='mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600'>
+          <span className='h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600' />
+          추천 결과를 불러오는 중입니다.
+        </div>
+      )}
+
+      {!room.room.latestScoreResultId && !isLoadingResult && !error && (
+        <p className='mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-600'>
+          아직 추천 결과가 없습니다. 참여자가 3명 이상이고 후보가 2개 이상이면
+          방장이 결과를 만들 수 있습니다.
+        </p>
+      )}
+
+      {calculation && (
+        <div className='mt-4 space-y-4'>
+          <CalculationStatus calculation={calculation} />
+          <CompletedResult
+            calculation={calculation}
+            isHost={isHost}
+            onSelectCandidate={handleSelectCandidate}
+            room={room}
+            selectedCandidateId={selectedCandidateId}
+          />
+        </div>
+      )}
+
       <DecisionConfirmationPanel
         acknowledgeIssues={acknowledgeIssues}
         calculation={calculation}
@@ -211,33 +239,6 @@ export function CalculationResultPanel({
             : null
         }
       />
-
-      {isLoadingResult && !calculation && (
-        <div className='mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600'>
-          <span className='h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600' />
-          계산 결과를 불러오는 중입니다.
-        </div>
-      )}
-
-      {!room.room.latestScoreResultId && !isLoadingResult && !error && (
-        <p className='mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          아직 계산 결과가 없습니다. 참여자가 3명 이상이고 후보가 2개 이상이면
-          호스트가 계산을 시작할 수 있습니다.
-        </p>
-      )}
-
-      {calculation && (
-        <div className='mt-4 space-y-4'>
-          <CalculationStatus calculation={calculation} />
-          <CompletedResult
-            calculation={calculation}
-            isHost={isHost}
-            onSelectCandidate={handleSelectCandidate}
-            room={room}
-            selectedCandidateId={selectedCandidateId}
-          />
-        </div>
-      )}
     </section>
   );
 }

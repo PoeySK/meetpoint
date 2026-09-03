@@ -4,12 +4,10 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  UnprocessableEntityException,
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { CandidateStatus } from '../../domain/candidate/candidate';
 import {
-  AvailabilityStatus,
   ParticipantResponseStatus,
   type ParticipantResponseRecord,
 } from '../../domain/participant-response/participant-response';
@@ -23,10 +21,7 @@ import {
 import { isRoomEditable } from '../../domain/room/room-state';
 import { markLatestScoreResultStale } from '../room-score-state';
 import { validateParticipantResponseInput } from './input-validation';
-import {
-  candidateFitsAvailabilityWindow,
-  resolveParticipantStatus,
-} from './participant-status';
+import { resolveParticipantStatus } from './participant-status';
 
 @Injectable()
 export class UpsertParticipantResponseUseCase {
@@ -50,8 +45,7 @@ export class UpsertParticipantResponseUseCase {
 
     const normalizedInput = validateParticipantResponseInput(input);
     const saved = await this.persistence.transaction(async (repositories) => {
-      const { rooms, participants, candidates, responses, conditions } =
-        repositories;
+      const { rooms, participants, candidates, responses } = repositories;
       const room = await rooms.findById(roomId, { lock: true });
       if (!room) {
         throw new NotFoundException('RESOURCE_NOT_FOUND');
@@ -66,20 +60,6 @@ export class UpsertParticipantResponseUseCase {
       }
       if (candidate.status === CandidateStatus.ARCHIVED) {
         throw new ConflictException('ROOM_STATE_CONFLICT');
-      }
-
-      const condition = await conditions.findByParticipantId(
-        room.id,
-        participantId
-      );
-      if (!condition) {
-        throw new UnprocessableEntityException('CONDITION_INCOMPLETE');
-      }
-      if (
-        normalizedInput.availabilityStatus === AvailabilityStatus.AVAILABLE &&
-        !candidateFitsAvailabilityWindow(candidate, condition)
-      ) {
-        throw new UnprocessableEntityException('TIME_CONDITION_CONFLICT');
       }
 
       const participant = await participants.findById(participantId);
@@ -132,7 +112,7 @@ export class UpsertParticipantResponseUseCase {
       });
       const roomResponses = await responses.findByRoomId(room.id);
       const participantStatus = resolveParticipantStatus(
-        condition,
+        participantId,
         activeCandidates,
         roomResponses
       );

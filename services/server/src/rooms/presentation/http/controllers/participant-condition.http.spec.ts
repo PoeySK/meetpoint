@@ -117,7 +117,7 @@ describe('Participant condition HTTP contract', () => {
     expectRoomError(confirmed, 'ROOM_STATE_CONFLICT');
   });
 
-  it('moves a participant to RESPONDED after condition and every active response are saved', async () => {
+  it('moves a participant to RESPONDED after every active response is saved', async () => {
     const created = await request(app.getHttpServer())
       .post('/api/v1/rooms')
       .send(validPayload())
@@ -172,10 +172,10 @@ describe('Participant condition HTTP contract', () => {
       .expect(200);
 
     expect(changedCondition.body.participantStatus).toBe(
-      ParticipantStatus.JOINED
+      ParticipantStatus.RESPONDED
     );
     expect(database.participants.get(member.body.participant.id)?.status).toBe(
-      ParticipantStatus.JOINED
+      ParticipantStatus.RESPONDED
     );
 
     const resubmitted = await request(app.getHttpServer())
@@ -211,9 +211,12 @@ describe('Participant condition HTTP contract', () => {
       )
       .set('Authorization', `Bearer ${member.body.access.participantToken}`)
       .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
-      .expect(422);
+      .expect(200);
 
-    expectRoomError(outsideWindow, 'TIME_CONDITION_CONFLICT');
+    expect(outsideWindow.body.response.availabilityStatus).toBe('AVAILABLE');
+    expect(outsideWindow.body.participantStatus).toBe(
+      ParticipantStatus.RESPONDED
+    );
   });
 
   it('keeps a failed condition save atomic', async () => {

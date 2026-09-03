@@ -24,8 +24,8 @@ type RoomWorkspaceWidgetProps = {
 
 const stepLabels: Record<WorkspaceStep, string> = {
   candidates: "후보 준비",
-  condition: "내 기준",
-  responses: "후보 응답",
+  responses: "내 의견",
+  condition: "내 기준 · 선택",
   result: "결과 확인",
 };
 
@@ -35,9 +35,6 @@ function getInitialStep(
 ): WorkspaceStep {
   if (isHost && room.candidates.length === 0) {
     return "candidates";
-  }
-  if (!room.myCondition) {
-    return "condition";
   }
   if (room.room.status === "CALCULATED" || room.room.status === "CONFIRMED") {
     return "result";
@@ -55,11 +52,11 @@ function getSectionClassName(
 function getStatusLabel(status: RoomDetailsResponse["room"]["status"]) {
   const labels = {
     DRAFT: "준비 중",
-    OPEN: "응답 받는 중",
-    CALCULATING: "계산 중",
-    CALCULATED: "결과 확인",
+    OPEN: "의견 받는 중",
+    CALCULATING: "추천 결과 만드는 중",
+    CALCULATED: "추천 결과 확인",
     CONFIRMED: "일정 확정",
-    CLOSED: "종료됨",
+    CLOSED: "종료",
   } as const;
 
   return labels[status];
@@ -96,27 +93,26 @@ export function RoomWorkspaceWidget({
     room.candidates.length === 0
       ? "후보 준비 필요"
       : isHost
-        ? `${respondedParticipantCount}/${room.participants.length}명 응답 완료`
-        : `${responseCount}/${room.candidates.length}개 후보 응답 완료`;
+        ? `${respondedParticipantCount}/${room.participants.length}명 의견 작성 완료`
+        : `${responseCount}/${room.candidates.length}개 후보 의견 작성 완료`;
   const completedSteps = [
-    room.myCondition !== null,
+    ...(isHost ? [room.candidates.length > 0] : []),
     responseComplete,
     room.room.status === "CALCULATED" || room.room.status === "CONFIRMED",
   ].filter(Boolean).length;
-  const progressPercent = Math.round((completedSteps / 3) * 100);
+  const totalSteps = isHost ? 3 : 2;
+  const progressPercent = Math.round((completedSteps / totalSteps) * 100);
 
   const mobileSteps: WorkspaceStep[] = [
     ...(isHost ? ["candidates" as const] : []),
-    "condition",
     "responses",
+    "condition",
     "result",
   ];
   const currentStepIndex = mobileSteps.indexOf(mobileStep);
   const canAdvance =
     mobileStep !== "result" &&
-    (mobileStep !== "candidates"
-      ? mobileStep !== "condition" || room.myCondition !== null
-      : room.candidates.length > 0);
+    (mobileStep !== "candidates" || room.candidates.length > 0);
 
   function advanceMobileStep() {
     if (!canAdvance) {
@@ -150,7 +146,7 @@ export function RoomWorkspaceWidget({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm font-semibold text-emerald-700">
-                Room workspace
+                모임 진행
               </p>
               <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
                 {getStatusLabel(room.room.status)}
@@ -162,14 +158,14 @@ export function RoomWorkspaceWidget({
             <p className="mt-2 text-sm leading-6 text-slate-600">
               {isHost && room.candidates.length === 0
                 ? "후보를 준비하면 참여자들이 같은 기준으로 비교할 수 있습니다."
-                : !room.myCondition
-                  ? "내 기준을 먼저 저장하면 후보 응답을 시작할 수 있습니다."
+                : room.room.status === "CALCULATED" ||
+                    room.room.status === "CONFIRMED"
+                  ? "추천 결과와 확정된 일정을 확인할 수 있습니다."
                   : !responseComplete
-                    ? "후보별 응답을 채우면 모두의 의견을 한 번에 비교할 수 있습니다."
-                    : room.room.status === "CALCULATED" ||
-                        room.room.status === "CONFIRMED"
-                      ? "계산 결과와 확정된 일정을 확인할 수 있습니다."
-                      : "모든 준비가 끝나면 호스트가 추천 계산을 시작합니다."}
+                    ? "후보별 의견을 먼저 저장해 주세요. 내 기준 입력은 선택 사항입니다."
+                    : !room.myCondition
+                      ? "의견을 저장했습니다. 내 기준을 추가하면 예산·시간·특징 비교가 더 정확해집니다."
+                      : "모든 준비가 끝나면 방장이 추천 결과를 만들 수 있습니다."}
             </p>
           </div>
           <div className="shrink-0 rounded-xl bg-slate-950 px-3.5 py-3 text-white sm:min-w-44 sm:text-right">
@@ -177,7 +173,7 @@ export function RoomWorkspaceWidget({
               진행 현황
             </p>
             <p className="mt-1 text-lg font-bold">{progressLabel}</p>
-            <p className="mt-1 text-xs text-slate-400">후보 · 내 기준 · 응답</p>
+            <p className="mt-1 text-xs text-slate-400">후보 · 의견 · 내 기준</p>
           </div>
         </div>
 
@@ -266,13 +262,13 @@ export function RoomWorkspaceWidget({
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 sm:px-5 [&::-webkit-details-marker]:hidden">
                 <span>
                   <span className="block text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    호스트 도구
+                    방장 도구
                   </span>
                   <span className="mt-1 block text-base font-semibold text-slate-950">
                     후보 관리
                   </span>
                   <span className="mt-1 block text-sm text-slate-600">
-                    {room.candidates.length} / 5개 후보 · 수정하거나 보관할 수 있습니다.
+                    {room.candidates.length} / 5개 후보 · 수정하거나 목록에서 뺄 수 있습니다.
                   </span>
                 </span>
                 <span
@@ -301,7 +297,7 @@ export function RoomWorkspaceWidget({
           <section className="mp-card p-4 sm:p-6">
             <ParticipantResponsePanel
               candidates={room.candidates}
-              hasCondition={room.myCondition !== null}
+              condition={room.myCondition}
               isReadOnly={
                 room.room.status === "CONFIRMED" || room.room.status === "CLOSED"
               }
@@ -366,10 +362,10 @@ export function RoomWorkspaceWidget({
           type="button"
         >
           {mobileStep === "candidates"
-            ? "내 기준으로"
-            : mobileStep === "condition"
-              ? "후보 응답으로"
-              : "결과 보기"}
+            ? "의견 입력"
+            : mobileStep === "responses"
+              ? "내 기준(선택)"
+              : "추천 결과 보기"}
         </button>
       </div>
     </section>

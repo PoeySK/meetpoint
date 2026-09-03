@@ -97,6 +97,7 @@ pub(crate) enum ExplanationFlag {
     MissingResponse,
     NoFullMatch,
     NoBudgetConstraint,
+    ConditionNotProvided,
 }
 
 impl ExplanationFlag {
@@ -108,6 +109,7 @@ impl ExplanationFlag {
             Self::MissingResponse => "MISSING_RESPONSE",
             Self::NoFullMatch => "NO_FULL_MATCH",
             Self::NoBudgetConstraint => "NO_BUDGET_CONSTRAINT",
+            Self::ConditionNotProvided => "CONDITION_NOT_PROVIDED",
         }
     }
 }

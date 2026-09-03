@@ -27,9 +27,9 @@ function validateForm(title: string, displayName: string) {
   }
 
   if (!displayName.trim()) {
-    errors.displayName = "호스트 이름을 입력해 주세요.";
+    errors.displayName = "방장 이름을 입력해 주세요.";
   } else if (displayName.trim().length > 30) {
-    errors.displayName = "호스트 이름은 30자 이하로 입력해 주세요.";
+    errors.displayName = "방장 이름은 30자 이하로 입력해 주세요.";
   }
 
   return errors;
@@ -79,7 +79,7 @@ export function CreateRoomForm() {
         );
       } catch {
         setFormError(
-          "이 브라우저에서는 세션 저장소를 사용할 수 없습니다. 저장소 설정을 확인하고 다시 시도해 주세요.",
+          "이 브라우저에 입장 정보를 저장할 수 없습니다. 브라우저 설정을 확인하고 다시 시도해 주세요.",
         );
         return;
       }
@@ -102,7 +102,7 @@ export function CreateRoomForm() {
         <p className="text-sm font-semibold text-emerald-700">새 방</p>
         <h2 className="text-xl font-semibold tracking-tight">모임 정보 입력</h2>
         <p className="text-sm leading-6 text-slate-500">
-          방을 만든 사람은 자동으로 호스트가 됩니다.
+          방을 만든 사람이 자동으로 방장이 됩니다.
         </p>
       </div>
 
@@ -137,7 +137,7 @@ export function CreateRoomForm() {
             className="text-sm font-semibold text-slate-800"
             htmlFor="displayName"
           >
-            호스트 이름
+            방장 이름
           </label>
           <input
             aria-describedby={
@@ -176,7 +176,7 @@ export function CreateRoomForm() {
           {isSubmitting ? "방을 만드는 중..." : "방 만들기"}
         </button>
         <p className="text-center text-xs leading-5 text-slate-400">
-          호스트 입장 토큰은 이 브라우저의 sessionStorage에만 보관됩니다.
+          방장 입장 정보는 이 브라우저에만 저장됩니다.
         </p>
         <p className="text-center text-sm text-slate-500">
           초대받은 참가자라면?{" "}

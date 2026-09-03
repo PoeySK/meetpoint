@@ -21,14 +21,14 @@ function describeRoomError(error: unknown): RoomLoadError {
   if (error instanceof RoomApiError) {
     if (error.code === "TOKEN_EXPIRED") {
       return {
-        title: "접근 토큰이 만료되었습니다.",
+        title: "방 입장 정보가 만료되었습니다.",
         message: "방 코드로 다시 입장해 주세요.",
       };
     }
 
     if (error.code === "INVALID_TOKEN") {
       return {
-        title: "접근 토큰을 확인할 수 없습니다.",
+        title: "방 입장 정보를 확인할 수 없습니다.",
         message: "방 코드와 이름을 입력해 다시 입장해 주세요.",
       };
     }
@@ -47,8 +47,8 @@ function describeRoomError(error: unknown): RoomLoadError {
   }
 
   return {
-    title: "서버에 연결할 수 없습니다.",
-    message: "네트워크 연결과 API 서버 상태를 확인한 뒤 다시 시도해 주세요.",
+    title: "서비스에 연결할 수 없습니다.",
+    message: "인터넷 연결을 확인한 뒤 다시 시도해 주세요.",
   };
 }
 
@@ -85,8 +85,8 @@ export function useRoomSession(roomId: string) {
       token = window.sessionStorage.getItem(getRoomTokenStorageKey(roomId));
     } catch {
       setError({
-        title: "브라우저 저장소에 접근할 수 없습니다.",
-        message: "세션 저장소를 사용할 수 있는 브라우저에서 다시 시도해 주세요.",
+        title: "브라우저에 입장 정보를 저장할 수 없습니다.",
+        message: "브라우저 설정을 확인한 뒤 다시 시도해 주세요.",
       });
       setIsLoading(false);
       return;
@@ -94,7 +94,7 @@ export function useRoomSession(roomId: string) {
 
     if (!token) {
       setError({
-        title: "이 방에 접근할 토큰이 없습니다.",
+        title: "이 방에 다시 입장해야 합니다.",
         message: "방 코드와 이름을 입력해 다시 입장해 주세요.",
       });
       setIsLoading(false);

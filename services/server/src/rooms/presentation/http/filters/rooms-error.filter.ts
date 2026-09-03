@@ -39,8 +39,6 @@ const ERROR_MESSAGES = {
     'The request does not satisfy the Room decision rules.',
   CONDITION_INCOMPLETE:
     '조건을 저장하려면 시간, 예산, 태그 입력을 다시 확인해 주세요.',
-  TIME_CONDITION_CONFLICT:
-    '선택한 후보 시간이 내 가능 시간에 포함되는지 확인해 주세요.',
 } as const;
 
 type RoomErrorCode = keyof typeof ERROR_MESSAGES;

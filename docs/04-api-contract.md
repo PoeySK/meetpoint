@@ -32,7 +32,7 @@
 - Room 조회의 `participants`에는 현재 활성 상태(`JOINED` 또는 `RESPONDED`)인 HOST·MEMBER Participant의 공개 정보를 반환한다. `LEFT`·`REMOVED` Participant의 이력은 이 응답에 포함하지 않는다.
 - Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
 - Room 조회의 `myResponses`에는 Authorization 토큰으로 확인한 현재 참여자가 현재 방의 활성 Candidate에 저장한 응답만 `candidates` 순서로 반환한다. 저장된 응답이 없으면 빈 배열을 반환하며, 다른 참여자의 응답과 `ARCHIVED` Candidate의 과거 응답은 반환하지 않는다.
-- ParticipantCondition을 저장하고 모든 활성 Candidate에 응답하면 `participantStatus`를 `RESPONDED`로 반환한다. Candidate가 추가되면 새 응답이 필요하므로 다시 `JOINED`가 된다.
+- ParticipantCondition은 선택 사항이다. 조건을 저장하지 않아도 활성 Candidate에 모두 응답하면 `participantStatus`를 `RESPONDED`로 반환하며, Candidate가 추가되면 새 응답이 필요하므로 다시 `JOINED`가 된다.
 - Participant lifecycle API는 MEMBER 본인의 leave와 HOST의 활성 MEMBER kick을 제공한다. 상태 변경 시 `LEFT`·`REMOVED` Participant는 활성 목록·계산 snapshot·coverage에서 제외하고 기존 Response와 계산·Decision 이력은 보존한다.
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 - Decision 확정은 최신 `COMPLETED` ScoreResult만 사용하며, `STALE`·`FAILED` 결과와 100% 미만 응답 coverage는 거부한다. 서버는 점수·순위를 다시 계산하지 않고 snapshot의 ID·상태·응답 존재만 재검증한다.
@@ -67,7 +67,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | 403 | `HOST_ONLY`, `PARTICIPANT_ONLY`, `FORBIDDEN` | 역할 또는 본인 범위를 벗어난 요청 |
 | 404 | `ROOM_NOT_FOUND_OR_INVALID_CODE`, `RESOURCE_NOT_FOUND`, `SCORE_RESULT_NOT_FOUND`, `DECISION_NOT_FOUND` | 방 또는 하위 객체가 없음 |
 | 409 | `ROOM_STATE_CONFLICT`, `CALCULATION_IN_PROGRESS`, `STALE_RESULT`, `DUPLICATE_RESPONSE`, `CANDIDATE_VERSION_CONFLICT` | 현재 상태 또는 오래된 Candidate 버전과 충돌 |
-| 422 | `BUSINESS_RULE_VIOLATION`, `NO_ACTIVE_CANDIDATES`, `CANDIDATE_LIMIT_EXCEEDED`, `CONDITION_INCOMPLETE`, `PARTICIPANT_COUNT_OUT_OF_RANGE`, `TIME_CONDITION_CONFLICT`, `RESPONSE_FIELD_MISSING` | JSON은 맞지만 MeetPoint 규칙 위반 |
+| 422 | `BUSINESS_RULE_VIOLATION`, `NO_ACTIVE_CANDIDATES`, `CANDIDATE_LIMIT_EXCEEDED`, `CONDITION_INCOMPLETE`, `PARTICIPANT_COUNT_OUT_OF_RANGE`, `RESPONSE_FIELD_MISSING` | JSON은 맞지만 MeetPoint 규칙 위반. `CONDITION_INCOMPLETE`은 조건을 보냈을 때의 형식·범위 오류이며 미입력을 뜻하지 않는다. 후보와 조건의 시간 충돌은 응답 제출을 거부하지 않고 계산 결과에 표시한다. |
 | 502 | `SOLVER_ERROR` | Solver가 계산 실패를 반환함 |
 | 503 | `SOLVER_UNAVAILABLE` | Solver에 연결할 수 없음 또는 타임아웃 |
 | 500 | `INTERNAL_ERROR` | 예상하지 못한 서버 오류 |
@@ -457,6 +457,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 
 `PUT /api/v1/rooms/{roomId}/participants/{participantId}/conditions`
 
+개인 조건은 선택 사항이다. 이 API를 호출하지 않아도 후보별 응답 제출과 계산을 진행할 수 있으며, 조건을 입력한 경우에만 시간·예산·태그 비교 기준으로 사용한다.
+
 #### 요청 JSON
 
 ```json
@@ -557,7 +559,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `400 VALIDATION_ERROR`: 상태가 세 값 중 하나가 아니거나 `travelBurden`이 `EASY`, `NORMAL`, `HARD` 중 하나가 아님
 - `travelBurden`은 모든 활성 후보에 필수다.
 - `note`는 선택 입력이며 0~300자다. Solver는 이 값을 점수·순위·충돌 판정에 사용하지 않는다.
-- `AVAILABLE` 응답은 후보 시간이 본인의 가능 시간 구간 안에 완전히 포함되는지 함께 검증한다. 조건 밖의 후보에는 `TIME_CONDITION_CONFLICT`를 반환한다.
+- 응답 제출에는 개인 조건이 필요하지 않다. 조건을 입력한 참여자가 시간·예산·태그 기준과 다른 후보에 `AVAILABLE` 또는 `MAYBE`를 선택해도 응답을 저장한다. 해당 차이는 계산 결과의 충돌·근거로 표시한다.
 
 ### 11. 후보 점수 계산 요청
 
@@ -596,7 +598,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `409 CALCULATION_IN_PROGRESS`: 같은 방에 실행 중 계산이 있음
 - `422 PARTICIPANT_COUNT_OUT_OF_RANGE`: 활성 참가자가 3~6명이 아님
 - `422 NO_ACTIVE_CANDIDATES`: 활성 후보가 2개 미만이거나 5개 초과
-- `422 CONDITION_INCOMPLETE`: 활성 참가자 중 하나라도 조건을 제출하지 않음. 현재 Server 계산은 `condition-aware-1`/`CONDITION_AWARE` 프로필을 사용한다.
+- 개인 조건은 선택 사항이다. 미입력 참여자의 `condition`은 `null`로 Solver에 전달하며 응답과 후보 정보로 계산한다. 결과의 `explanationFlags`에 `CONDITION_NOT_PROVIDED`를 표시한다.
 - 후보별 응답 누락은 계산을 거부하지 않고 결과의 `coverage`와 `MISSING_RESPONSE`로 표시한다.
 - `clientRequestId`가 같은 재시도 요청은 동일 계산을 재사용하도록 설계하지만, 이 키의 보존 기간은 미결정이다.
 
@@ -644,10 +646,10 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
             },
             "hardConflicts": [],
             "blockingIssues": [],
-            "reasons": ["가능 시간 응답: AVAILABLE", "이동 부담 EASY / 참여자 자기 평가", "예상 비용 28,000원 / 상한 30,000원 이내"]
+            "reasons": ["참석 가능 여부: 참석 가능", "이동 부담: 이동 쉬움", "예산: 예산 범위 안", "선호하는 특징: 선호 특징 1/1개 일치"]
           }
         ],
-        "reasons": ["3명 응답 완료", "모든 필수 태그 충족"],
+        "reasons": ["3명이 모두 의견을 남겼습니다."],
         "conflicts": [],
         "blockingIssues": [],
         "explanationFlags": []
@@ -658,7 +660,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 }
 ```
 
-`status`가 `RUNNING`이면 `candidates`가 없을 수 있다. `FAILED`이면 `calculation.error`에 Solver 오류 코드와 재시도 가능 여부를 담고, 해당 계산 요청으로 `Room`은 `OPEN`으로 돌아간다.
+`status`가 `RUNNING`이면 `candidates`가 없을 수 있다. `FAILED`이면 `calculation.error`에 Solver 오류 코드와 재시도 가능 여부를 담고, 해당 계산 요청으로 `Room`은 `OPEN`으로 돌아간다. `coverage`는 API 호환성을 위한 필드명이며, 화면에서는 “의견 작성 현황”으로 표시한다. `reasons`와 참가자별 `reasons`는 화면에 바로 보여줄 수 있는 한국어 설명 문장으로 반환한다.
 
 위 JSON은 설명을 위해 `participantBreakdown`을 한 명만 보인 축약 예시다. 실제 `COMPLETED` 응답에서는 `coverage.totalParticipants`에 해당하는 모든 참가자의 breakdown을 반환한다.
 
@@ -927,6 +929,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `candidates`가 비어 있으면 `NO_CANDIDATES`다.
 - 후보 ID와 참여자 ID는 각 배열에서 유일해야 한다.
 - 후보 시간·비용·태그와 조건 필드는 NestJS 계약과 같은 범위를 사용한다.
+- `participants[].condition`은 `null`일 수 있다. 이 경우 조건 충돌 없이 응답과 후보 정보만 계산하고 `CONDITION_NOT_PROVIDED`를 결과에 남긴다.
 - 응답이 없는 후보는 입력 오류가 아니라 `MISSING_RESPONSE`로 결과에 포함한다. 응답은 있으나 `travelBurden`이 빠진 경우는 `RESPONSE_FIELD_MISSING` 오류다.
 - Solver는 입력에 있는 `roomId`를 결과에 되돌려 줄 수 있지만, 이를 근거로 데이터베이스를 조회하지 않는다.
 
@@ -1009,7 +1012,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | HTTP 상태 | Solver 오류 코드 | 재시도 | 의미 |
 | --- | --- | --- | --- |
 | 400 | `INVALID_JSON`, `INVALID_SCHEMA` | 아니오 | JSON 또는 필드 구조 오류 |
-| 422 | `NO_PARTICIPANTS`, `NO_CANDIDATES`, `INVALID_TIME_RANGE`, `RESPONSE_FIELD_MISSING`, `CONDITION_MISSING`, `INVALID_CONDITION` | 아니오 | 입력 스냅샷으로 계산할 수 없음 |
+| 422 | `NO_PARTICIPANTS`, `NO_CANDIDATES`, `INVALID_TIME_RANGE`, `RESPONSE_FIELD_MISSING`, `INVALID_CONDITION` | 아니오 | 입력 스냅샷으로 계산할 수 없음. 개인 조건 `null`은 허용한다. |
 | 500 | `SOLVER_INTERNAL_ERROR` | 한 번 | 계산 내부 오류 |
 | 503 | `SOLVER_OVERLOADED` | 한 번 | 일시적으로 계산할 수 없음 |
 

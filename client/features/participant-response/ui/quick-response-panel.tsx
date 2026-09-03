@@ -18,7 +18,6 @@ type QuickResponsePanelProps = {
   message: PanelMessage | null;
   onAvailabilityChange: (value: AvailabilityStatus) => void;
   onTravelChange: (value: TravelBurden) => void;
-  onApply: () => void;
   onSave: () => void;
 };
 
@@ -29,7 +28,6 @@ export function QuickResponsePanel({
   message,
   onAvailabilityChange,
   onTravelChange,
-  onApply,
   onSave,
 }: QuickResponsePanelProps) {
   return (
@@ -42,18 +40,18 @@ export function QuickResponsePanel({
           className="text-lg font-semibold text-slate-950"
           id="quick-response-heading"
         >
-          빠른 응답 입력
+          빠른 의견 입력
         </h3>
         <p className="text-sm leading-6 text-slate-600">
-          선택한 값을 전체 후보 폼에 먼저 적용합니다. &quot;전체 후보에 적용&quot;은
-          입력만 채우며, 실제 저장은 별도로 확인해야 합니다.
+          모든 후보에 같은 선택을 남길 때 사용하세요. 두 값을 선택한 뒤 저장
+          버튼 한 번으로 반영할 수 있습니다.
         </p>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-slate-800">
-            전체 가능 여부
+            모든 후보의 가능 여부
           </legend>
           <div className="grid grid-cols-3 gap-2">
             {availabilityOptions.map((option) => (
@@ -77,7 +75,7 @@ export function QuickResponsePanel({
 
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-slate-800">
-            전체 이동 부담
+            모든 후보의 이동 부담
           </legend>
           <div className="grid grid-cols-3 gap-2">
             {travelOptions.map((option) => (
@@ -102,26 +100,18 @@ export function QuickResponsePanel({
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <button
-          className="mp-button mp-button-secondary border-emerald-700 px-3 py-2 text-sm text-emerald-800 hover:border-emerald-700 hover:bg-emerald-100 disabled:opacity-60"
-          disabled={isDisabled}
-          onClick={onApply}
-          type="button"
-        >
-          전체 후보에 적용
-        </button>
-        <button
           className="mp-button w-full bg-emerald-700 px-3 py-2 text-sm text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300 sm:w-auto"
           disabled={isDisabled}
           onClick={onSave}
           type="button"
         >
-          전체 후보 저장
+          이 선택으로 모두 저장
         </button>
       </div>
 
       <p className="mt-3 text-xs leading-5 text-slate-600">
-        이동 부담은 실제 거리나 시간이 아니라 참여자가 느끼는 자기 평가입니다.
-        저장하지 않은 입력은 Server와 계산에 전달되지 않습니다.
+        이동 부담은 실제 거리나 시간이 아니라 본인이 느끼는 정도입니다. 저장하지
+        않은 내용은 반영되지 않습니다.
       </p>
       {message && (
         <p

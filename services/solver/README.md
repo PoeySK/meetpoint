@@ -17,8 +17,9 @@ GET http://localhost:4000/health
 ```
 
 계산 요청은 `POST http://localhost:4000/v1/solve`로 보냅니다. 현재 입력 프로필은
-`CONDITION_AWARE`이며, ParticipantCondition과 ParticipantResponse를 함께 사용해
-시간·이동 부담·예산·선호를 계산합니다. 기존 결과 재현을 위해
+`CONDITION_AWARE`이며, 입력된 ParticipantCondition과 ParticipantResponse를 사용해
+시간·이동 부담·예산·선호를 계산합니다. ParticipantCondition이 없어도 응답 기반 계산을
+수행하고 결과에 미입력 기준을 표시합니다. 기존 결과 재현을 위해
 `MVP_NO_CONDITIONS` 입력도 호환하며, Solver는 PostgreSQL에 접근하지 않습니다.
 
 응답에는 `status`, `service`, `timestamp`가 포함됩니다. `/v1/solve`는 후보별

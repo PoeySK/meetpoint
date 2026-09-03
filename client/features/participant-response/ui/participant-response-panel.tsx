@@ -8,6 +8,7 @@ import type {
   TravelBurden,
 } from "@/entities/participant-response";
 import type { Candidate } from "@/entities/candidate";
+import type { ParticipantCondition } from "@/entities/participant-condition";
 import { RoomApiError } from "@/shared/api/http-client";
 import {
   createInitialForms,
@@ -15,6 +16,7 @@ import {
   getMissingFields,
   getMissingFieldsMessage,
   isFormDirty,
+  type ResponseSaveOverrides,
   type PanelMessage,
   type ResponseForm,
 } from "@/features/participant-response/model/response-form";
@@ -27,7 +29,7 @@ type ParticipantResponsePanelProps = {
   participantId: string;
   candidates: Candidate[];
   responses: ParticipantResponsePayload[];
-  hasCondition?: boolean;
+  condition?: ParticipantCondition | null;
   isReadOnly?: boolean;
   onRoomRefresh: () => Promise<void>;
 };
@@ -35,26 +37,20 @@ type ParticipantResponsePanelProps = {
 function describeResponseError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === "TOKEN_EXPIRED" || error.code === "INVALID_TOKEN") {
-      return "입장 토큰이 유효하지 않습니다. 방에 다시 입장해 주세요.";
+      return "방 입장 정보가 만료되었습니다. 방에 다시 입장해 주세요.";
     }
     if (error.code === "ROOM_STATE_CONFLICT") {
-      return "현재 방 상태에서는 응답을 수정할 수 없습니다.";
+      return "지금은 의견을 수정할 수 없습니다.";
     }
     if (error.code === "RESOURCE_NOT_FOUND") {
-      return "응답 대상 후보를 찾을 수 없습니다.";
-    }
-    if (error.code === "CONDITION_INCOMPLETE") {
-      return "먼저 내 기준을 저장한 뒤 후보 응답을 입력해 주세요.";
-    }
-    if (error.code === "TIME_CONDITION_CONFLICT") {
-      return "가능 시간에 포함되지 않는 후보입니다. 참석 가능 여부를 다시 확인해 주세요.";
+      return "의견을 남길 후보를 찾을 수 없습니다.";
     }
     if (error.code === "VALIDATION_ERROR") {
-      return "응답 입력을 다시 확인해 주세요.";
+      return "의견 입력을 다시 확인해 주세요.";
     }
   }
 
-  return "응답을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return "의견을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
 export function ParticipantResponsePanel({
@@ -63,7 +59,7 @@ export function ParticipantResponsePanel({
   participantId,
   candidates,
   responses,
-  hasCondition = true,
+  condition = null,
   isReadOnly = false,
   onRoomRefresh,
 }: ParticipantResponsePanelProps) {
@@ -84,7 +80,7 @@ export function ParticipantResponsePanel({
     (form) => form.isSubmitting,
   );
   const isInteractionDisabled =
-    isReadOnly || !hasCondition || isBulkSubmitting || hasSubmittingForm;
+    isReadOnly || isBulkSubmitting || hasSubmittingForm;
 
   useEffect(() => {
     const incomingResponsesByCandidateId = new Map(
@@ -182,12 +178,15 @@ export function ParticipantResponsePanel({
     });
   }
 
-  async function saveResponse(candidateId: string) {
-    if (isBulkSubmitting || !hasCondition) {
+  async function saveResponse(
+    candidateId: string,
+    overrides: ResponseSaveOverrides = {},
+  ) {
+    if (isReadOnly || isBulkSubmitting) {
       return;
     }
 
-    const form = getForm(candidateId);
+    const form = { ...getForm(candidateId), ...overrides };
     const missingFieldsMessage = getMissingFieldsMessage(form);
     if (missingFieldsMessage) {
       updateForm(candidateId, {
@@ -219,7 +218,7 @@ export function ParticipantResponsePanel({
       setSavedResponse(
         candidateId,
         result.response,
-        "저장한 응답이 반영되었습니다.",
+        "저장한 의견이 반영되었습니다.",
       );
       await onRoomRefresh();
     } catch (error) {
@@ -231,47 +230,22 @@ export function ParticipantResponsePanel({
     }
   }
 
-  function applyFastResponse() {
-    if (!fastAvailabilityStatus || !fastTravelBurden) {
-      setBulkMessage({
-        text: "전체 후보에 적용하려면 가능 여부와 이동 부담을 모두 선택해 주세요.",
-        kind: "error",
-      });
-      return;
-    }
-
-    setForms((current) => {
-      const next = { ...current };
-
-      for (const candidate of candidates) {
-        const form =
-          current[candidate.id] ??
-          createResponseForm(responsesByCandidateId.get(candidate.id));
-        next[candidate.id] = {
-          ...form,
-          availabilityStatus: fastAvailabilityStatus,
-          travelBurden: fastTravelBurden,
-          message: "",
-          messageKind: null,
-        };
-      }
-
-      return next;
-    });
-    setBulkMessage({
-      text: "전체 후보에 입력값을 적용했습니다. 아직 Server에 저장하지 않은 값입니다.",
-      kind: "info",
-    });
-  }
-
-  async function saveAllResponses() {
-    if (isInteractionDisabled || candidates.length === 0 || !hasCondition) {
+  async function saveAllResponses(
+    quickResponse?: Pick<
+      ResponseSaveOverrides,
+      "availabilityStatus" | "travelBurden"
+    >,
+  ) {
+    if (isInteractionDisabled || candidates.length === 0) {
       return;
     }
 
     const formsToSave = candidates.map((candidate) => ({
       candidate,
-      form: getForm(candidate.id),
+      form: {
+        ...getForm(candidate.id),
+        ...quickResponse,
+      },
     }));
     const incompleteForms = formsToSave.filter(
       ({ form }) => getMissingFields(form).length > 0,
@@ -292,7 +266,7 @@ export function ParticipantResponsePanel({
         return next;
       });
       setBulkMessage({
-        text: `모든 후보의 필수 응답을 선택해 주세요. 미완료 후보 ${incompleteForms.length}개가 있습니다.`,
+        text: `모든 후보에 가능 여부와 이동 부담을 선택해 주세요. 아직 선택하지 않은 후보 ${incompleteForms.length}개가 있습니다.`,
         kind: "error",
       });
       return;
@@ -300,7 +274,7 @@ export function ParticipantResponsePanel({
 
     setIsBulkSubmitting(true);
     setBulkMessage({
-      text: `${candidates.length}개 후보의 응답을 저장하는 중입니다...`,
+      text: `${candidates.length}개 후보의 의견을 저장하는 중입니다...`,
       kind: "info",
     });
     setForms((current) => {
@@ -342,7 +316,7 @@ export function ParticipantResponsePanel({
         setSavedResponse(
           candidateId,
           result.value.response,
-          "저장한 응답이 일괄 반영되었습니다.",
+          "저장한 의견이 일괄 반영되었습니다.",
         );
       } else {
         failureCount += 1;
@@ -358,7 +332,7 @@ export function ParticipantResponsePanel({
     setBulkMessage({
       text:
         failureCount === 0
-          ? `${successCount}개 후보의 응답을 모두 저장했습니다.`
+          ? `${successCount}개 후보의 의견을 모두 저장했습니다.`
           : `${successCount}개 저장 완료, ${failureCount}개 저장 실패입니다. 실패한 후보의 입력은 유지됩니다.`,
       kind: failureCount === 0 ? "success" : "error",
     });
@@ -367,33 +341,43 @@ export function ParticipantResponsePanel({
     }
   }
 
+  function saveQuickResponses() {
+    if (!fastAvailabilityStatus || !fastTravelBurden) {
+      setBulkMessage({
+        text: "모든 후보에 저장하려면 가능 여부와 이동 부담을 모두 선택해 주세요.",
+        kind: "error",
+      });
+      return;
+    }
+
+    void saveAllResponses({
+      availabilityStatus: fastAvailabilityStatus,
+      travelBurden: fastTravelBurden,
+    });
+  }
+
   return (
     <section className="space-y-4">
       <div className="space-y-2">
-        <p className="text-sm font-semibold text-emerald-700">내 응답</p>
+        <p className="text-sm font-semibold text-emerald-700">내 의견</p>
         <h2 className="text-xl font-semibold tracking-tight text-slate-950">
-          후보별 응답
+          후보별 의견
         </h2>
         <p className="text-sm leading-6 text-slate-500">
-          각 후보의 가능 여부와 이동 부담을 선택하세요. 저장하지 않은 값은 계산에
-          반영되지 않습니다.
+          각 후보의 참석 가능 여부와 이동 부담을 선택하세요. 두 항목을 모두 고르면
+          내 의견이 바로 저장되고, 메모는 필요할 때만 추가하면 됩니다.
         </p>
         {isReadOnly && (
           <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600">
-            방이 확정되어 응답을 읽기 전용으로 표시합니다. 다시 변경하려면 호스트가
-            먼저 재검토를 시작해야 합니다.
-          </p>
-        )}
-        {!isReadOnly && !hasCondition && (
-          <p className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800">
-            후보 응답을 시작하려면 위의 내 기준을 먼저 저장해 주세요.
+            방이 확정되어 의견을 읽기 전용으로 표시합니다. 다시 바꾸려면 방장이
+            먼저 다시 살펴보기를 시작해야 합니다.
           </p>
         )}
       </div>
 
       {candidates.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white/65 p-4 text-sm leading-5 text-slate-500">
-          호스트가 후보를 등록하면 이곳에서 응답할 수 있습니다.
+          방장이 후보를 등록하면 이곳에서 의견을 남길 수 있습니다.
         </div>
       ) : (
         <>
@@ -401,9 +385,8 @@ export function ParticipantResponsePanel({
             availabilityStatus={fastAvailabilityStatus}
             isDisabled={isInteractionDisabled}
             message={bulkMessage}
-            onApply={applyFastResponse}
             onAvailabilityChange={setFastAvailabilityStatus}
-            onSave={() => void saveAllResponses()}
+            onSave={saveQuickResponses}
             onTravelChange={setFastTravelBurden}
             travelBurden={fastTravelBurden}
           />
@@ -412,11 +395,14 @@ export function ParticipantResponsePanel({
             {candidates.map((candidate) => (
               <CandidateResponseCard
                 candidate={candidate}
+                condition={condition}
                 form={getForm(candidate.id)}
                 isBulkSubmitting={isBulkSubmitting}
-                isReadOnly={isReadOnly || !hasCondition}
+                isReadOnly={isReadOnly}
                 key={candidate.id}
-                onSave={() => void saveResponse(candidate.id)}
+                onSave={(overrides) =>
+                  void saveResponse(candidate.id, overrides)
+                }
                 onUpdate={(update) => updateForm(candidate.id, update)}
               />
             ))}

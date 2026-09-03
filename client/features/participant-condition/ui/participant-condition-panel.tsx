@@ -121,7 +121,7 @@ function validateDraft(
     new Set(allTags.map((tag) => tag.toUpperCase())).size !== allTags.length
   ) {
     errors.preferences =
-      '각 태그 종류는 최대 10개까지 입력할 수 있고 중복해서 사용할 수 없습니다.';
+      '특징은 종류별로 최대 10개까지 입력할 수 있고 중복해서 사용할 수 없습니다.';
   }
 
   return errors;
@@ -130,7 +130,7 @@ function validateDraft(
 function describeConditionError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === 'CONDITION_INCOMPLETE') {
-      return '가능 시간·예산·태그 입력을 다시 확인해 주세요.';
+      return '가능 시간·예산·특징 입력을 다시 확인해 주세요.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '확정되거나 종료된 방에서는 내 기준을 수정할 수 없습니다.';
@@ -250,7 +250,7 @@ export function ParticipantConditionPanel({
     setIsSubmitting(true);
     void upsertParticipantCondition(roomId, participantId, token, input)
       .then(async () => {
-        setFormMessage('내 기준을 저장했습니다. 후보 응답을 입력해 주세요.');
+        setFormMessage('내 기준을 저장했습니다. 추천 결과에 참고로 반영됩니다.');
         await onRoomRefresh();
       })
       .catch((error: unknown) => {
@@ -265,12 +265,18 @@ export function ParticipantConditionPanel({
     <section className='mp-card border-sky-100 bg-sky-50/55 p-4 sm:p-6'>
       <div className='space-y-1.5'>
         <p className='text-sm font-semibold text-sky-700'>내 기준</p>
-        <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-          가능한 조건을 알려주세요
-        </h2>
+        <div className='flex flex-wrap items-center gap-2'>
+          <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
+            원하는 기준을 알려주세요
+          </h2>
+          <span className='rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-sky-700'>
+            선택 사항
+          </span>
+        </div>
         <p className='text-sm leading-6 text-slate-600'>
-          가능한 시간, 1인 예산, 선호 태그를 저장하면 후보별 응답과 계산 결과에
-          반영됩니다. 다른 참여자에게는 내 상세 조건이 공개되지 않습니다.
+          원하는 시간, 1인 예산, 선호하는 특징을 입력하면 추천 결과에 참고로
+          반영됩니다. 입력하지 않아도 후보별 의견을 남기고 추천 결과를 만들 수 있으며, 다른
+          참여자에게는 내 상세 조건이 공개되지 않습니다.
         </p>
       </div>
 
@@ -282,7 +288,7 @@ export function ParticipantConditionPanel({
         <form className='mt-5 space-y-5' onSubmit={handleSubmit}>
           <fieldset className='space-y-3'>
             <legend className='text-sm font-semibold text-slate-800'>
-              가능한 시간 <span className='font-normal text-slate-500'>후보 시간이 이 안에 들어와야 합니다.</span>
+              내가 가능한 시간 <span className='font-normal text-slate-500'>맞지 않는 후보도 선택할 수 있고 추천 결과에서 알려드립니다.</span>
             </legend>
             {windows.map((window, index) => (
               <div
@@ -290,7 +296,7 @@ export function ParticipantConditionPanel({
                 key={`condition-window-${index}`}
               >
                 <div className='mb-2 flex items-center justify-between gap-2'>
-                  <p className='text-xs font-semibold text-slate-600'>가능 시간 {index + 1}</p>
+                    <p className='text-xs font-semibold text-slate-600'>가능한 시간 {index + 1}</p>
                   <button
                     className='text-xs font-semibold text-slate-500 underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40'
                     disabled={windows.length === 1 || isSubmitting}
@@ -364,7 +370,7 @@ export function ParticipantConditionPanel({
           </fieldset>
 
           <fieldset className='space-y-2'>
-            <legend className='text-sm font-semibold text-slate-800'>예산</legend>
+            <legend className='text-sm font-semibold text-slate-800'>예산 <span className='font-normal text-slate-500'>예산을 넘는 후보도 선택할 수 있습니다.</span></legend>
             <label className='flex items-center gap-2 text-sm text-slate-700'>
               <input
                 checked={noBudgetLimit}
@@ -404,9 +410,9 @@ export function ParticipantConditionPanel({
           </fieldset>
 
           <fieldset className='space-y-3'>
-            <legend className='text-sm font-semibold text-slate-800'>선호 태그 <span className='font-normal text-slate-500'>쉼표로 구분해 입력합니다.</span></legend>
+            <legend className='text-sm font-semibold text-slate-800'>선호하는 특징 <span className='font-normal text-slate-500'>추천 결과에 참고합니다. 쉼표로 구분해 입력합니다.</span></legend>
             <label className='block space-y-1 text-sm font-medium text-slate-700'>
-              꼭 필요한 태그
+              꼭 필요한 특징
               <input
                 className='mp-input'
                 disabled={isSubmitting}
@@ -416,7 +422,7 @@ export function ParticipantConditionPanel({
               />
             </label>
             <label className='block space-y-1 text-sm font-medium text-slate-700'>
-              있으면 좋은 태그
+              있으면 좋은 특징
               <input
                 className='mp-input'
                 disabled={isSubmitting}
@@ -426,7 +432,7 @@ export function ParticipantConditionPanel({
               />
             </label>
             <label className='block space-y-1 text-sm font-medium text-slate-700'>
-              피하고 싶은 태그
+              피하고 싶은 특징
               <input
                 className='mp-input'
                 disabled={isSubmitting}
@@ -461,7 +467,7 @@ export function ParticipantConditionPanel({
 
       {!isReadOnly && !condition && !formMessage && (
         <p className='mt-4 text-xs leading-5 text-slate-500'>
-          내 기준을 저장해야 후보별 참석 가능 여부를 입력할 수 있습니다.
+          내 기준은 나중에 입력해도 됩니다. 먼저 후보별 의견을 남겨 보세요.
         </p>
       )}
     </section>
