@@ -13,15 +13,11 @@ export async function reconcileParticipantStatusesAfterCandidateChange(
   const activeParticipants = (
     await repositories.participants.findByRoomId(roomId)
   ).filter(isActiveParticipant);
-  const conditions = await repositories.conditions.findByRoomId(roomId);
-  const conditionByParticipantId = new Map(
-    conditions.map((condition) => [condition.participantId, condition])
-  );
   const responses = await repositories.responses.findByRoomId(roomId);
 
   for (const participant of activeParticipants) {
     const nextStatus = resolveParticipantStatus(
-      conditionByParticipantId.get(participant.id) ?? null,
+      participant.id,
       activeCandidates,
       responses
     );

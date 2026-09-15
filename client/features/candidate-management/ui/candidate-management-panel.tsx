@@ -127,7 +127,7 @@ function validateCandidateForm(
     .map((tag) => tag.trim())
     .filter(Boolean);
   if (normalizedTags.length > 10) {
-    errors.tags = '태그는 최대 10개까지 입력할 수 있습니다.';
+      errors.tags = '특징은 최대 10개까지 입력할 수 있습니다.';
   }
 
   return errors;
@@ -136,13 +136,13 @@ function validateCandidateForm(
 function describeCandidateError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === 'CANDIDATE_LIMIT_EXCEEDED') {
-      return '활성 후보는 최대 5개까지 등록할 수 있습니다.';
+      return '후보는 최대 5개까지 등록할 수 있습니다.';
     }
     if (error.code === 'HOST_ONLY') {
-      return '호스트만 후보를 등록할 수 있습니다.';
+      return '방장만 후보를 등록할 수 있습니다.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
-      return '현재 방 상태에서는 후보를 변경할 수 없습니다.';
+      return '지금은 후보를 바꿀 수 없습니다.';
     }
     if (error.code === 'CANDIDATE_VERSION_CONFLICT') {
       return '다른 사람이 후보를 먼저 변경했습니다. 최신 정보를 확인한 뒤 다시 저장해 주세요.';
@@ -341,12 +341,12 @@ export function CandidateManagementPanel({
         setEditingCandidateId(null);
         clearCandidateForm();
         setFormNotice(
-          '후보를 수정했습니다. 최신 계산 결과가 있다면 다시 계산해 주세요.',
+          '후보를 수정했습니다. 새 추천 결과가 있다면 다시 만들어 주세요.',
         );
       } else {
         await createCandidate(roomId, token, input);
         clearCandidateForm();
-        setFormNotice('후보를 등록했습니다. 참여자에게 응답을 요청해 주세요.');
+        setFormNotice('후보를 등록했습니다. 참여자들에게 의견을 남겨 달라고 알려주세요.');
       }
       await onRoomRefresh();
     } catch (error) {
@@ -392,7 +392,7 @@ export function CandidateManagementPanel({
       }
       setArchiveCandidateId(null);
       setFormNotice(
-        '후보를 보관했습니다. 과거 계산 결과의 기록은 그대로 보존됩니다.',
+        '후보를 목록에서 뺐습니다. 기존 추천 결과의 기록은 그대로 남아 있습니다.',
       );
       await onRoomRefresh();
     } catch (error) {
@@ -412,12 +412,12 @@ export function CandidateManagementPanel({
     <section className='mp-card border-emerald-100 bg-emerald-50/55 p-4 sm:p-6'>
       <div className='mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
         <div className='space-y-1.5'>
-          <p className='text-sm font-semibold text-emerald-700'>호스트</p>
+          <p className='text-sm font-semibold text-emerald-700'>방장</p>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-            장소 후보 관리
+            모임 후보 관리
           </h2>
           <p className='text-sm leading-6 text-slate-600'>
-            참여자들의 비교를 위해 시간과 장소를 최대 5개까지 등록할 수
+            참여자들이 비교할 시간과 장소를 최대 5개까지 등록할 수
             있습니다.
           </p>
         </div>
@@ -538,7 +538,7 @@ export function CandidateManagementPanel({
                     }}
                     type='button'
                   >
-                    보관
+                    목록에서 빼기
                   </button>
                 </div>
               </div>
@@ -546,8 +546,8 @@ export function CandidateManagementPanel({
               {archiveCandidateId === candidate.id && (
                 <div className='mt-3 rounded-xl border border-rose-100 bg-rose-50/80 p-3'>
                   <p className='text-sm leading-5 text-rose-800'>
-                    이 후보는 새 계산과 응답 대상에서 제외됩니다. 과거 계산 결과의 기록은
-                    보존됩니다. 보관할까요?
+                    이 후보를 새 추천과 의견 대상에서 뺍니다. 기존 추천 결과에는 기록이
+                    남습니다. 뺄까요?
                   </p>
                   <div className='mt-3 flex flex-wrap gap-2'>
                     <button
@@ -556,7 +556,7 @@ export function CandidateManagementPanel({
                       onClick={() => void handleArchive(candidate)}
                       type='button'
                     >
-                      {isArchiving ? '보관 중...' : '보관하기'}
+                      {isArchiving ? '처리 중...' : '목록에서 빼기'}
                     </button>
                     <button
                       className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
@@ -577,12 +577,12 @@ export function CandidateManagementPanel({
       {isCandidateMutationDisabled ? (
         <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
           {room.room.status === 'CALCULATING'
-            ? '계산이 진행 중이라 후보를 변경할 수 없습니다.'
+            ? '추천 결과를 만드는 중이라 후보를 바꿀 수 없습니다.'
             : '확정되거나 종료된 방에서는 후보를 변경할 수 없습니다.'}
         </p>
       ) : hasReachedCandidateLimit && !editingCandidate ? (
         <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          활성 후보 5개가 등록되어 더 추가할 수 없습니다.
+          후보 5개가 이미 등록되어 더 추가할 수 없습니다.
         </p>
       ) : (
         <CandidateForm

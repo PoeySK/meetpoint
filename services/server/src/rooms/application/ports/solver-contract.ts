@@ -31,7 +31,7 @@ export interface SolverSnapshot {
       availabilityWindows: Array<{ startsAt: string; endsAt: string }>;
       maxBudgetKrw: number | null;
       preferences: ParticipantPreferences;
-    };
+    } | null;
   }>;
   candidates: Array<{
     candidateId: string;

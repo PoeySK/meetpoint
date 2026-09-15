@@ -17,20 +17,20 @@ type UseParticipantLifecycleOptions = {
 function describeLifecycleError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === "HOST_ONLY") {
-      return "호스트만 다른 참가자를 강퇴할 수 있습니다.";
+      return "방장만 다른 사람을 내보낼 수 있습니다.";
     }
     if (error.code === "ROOM_STATE_CONFLICT") {
-      return "현재 방 상태에서는 나가기 또는 강퇴를 처리할 수 없습니다.";
+      return "지금은 사람을 나가게 하거나 내보낼 수 없습니다.";
     }
     if (error.code === "RESOURCE_NOT_FOUND") {
-      return "참가자 또는 방을 찾을 수 없습니다. 방 상태를 다시 확인해 주세요.";
+      return "참여자 또는 방을 찾을 수 없습니다. 방 정보를 다시 확인해 주세요.";
     }
     if (error.code === "TOKEN_EXPIRED" || error.code === "INVALID_TOKEN") {
-      return "방 접근 토큰이 유효하지 않습니다. 방에 다시 입장해 주세요.";
+      return "방 입장 정보가 만료되었습니다. 방 코드로 다시 입장해 주세요.";
     }
   }
 
-  return "참가자 상태를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return "참여자 정보를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
 export function useParticipantLifecycle({

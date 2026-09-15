@@ -519,6 +519,41 @@ describe('StartCalculationUseCase flow', () => {
     });
   });
 
+  it('allows calculation when a participant skips optional conditions', async () => {
+    const seed = createSeed();
+    seed.store.conditions.delete('participant-member-1');
+    let solverInput!: SolverSnapshot;
+    globalThis.fetch = jest.fn((_input, init) => {
+      solverInput = parseSolverSnapshot(init);
+      return {
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve(solverResponseFromSnapshot(solverInput)),
+      };
+    });
+    const service = createCalculationService(
+      createCalculationDataSource(seed.store)
+    );
+
+    const started = await service.startCalculation(
+      seed.roomId,
+      seed.hostToken,
+      { clientRequestId: 'client-optional-condition' }
+    );
+    const completed = await waitForStatus(
+      seed.store,
+      started.calculation.id,
+      ScoreResultStatus.COMPLETED
+    );
+
+    expect(
+      solverInput.participants.find(
+        (participant) => participant.participantId === 'participant-member-1'
+      )?.condition
+    ).toBeNull();
+    expect(completed.status).toBe(ScoreResultStatus.COMPLETED);
+  });
+
   it('keeps a missing response absent from the calculation snapshot', async () => {
     const seed = createSeed();
     seed.store.responses.delete('participant-member-1-candidate-2');

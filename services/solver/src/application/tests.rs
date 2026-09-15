@@ -94,6 +94,41 @@ fn uses_conditionless_budget_and_preference_defaults() {
 }
 
 #[test]
+fn returns_user_friendly_reasons() {
+    let result = solve(request_with_responses(vec![response(
+        "candidate_1",
+        "AVAILABLE",
+        "EASY",
+    )]))
+    .unwrap();
+    let complete = result
+        .candidates
+        .iter()
+        .find(|candidate| candidate.candidate_id == "candidate_1")
+        .unwrap();
+    let incomplete = result
+        .candidates
+        .iter()
+        .find(|candidate| candidate.candidate_id == "candidate_2")
+        .unwrap();
+
+    assert_eq!(complete.reasons, vec!["1명이 모두 의견을 남겼습니다."]);
+    assert_eq!(
+        incomplete.reasons,
+        vec!["전체 1명 중 0명이 의견을 남겼습니다."]
+    );
+    assert_eq!(
+        complete.participant_breakdown[0].reasons,
+        vec![
+            "참석 가능 여부: 참석 가능",
+            "이동 부담: 이동 쉬움",
+            "예산: 예산 제한 없음",
+            "선호하는 특징: 내 기준을 입력하지 않음",
+        ]
+    );
+}
+
+#[test]
 fn calculates_easy_normal_and_hard_scores() {
     let mut request = request_with_responses(vec![
         response("candidate_1", "AVAILABLE", "EASY"),
@@ -329,13 +364,18 @@ fn applies_condition_budget_and_preference_scores_and_conflicts() {
 }
 
 #[test]
-fn rejects_condition_aware_requests_without_each_participant_condition() {
+fn allows_condition_aware_requests_without_a_participant_condition() {
     let mut request = condition_request();
     request.participants[0].condition = None;
 
-    assert_eq!(
-        solve(request).unwrap_err().code.as_str(),
-        "CONDITION_MISSING"
+    let result = solve(request).unwrap();
+    let candidate = &result.candidates[0];
+
+    assert_eq!(candidate.overall_score, 100.0);
+    assert!(
+        candidate
+            .explanation_flags
+            .contains(&"CONDITION_NOT_PROVIDED".to_string())
     );
 }
 

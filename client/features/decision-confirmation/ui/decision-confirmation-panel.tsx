@@ -56,35 +56,35 @@ export function DecisionConfirmationPanel({
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-emerald-700">Decision</p>
+              <p className="text-sm font-semibold text-emerald-700">확정 결과</p>
               <h3
                 className="mt-1 text-lg font-semibold text-slate-950"
                 id="decision-summary-heading"
               >
                 {decision.status === "CONFIRMED"
-                  ? "호스트가 후보를 확정했습니다"
-                  : "확정 결과를 재검토하는 중입니다"}
+                  ? "방장이 일정을 확정했습니다"
+                  : "확정한 일정을 다시 살펴보는 중입니다"}
               </h3>
             </div>
             <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
-              {decision.status === "CONFIRMED" ? "확정됨" : "재검토 중"}
+              {decision.status === "CONFIRMED" ? "확정됨" : "다시 살펴보는 중"}
             </span>
           </div>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             <div className="rounded-xl bg-white/80 p-3">
-              <p className="text-xs text-slate-500">확정 후보</p>
+              <p className="text-xs text-slate-500">확정한 일정</p>
               <p className="mt-1 font-semibold text-slate-950">
                 {decision.candidate.place.name}
               </p>
             </div>
             <div className="rounded-xl bg-white/80 p-3">
-              <p className="text-xs text-slate-500">확정 당시 점수</p>
+              <p className="text-xs text-slate-500">당시 추천 점수</p>
               <p className="mt-1 font-semibold text-slate-950">
                 {decision.overallScore.toFixed(1)}
               </p>
             </div>
             <div className="rounded-xl bg-white/80 p-3">
-              <p className="text-xs text-slate-500">결정 메모</p>
+              <p className="text-xs text-slate-500">확정 메모</p>
               <p className="mt-1 text-sm leading-5 text-slate-700">
                 {decision.decisionNote ?? "없음"}
               </p>
@@ -92,13 +92,13 @@ export function DecisionConfirmationPanel({
           </div>
           {decision.status === "REOPENED" && (
             <p className="mt-4 text-sm leading-6 text-amber-800">
-              {decision.reopenReason ?? "재검토 사유가 기록되었습니다."} 후보 또는 응답을 변경한 뒤 다시 계산해야 새 결정을 확정할 수 있습니다.
+              {decision.reopenReason ?? "다시 살펴보는 이유가 기록되었습니다."} 후보 또는 의견을 바꾼 뒤 다시 추천 결과를 만들어야 새 일정을 확정할 수 있습니다.
             </p>
           )}
           {decision.status === "CONFIRMED" && isHost && (
             <div className="mt-5 border-t border-emerald-100 pt-5">
               <label className="block space-y-2 text-sm font-semibold text-slate-800">
-                재검토 사유
+                다시 살펴보는 이유
                 <textarea
                   className="mp-input min-h-20 resize-y"
                   disabled={isReopening}
@@ -114,7 +114,7 @@ export function DecisionConfirmationPanel({
                 onClick={onReopen}
                 type="button"
               >
-                {isReopening ? "재검토 시작 중..." : "확정 결과 재검토"}
+                {isReopening ? "다시 살펴보는 중..." : "확정한 일정 다시 살펴보기"}
               </button>
             </div>
           )}
@@ -146,32 +146,32 @@ export function DecisionConfirmationPanel({
             aria-labelledby="decision-form-heading"
             className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
           >
-            <p className="text-sm font-semibold text-emerald-700">호스트 결정</p>
+            <p className="text-sm font-semibold text-emerald-700">방장 확정</p>
             <h3
               className="mt-1 text-lg font-semibold text-slate-950"
               id="decision-form-heading"
             >
-              후보를 선택하고 명시적으로 확정해 주세요.
+              원하는 후보를 고른 뒤 일정을 확정해 주세요.
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              순위가 높은 후보를 자동으로 선택하거나 확정하지 않습니다. 선택한 계산 결과만 Server에 전달합니다.
+              추천 1순위가 미리 선택되어 있어도 자동으로 확정하지 않습니다. 확인할 점을 살펴본 뒤 직접 확정해 주세요.
             </p>
 
             {!selectedCandidate && (
               <p className="mt-3 rounded-xl bg-white px-3 py-2.5 text-sm text-slate-600">
-                후보 카드의 “이 후보 선택” 버튼을 먼저 눌러 주세요.
+                후보 카드의 “이 후보 고르기” 버튼을 눌러 주세요.
               </p>
             )}
 
             {selectedCandidate && calculation && (
               <div className="mt-3 space-y-3 rounded-xl bg-white p-3.5">
                 <p className="text-sm text-slate-700">
-                  선택 후보: <strong>{selectedCandidateName ?? "후보 정보를 확인할 수 없습니다"}</strong>
+                  고른 후보: <strong>{selectedCandidateName ?? "후보 정보를 확인할 수 없습니다"}</strong>
                 </p>
                 {!coverageIsComplete && (
                   <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
-                    응답 {calculation.coverage.submittedResponses}/
-                    {calculation.coverage.expectedResponses}개가 저장되어 확정할 수 없습니다.
+                    작성한 의견 {calculation.coverage.submittedResponses}개 /
+                    전체 {calculation.coverage.expectedResponses}개라 아직 확정할 수 없습니다.
                   </p>
                 )}
                 {selectedCandidateHasIssues && (
@@ -184,11 +184,11 @@ export function DecisionConfirmationPanel({
                       }
                       type="checkbox"
                     />
-                    <span>선택 후보의 이슈와 계산 근거를 확인했습니다.</span>
+                    <span>고른 후보의 확인할 점과 추천 근거를 살펴봤습니다.</span>
                   </label>
                 )}
                 <label className="block space-y-2 text-sm font-semibold text-slate-800">
-                  결정 메모 {selectedCandidateHasIssues ? "(필수)" : "(선택)"}
+                  확정 메모 {selectedCandidateHasIssues ? "(필수)" : "(선택)"}
                   <textarea
                     className="mp-input min-h-20 resize-y"
                     disabled={isConfirming}
@@ -196,7 +196,7 @@ export function DecisionConfirmationPanel({
                     onChange={(event) => onDecisionNoteChange(event.target.value)}
                     placeholder={
                       selectedCandidateHasIssues
-                        ? "이슈를 확인한 이유를 1~300자로 입력해 주세요."
+                        ? "확인할 점을 살펴본 이유를 1~300자로 입력해 주세요."
                         : "확정 이유를 남길 수 있습니다."
                     }
                     value={decisionNote}
@@ -216,7 +216,7 @@ export function DecisionConfirmationPanel({
                   onClick={onConfirm}
                   type="button"
                 >
-                  {isConfirming ? "후보 확정 중..." : "선택한 후보 확정"}
+                  {isConfirming ? "일정 확정 중..." : "이 일정으로 확정"}
                 </button>
               </div>
             )}

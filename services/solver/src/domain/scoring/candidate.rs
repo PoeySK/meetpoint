@@ -141,6 +141,12 @@ fn score_participant(
     let mut hard_conflicts = Vec::new();
     let mut blocking_issues = Vec::new();
     let mut explanation_flags = Vec::new();
+    if policy.condition_aware && condition.is_none() {
+        push_unique(
+            &mut explanation_flags,
+            ExplanationFlag::ConditionNotProvided,
+        );
+    }
     let (time, travel_burden, availability_reason, travel_reason) = match response {
         Some(response) => {
             let (time, availability) = match response.availability {
@@ -194,8 +200,8 @@ fn score_participant(
     };
 
     let (budget, budget_reason) = match (response, condition) {
-        (None, _) => (0.0, "MISSING".to_string()),
-        (Some(_), None) => (weights.budget, "NO_BUDGET_CONSTRAINT".to_string()),
+        (None, _) => (0.0, "의견 없음".to_string()),
+        (Some(_), None) => (weights.budget, "예산 제한 없음".to_string()),
         (Some(_), Some(condition)) => score_budget(
             condition.max_budget_krw,
             candidate.estimated_cost_per_person_krw,
@@ -205,8 +211,8 @@ fn score_participant(
         ),
     };
     let (preference, preference_reason) = match (response, condition) {
-        (None, _) => (0.0, "PREFERENCE_UNEVALUATED".to_string()),
-        (Some(_), None) => (weights.preference, "PREFERENCE_UNEVALUATED".to_string()),
+        (None, _) => (0.0, "의견 없음".to_string()),
+        (Some(_), None) => (weights.preference, "내 기준을 입력하지 않음".to_string()),
         (Some(_), Some(condition)) => score_preferences(
             condition,
             &candidate.tags,
@@ -216,15 +222,18 @@ fn score_participant(
     };
 
     let mut reasons = if availability_reason == "MISSING" {
-        vec!["response: MISSING".to_string()]
+        vec!["참석 가능 여부: 아직 작성하지 않음".to_string()]
     } else {
         vec![
-            format!("availability: {availability_reason}"),
-            format!("travelBurden: {travel_reason}"),
+            format!(
+                "참석 가능 여부: {}",
+                availability_reason_label(availability_reason)
+            ),
+            format!("이동 부담: {}", travel_burden_reason_label(travel_reason)),
         ]
     };
-    reasons.push(format!("budget: {budget_reason}"));
-    reasons.push(format!("preference: {preference_reason}"));
+    reasons.push(format!("예산: {budget_reason}"));
+    reasons.push(format!("선호하는 특징: {preference_reason}"));
 
     ParticipantScore {
         score: time + travel_burden + budget + preference,
@@ -241,6 +250,25 @@ fn score_participant(
     }
 }
 
+fn availability_reason_label(reason: &str) -> &'static str {
+    match reason {
+        "AVAILABLE" => "참석 가능",
+        "AVAILABLE_OUTSIDE_CONDITION" => "내가 가능한 시간과 다름",
+        "MAYBE" => "참석 여부 보류",
+        "UNAVAILABLE" => "참석 불가",
+        _ => "확인 필요",
+    }
+}
+
+fn travel_burden_reason_label(reason: &str) -> &'static str {
+    match reason {
+        "EASY" => "이동 쉬움",
+        "NORMAL" => "이동 보통",
+        "HARD" => "이동 어려움",
+        _ => "확인 필요",
+    }
+}
+
 fn score_budget(
     max_budget_krw: Option<i32>,
     cost: i32,
@@ -250,27 +278,24 @@ fn score_budget(
 ) -> (f64, String) {
     let Some(max_budget_krw) = max_budget_krw else {
         push_unique(explanation_flags, ExplanationFlag::NoBudgetConstraint);
-        return (weight, "NO_BUDGET_CONSTRAINT".to_string());
+        return (weight, "예산 제한 없음".to_string());
     };
 
     let budget = max_budget_krw as f64;
     let cost = cost as f64;
     if cost <= budget {
-        return (weight, "WITHIN_LIMIT".to_string());
+        return (weight, "예산 범위 안".to_string());
     }
 
     hard_conflicts.push(ConflictCode::BudgetLimitExceeded);
     if budget == 0.0 {
-        return (0.0, "OVER_LIMIT".to_string());
+        return (0.0, "예산 초과".to_string());
     }
 
     if cost <= budget * 2.0 {
-        (
-            weight * (2.0 - cost / budget),
-            "ABOVE_LIMIT_WITHIN_TWICE".to_string(),
-        )
+        (weight * (2.0 - cost / budget), "예산 초과".to_string())
     } else {
-        (0.0, "OVER_TWICE_LIMIT".to_string())
+        (0.0, "예산을 크게 초과".to_string())
     }
 }
 
@@ -301,36 +326,51 @@ fn score_preferences(
     } else {
         0.0
     };
+    let preferred_match_count = condition
+        .preferred_tags
+        .iter()
+        .filter(|tag| candidate_tags.contains(tag))
+        .count();
     let preferred_score = if condition.preferred_tags.is_empty() {
         weight / 3.0
     } else {
-        let matched = condition
-            .preferred_tags
-            .iter()
-            .filter(|tag| candidate_tags.contains(tag))
-            .count();
-        weight / 3.0 * matched as f64 / condition.preferred_tags.len() as f64
+        weight / 3.0 * preferred_match_count as f64 / condition.preferred_tags.len() as f64
     };
 
-    let reason = if required_missing || avoid_present {
-        format!(
-            "REQUIRED_MATCH={};PREFERRED_MATCH={};AVOID_MATCH={}",
-            !required_missing,
-            preferred_score > 0.0,
-            avoid_present
-        )
+    let mut reasons: Vec<String> = Vec::new();
+    if !condition.required_tags.is_empty() {
+        reasons.push(
+            if required_missing {
+                "필요한 특징 부족"
+            } else {
+                "필요한 특징 충족"
+            }
+            .to_string(),
+        );
+    }
+    if avoid_present {
+        reasons.push("피하고 싶은 특징 포함".to_string());
+    }
+    if !condition.preferred_tags.is_empty() {
+        reasons.push(format!(
+            "선호 특징 {preferred_match_count}/{}개 일치",
+            condition.preferred_tags.len()
+        ));
+    }
+    let reason = if reasons.is_empty() {
+        "입력한 특징 없음".to_string()
     } else {
-        format!("REQUIRED_MATCH=true;PREFERRED_SCORE={:.1}", preferred_score)
+        reasons.join(" · ")
     };
     (required_score + preferred_score, reason)
 }
 
 fn candidate_reasons(submitted_responses: usize, expected_responses: usize) -> Vec<String> {
     if submitted_responses == expected_responses {
-        vec![format!("{submitted_responses} responses submitted")]
+        vec![format!("{submitted_responses}명이 모두 의견을 남겼습니다.")]
     } else {
         vec![format!(
-            "{submitted_responses}/{expected_responses} responses submitted"
+            "전체 {expected_responses}명 중 {submitted_responses}명이 의견을 남겼습니다."
         )]
     }
 }

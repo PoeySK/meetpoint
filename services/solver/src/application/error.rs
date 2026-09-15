@@ -7,7 +7,6 @@ pub enum SolveErrorCode {
     NoCandidates,
     InvalidTimeRange,
     ResponseFieldMissing,
-    ConditionMissing,
     InvalidCondition,
 }
 
@@ -19,7 +18,6 @@ impl SolveErrorCode {
             Self::NoCandidates => "NO_CANDIDATES",
             Self::InvalidTimeRange => "INVALID_TIME_RANGE",
             Self::ResponseFieldMissing => "RESPONSE_FIELD_MISSING",
-            Self::ConditionMissing => "CONDITION_MISSING",
             Self::InvalidCondition => "INVALID_CONDITION",
         }
     }

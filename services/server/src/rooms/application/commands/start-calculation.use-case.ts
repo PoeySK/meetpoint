@@ -109,20 +109,6 @@ export class StartCalculationUseCase {
         }
 
         const participantConditions = await conditions.findByRoomId(room.id);
-        const conditionByParticipantId = new Map(
-          participantConditions.map((condition) => [
-            condition.participantId,
-            condition,
-          ])
-        );
-        if (
-          activeParticipants.some(
-            (participant) => !conditionByParticipantId.has(participant.id)
-          )
-        ) {
-          throw new UnprocessableEntityException('CONDITION_INCOMPLETE');
-        }
-
         const snapshot = createSolverSnapshot(
           requestId,
           room,

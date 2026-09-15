@@ -8,17 +8,20 @@ import { useState } from 'react';
 
 const statusLabels: Record<RoomStatus, string> = {
   DRAFT: '준비 중',
-  OPEN: '참여 가능',
-  CALCULATING: '계산 중',
-  CALCULATED: '계산 완료',
-  CONFIRMED: '확정됨',
-  CLOSED: '종료됨',
+  OPEN: '의견 받는 중',
+  CALCULATING: '추천 결과 만드는 중',
+  CALCULATED: '추천 결과 확인',
+  CONFIRMED: '일정 확정',
+  CLOSED: '종료',
 };
 
 export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>(
     'idle'
   );
+  const [inviteCopyState, setInviteCopyState] = useState<
+    'idle' | 'copied' | 'failed'
+  >('idle');
 
   async function copyRoomCode() {
     try {
@@ -26,6 +29,18 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
       setCopyState('copied');
     } catch {
       setCopyState('failed');
+    }
+  }
+
+  async function copyInviteLink() {
+    try {
+      const inviteUrl = `${window.location.origin}/join/${encodeURIComponent(
+        room.room.roomCode
+      )}`;
+      await navigator.clipboard.writeText(inviteUrl);
+      setInviteCopyState('copied');
+    } catch {
+      setInviteCopyState('failed');
     }
   }
 
@@ -38,7 +53,7 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
               {statusLabels[room.room.status]}
             </span>
             <div>
-              <p className='text-sm font-semibold text-emerald-700'>방 대기</p>
+              <p className='text-sm font-semibold text-emerald-700'>모임 진행</p>
               <h1 className='mt-1 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl'>
                 {room.room.title}
               </h1>
@@ -52,13 +67,22 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
             <p className='mt-1 text-2xl font-bold tracking-[0.16em]'>
               {room.room.roomCode}
             </p>
-            <button
-              className='mt-2 rounded-lg border border-white/20 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-300'
-              onClick={copyRoomCode}
-              type='button'
-            >
-              {copyState === 'copied' ? '복사됨' : '코드 복사'}
-            </button>
+            <div className='mt-2 flex flex-wrap gap-2 sm:justify-end'>
+              <button
+                className='rounded-lg border border-white/20 px-2.5 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-emerald-300'
+                onClick={copyRoomCode}
+                type='button'
+              >
+                {copyState === 'copied' ? '코드 복사됨' : '코드 복사'}
+              </button>
+              <button
+                className='rounded-lg bg-emerald-500 px-2.5 py-1.5 text-xs font-semibold text-emerald-950 transition hover:bg-emerald-400 focus:outline-none focus:ring-2 focus:ring-emerald-300'
+                onClick={copyInviteLink}
+                type='button'
+              >
+                {inviteCopyState === 'copied' ? '링크 복사됨' : '초대 링크 복사'}
+              </button>
+            </div>
           </div>
         </div>
         {copyState === 'failed' && (
@@ -67,15 +91,21 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
             주세요.
           </p>
         )}
+        {inviteCopyState === 'failed' && (
+          <p className='mt-2 text-sm text-rose-600'>
+            초대 링크를 자동으로 복사하지 못했습니다. 방 코드를 직접 공유해
+            주세요.
+          </p>
+        )}
       </section>
 
       <section className='grid gap-3 sm:grid-cols-3'>
         <div className='mp-card p-3.5'>
-          <p className='text-sm text-slate-500'>호스트</p>
+          <p className='text-sm text-slate-500'>방장</p>
           <p className='mt-2 font-semibold text-slate-950'>
             {room.hostParticipant.displayName}
           </p>
-          <p className='mt-1 text-xs text-emerald-700'>호스트</p>
+          <p className='mt-1 text-xs text-emerald-700'>방장</p>
         </div>
         <div className='mp-card p-3.5'>
           <p className='text-sm text-slate-500'>참여자</p>
@@ -90,19 +120,19 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
           <p className='text-sm text-slate-500'>현재 단계</p>
           <p className='mt-2 font-semibold text-slate-950'>
             {room.room.status === 'CONFIRMED'
-              ? '후보 확정'
+                ? '일정 확정'
               : room.room.status === 'CALCULATED'
-                ? '결정 대기 중'
+                ? '추천 결과 확인'
                 : room.room.status === 'CALCULATING'
-                  ? '계산 진행 중'
-                  : '참여자 기다리는 중'}
+                  ? '추천 결과 만드는 중'
+                  : '사람을 기다리는 중'}
           </p>
           <p className='mt-1 text-xs text-slate-500'>
             {room.room.status === 'CONFIRMED'
-              ? '참여자는 확정 결과를 조회할 수 있습니다'
+              ? '확정된 일정을 확인할 수 있습니다'
               : room.room.status === 'CALCULATED'
-                ? '호스트가 후보를 직접 선택합니다'
-                : '입력과 계산을 준비하는 단계입니다'}
+                ? '방장이 후보를 직접 고릅니다'
+                : '후보와 의견을 준비하는 단계입니다'}
           </p>
         </div>
       </section>

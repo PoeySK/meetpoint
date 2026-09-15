@@ -34,7 +34,7 @@ export function createSolverSnapshot(
       condition: (() => {
         const condition = conditionByParticipantId.get(participant.id);
         if (!condition) {
-          throw new Error('Participant condition is missing from snapshot.');
+          return null;
         }
         return {
           availabilityWindows: condition.availabilityWindows.map((window) => ({

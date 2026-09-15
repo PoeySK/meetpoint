@@ -7,7 +7,7 @@ export function HomeHero() {
       </div>
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-          Make the first move
+          친구들과 약속을 시작해 보세요
         </p>
         <h1 className="max-w-xl text-3xl font-semibold leading-[1.15] tracking-tight sm:text-5xl">
           모임의 시작점을
@@ -30,7 +30,7 @@ export function HomeHero() {
         </p>
         <p className="rounded-xl border border-slate-200/80 bg-white/65 p-3">
           <span className="mb-1 block text-[11px] font-semibold text-emerald-700">03</span>
-          함께 기다리기
+          의견 모으기
         </p>
       </div>
     </section>

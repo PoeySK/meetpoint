@@ -128,10 +128,11 @@ fn validate_participants(
         }
 
         let condition = if policy.condition_aware {
-            Some(validate_condition(
-                participant,
-                &participant.participant_id,
-            )?)
+            participant
+                .condition
+                .as_ref()
+                .map(|condition| validate_condition(condition, &participant.participant_id))
+                .transpose()?
         } else {
             None
         };
@@ -186,17 +187,9 @@ fn to_domain_candidate(candidate: &crate::contract::SolverCandidate) -> Candidat
 }
 
 fn validate_condition(
-    participant: &crate::contract::SolverParticipant,
+    condition: &crate::contract::SolverCondition,
     participant_id: &str,
 ) -> Result<ParticipantCondition, SolveError> {
-    let condition = participant.condition.as_ref().ok_or_else(|| {
-        SolveError::unprocessable(
-            SolveErrorCode::ConditionMissing,
-            "participant condition is required",
-            json!({ "participantId": participant_id }),
-        )
-    })?;
-
     if condition.availability_windows.is_empty() || condition.availability_windows.len() > 10 {
         return Err(SolveError::unprocessable(
             SolveErrorCode::InvalidCondition,

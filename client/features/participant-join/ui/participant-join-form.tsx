@@ -95,7 +95,7 @@ export function ParticipantJoinForm({
         );
       } catch {
         setFormError(
-          '이 브라우저에서 세션 저장소를 사용할 수 없습니다. 저장소 설정을 확인해 주세요.'
+          '이 브라우저에 입장 정보를 저장할 수 없습니다. 브라우저 설정을 확인해 주세요.'
         );
         return;
       }
@@ -166,7 +166,7 @@ export function ParticipantJoinForm({
                 className='text-sm font-semibold text-slate-800'
                 htmlFor='displayName'
               >
-                표시 이름
+                이름
               </label>
               <input
                 aria-describedby={

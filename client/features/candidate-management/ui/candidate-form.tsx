@@ -224,7 +224,7 @@ export function CandidateForm({
           )}
         </label>
         <label className="space-y-2 text-sm font-semibold text-slate-800">
-          태그
+          특징
           <input
             className="mp-input"
             disabled={isSubmitting}

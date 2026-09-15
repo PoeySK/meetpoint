@@ -1,9 +1,11 @@
 "use client";
 
 import type { Candidate } from "@/entities/candidate";
+import type { ParticipantCondition } from "@/entities/participant-condition";
 import {
   availabilityOptions,
   formatCandidateTime,
+  getConditionWarnings,
   getMissingFieldsDescription,
   getMissingFieldsMessage,
   getResponseState,
@@ -11,20 +13,23 @@ import {
   responseStateClassName,
   responseStateLabel,
   travelOptions,
+  type ResponseSaveOverrides,
   type ResponseForm,
 } from "@/features/participant-response/model/response-form";
 
 type CandidateResponseCardProps = {
   candidate: Candidate;
+  condition: ParticipantCondition | null | undefined;
   form: ResponseForm;
   isReadOnly: boolean;
   isBulkSubmitting: boolean;
   onUpdate: (update: Partial<ResponseForm>) => void;
-  onSave: () => void;
+  onSave: (overrides?: ResponseSaveOverrides) => void;
 };
 
 export function CandidateResponseCard({
   candidate,
+  condition,
   form,
   isReadOnly,
   isBulkSubmitting,
@@ -34,7 +39,23 @@ export function CandidateResponseCard({
   const responseState = getResponseState(form);
   const missingFieldsMessage = getMissingFieldsMessage(form);
   const missingFieldsDescription = getMissingFieldsDescription(form);
+  const conditionWarnings = getConditionWarnings(
+    candidate,
+    condition,
+    form.availabilityStatus,
+  );
   const isDisabled = isReadOnly || form.isSubmitting || isBulkSubmitting;
+
+  function updateResponse(update: ResponseSaveOverrides) {
+    onUpdate({ ...update, message: "", messageKind: null });
+
+    const availabilityStatus =
+      update.availabilityStatus ?? form.availabilityStatus;
+    const travelBurden = update.travelBurden ?? form.travelBurden;
+    if (availabilityStatus && travelBurden && !isDisabled) {
+      onSave({ availabilityStatus, travelBurden });
+    }
+  }
 
   return (
     <article
@@ -63,7 +84,7 @@ export function CandidateResponseCard({
           </span>
           {responseState === "missing" && (
             <span className="text-xs text-slate-500">
-              아직 계산에 반영될 저장 응답이 없습니다.
+              아직 추천 결과에 반영될 저장된 의견이 없습니다.
             </span>
           )}
         </div>
@@ -106,13 +127,7 @@ export function CandidateResponseCard({
                 }`}
                 disabled={isDisabled}
                 key={option.value}
-                onClick={() =>
-                  onUpdate({
-                    availabilityStatus: option.value,
-                    message: "",
-                    messageKind: null,
-                  })
-                }
+                onClick={() => updateResponse({ availabilityStatus: option.value })}
                 type="button"
               >
                 {option.label}
@@ -136,13 +151,7 @@ export function CandidateResponseCard({
                 }`}
                 disabled={isDisabled}
                 key={option.value}
-                onClick={() =>
-                  onUpdate({
-                    travelBurden: option.value,
-                    message: "",
-                    messageKind: null,
-                  })
-                }
+                onClick={() => updateResponse({ travelBurden: option.value })}
                 type="button"
               >
                 {option.label}
@@ -150,6 +159,23 @@ export function CandidateResponseCard({
             ))}
           </div>
         </fieldset>
+
+        {conditionWarnings.length > 0 && (
+          <div
+            aria-live="polite"
+            className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800"
+          >
+            <p className="font-semibold">내 기준과 다른 점이 있어요.</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {conditionWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+            <p className="mt-1 text-xs">
+              그래도 이 선택은 저장됩니다. 추천 결과에서 함께 확인할 수 있습니다.
+            </p>
+          </div>
+        )}
 
         <label className="block space-y-2 text-sm font-semibold text-slate-800">
           메모 (선택)
@@ -164,15 +190,15 @@ export function CandidateResponseCard({
                 messageKind: null,
               })
             }
-            placeholder="참여자에게 공유할 메모"
+            placeholder="함께 볼 메모"
             value={form.note}
           />
         </label>
 
         {missingFieldsMessage && (
           <p className="text-xs leading-5 text-amber-700">
-            저장하려면 {missingFieldsDescription} 선택하지 않은 값은 Server에
-            제출되지 않습니다.
+            저장하려면 {missingFieldsDescription} 아직 선택하지 않은 값은 저장되지
+            않습니다.
           </p>
         )}
 
@@ -188,14 +214,16 @@ export function CandidateResponseCard({
         <button
           className="mp-button mp-button-primary w-full"
           disabled={isDisabled}
-          onClick={onSave}
+          onClick={() => onSave()}
           type="button"
         >
           {form.isSubmitting
-            ? "응답 저장 중..."
+            ? "저장 중..."
             : isBulkSubmitting
-              ? "전체 후보 저장 중..."
-              : "응답 저장"}
+              ? "전체 저장 중..."
+              : responseState === "dirty"
+                ? "변경 저장"
+                : "의견 저장"}
         </button>
       </div>
     </article>

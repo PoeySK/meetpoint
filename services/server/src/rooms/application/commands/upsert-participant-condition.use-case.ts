@@ -103,7 +103,7 @@ export class UpsertParticipantConditionUseCase {
       });
       const roomResponses = await responses.findByRoomId(room.id);
       const participantStatus = resolveParticipantStatus(
-        condition,
+        participant.id,
         activeCandidates,
         roomResponses
       );

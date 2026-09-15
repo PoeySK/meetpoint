@@ -127,6 +127,16 @@ describe('Participant response HTTP contract', () => {
       travelBurden: TravelBurden.NORMAL,
     };
 
+    database.conditions.clear();
+    const withoutCondition = await request(app.getHttpServer())
+      .put(path)
+      .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
+      .send(validResponse)
+      .expect(200);
+    expect(withoutCondition.body.participantStatus).toBe(
+      ParticipantStatus.RESPONDED
+    );
+
     const wrongParticipant = await request(app.getHttpServer())
       .put(
         `/api/v1/rooms/${created.body.room.id}/participants/${created.body.hostParticipant?.id ?? created.body.room.hostParticipantId}/responses/${candidate.body.candidate.id}`

@@ -57,7 +57,7 @@ export async function request<T>(path: string, options: RequestInit = {}) {
       cache: "no-store",
     });
   } catch {
-    throw new RoomApiError("서버에 연결할 수 없습니다.", 0, "NETWORK_ERROR");
+    throw new RoomApiError("서비스에 연결할 수 없습니다.", 0, "NETWORK_ERROR");
   }
 
   let payload: unknown;

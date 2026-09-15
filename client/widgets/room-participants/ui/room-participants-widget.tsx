@@ -8,15 +8,15 @@ import type {
 import { useState } from 'react';
 
 const roleLabels: Record<PublicParticipant['role'], string> = {
-  HOST: '호스트',
-  MEMBER: '참가자',
+  HOST: '방장',
+  MEMBER: '참여자',
 };
 
 const statusLabels: Record<ParticipantStatus, string> = {
   JOINED: '입장함',
-  RESPONDED: '응답 완료',
+  RESPONDED: '의견 작성 완료',
   LEFT: '나감',
-  REMOVED: '제외됨',
+  REMOVED: '참여 제외',
 };
 
 export function RoomParticipantsWidget({
@@ -99,7 +99,7 @@ export function RoomParticipantsWidget({
 
       {!canChangeParticipants && (
         <p className='mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800'>
-          계산 중이거나 확정된 방에서는 참가자 변경을 처리할 수 없습니다.
+          추천 결과를 만드는 중이거나 일정이 확정되면 함께하는 사람을 바꿀 수 없습니다.
         </p>
       )}
 
@@ -160,7 +160,7 @@ export function RoomParticipantsWidget({
                       >
                         {removingParticipantId === participant.id
                           ? '처리 중...'
-                          : '강퇴 확인'}
+                          : '내보내기 확인'}
                       </button>
                       <button
                         className='rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-500 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50'
@@ -182,7 +182,7 @@ export function RoomParticipantsWidget({
                       onClick={() => setKickConfirmationId(participant.id)}
                       type='button'
                     >
-                      강퇴
+                      내보내기
                     </button>
                   ))}
               </div>
