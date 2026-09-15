@@ -13,10 +13,10 @@ const roleLabels: Record<PublicParticipant['role'], string> = {
 };
 
 const statusLabels: Record<ParticipantStatus, string> = {
-  JOINED: '입장함',
-  RESPONDED: '의견 작성 완료',
-  LEFT: '나감',
-  REMOVED: '참여 제외',
+  JOINED: '응답 준비 중',
+  RESPONDED: '응답 완료',
+  LEFT: '참여 종료',
+  REMOVED: '참여 제외됨',
 };
 
 export function RoomParticipantsWidget({
@@ -78,7 +78,7 @@ export function RoomParticipantsWidget({
             <span className='font-semibold'>
               {currentParticipant.displayName}
             </span>
-            님으로 입장했습니다. ({roleLabels[currentParticipant.role]})
+            님으로 참여 중입니다. ({roleLabels[currentParticipant.role]})
           </p>
           {!isHost && (
             <button
@@ -99,7 +99,7 @@ export function RoomParticipantsWidget({
 
       {!canChangeParticipants && (
         <p className='mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800'>
-          추천 결과를 만드는 중이거나 일정이 확정되면 함께하는 사람을 바꿀 수 없습니다.
+          추천 결과를 준비 중이거나 일정이 확정된 뒤, 또는 모임이 종료된 뒤에는 참여자를 바꿀 수 없습니다.
         </p>
       )}
 
@@ -160,7 +160,7 @@ export function RoomParticipantsWidget({
                       >
                         {removingParticipantId === participant.id
                           ? '처리 중...'
-                          : '내보내기 확인'}
+                          : '제외 확인'}
                       </button>
                       <button
                         className='rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-500 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50'
@@ -182,7 +182,7 @@ export function RoomParticipantsWidget({
                       onClick={() => setKickConfirmationId(participant.id)}
                       type='button'
                     >
-                      내보내기
+                      참여 제외
                     </button>
                   ))}
               </div>

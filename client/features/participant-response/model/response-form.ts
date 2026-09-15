@@ -36,14 +36,14 @@ export const availabilityOptions: Array<{
   label: string;
 }> = [
   { value: "AVAILABLE", label: "가능" },
-  { value: "MAYBE", label: "보류" },
+  { value: "MAYBE", label: "아마 가능" },
   { value: "UNAVAILABLE", label: "불가" },
 ];
 
 export const travelOptions: Array<{ value: TravelBurden; label: string }> = [
-  { value: "EASY", label: "쉬움" },
+  { value: "EASY", label: "편함" },
   { value: "NORMAL", label: "보통" },
-  { value: "HARD", label: "어려움" },
+  { value: "HARD", label: "부담됨" },
 ];
 
 export function createResponseForm(
@@ -106,7 +106,7 @@ export function getMissingFields(form: ResponseForm) {
   const missingFields: string[] = [];
 
   if (!form.availabilityStatus) {
-    missingFields.push("가능 여부");
+    missingFields.push("참석 가능 여부");
   }
   if (!form.travelBurden) {
     missingFields.push("이동 부담");
@@ -122,11 +122,11 @@ export function getMissingFieldsMessage(form: ResponseForm) {
     return "";
   }
   if (missingFields.length === 2) {
-    return "가능 여부와 이동 부담을 모두 선택해 주세요.";
+    return "참석 가능 여부와 이동 부담을 모두 선택해 주세요.";
   }
 
-  return missingFields[0] === "가능 여부"
-    ? "가능 여부를 선택해 주세요."
+  return missingFields[0] === "참석 가능 여부"
+    ? "참석 가능 여부를 선택해 주세요."
     : "이동 부담을 선택해 주세요.";
 }
 
@@ -137,11 +137,11 @@ export function getMissingFieldsDescription(form: ResponseForm) {
     return "";
   }
   if (missingFields.length === 2) {
-    return "가능 여부와 이동 부담을 모두 선택해야 합니다.";
+    return "참석 가능 여부와 이동 부담을 모두 선택해야 합니다.";
   }
 
-  return missingFields[0] === "가능 여부"
-    ? "가능 여부를 선택해야 합니다."
+  return missingFields[0] === "참석 가능 여부"
+    ? "참석 가능 여부를 선택해야 합니다."
     : "이동 부담을 선택해야 합니다.";
 }
 
@@ -172,7 +172,7 @@ export function getConditionWarnings(
       );
     })
   ) {
-    warnings.push("내가 입력한 가능 시간 밖입니다.");
+    warnings.push("선택 조건에 입력한 가능 시간과 다릅니다.");
   }
 
   if (
@@ -180,7 +180,7 @@ export function getConditionWarnings(
     candidate.estimatedCostPerPersonKrw > condition.maxBudgetKrw
   ) {
     warnings.push(
-      `예상 비용이 내 예산 한도(${condition.maxBudgetKrw.toLocaleString("ko-KR")}원)를 넘습니다.`,
+      `1인 예상 비용이 선택한 예산 한도(${condition.maxBudgetKrw.toLocaleString("ko-KR")}원)를 넘습니다.`,
     );
   }
 
@@ -191,7 +191,7 @@ export function getConditionWarnings(
     (tag) => !candidateTags.has(tag.trim().toUpperCase()),
   );
   if (missingRequiredTags.length > 0) {
-    warnings.push(`필요한 특징이 빠져 있습니다: ${missingRequiredTags.join(", ")}`);
+    warnings.push(`필수로 고른 특징이 없습니다: ${missingRequiredTags.join(", ")}`);
   }
 
   const presentAvoidTags = condition.preferences.avoidTags.filter((tag) =>
@@ -236,13 +236,13 @@ export function messageClassName(kind: ResponseMessageKind) {
 
 export function responseStateLabel(state: ReturnType<typeof getResponseState>) {
   if (state === "saved") {
-    return "저장됨";
+    return "의견 저장됨";
   }
   if (state === "dirty") {
     return "변경 후 저장 필요";
   }
 
-  return "아직 저장된 의견 없음";
+  return "의견 미저장";
 }
 
 export function responseStateClassName(

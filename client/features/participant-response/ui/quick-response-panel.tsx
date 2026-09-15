@@ -40,18 +40,18 @@ export function QuickResponsePanel({
           className="text-lg font-semibold text-slate-950"
           id="quick-response-heading"
         >
-          빠른 의견 입력
+          한 번에 의견 입력
         </h3>
         <p className="text-sm leading-6 text-slate-600">
-          모든 후보에 같은 선택을 남길 때 사용하세요. 두 값을 선택한 뒤 저장
-          버튼 한 번으로 반영할 수 있습니다.
+          모든 후보에 같은 의견을 남길 때 사용하세요. 두 항목을 선택한 뒤 한 번에
+          저장할 수 있습니다.
         </p>
       </div>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-slate-800">
-            모든 후보의 가능 여부
+            모든 후보의 참석 가능 여부
           </legend>
           <div className="grid grid-cols-3 gap-2">
             {availabilityOptions.map((option) => (
@@ -105,13 +105,13 @@ export function QuickResponsePanel({
           onClick={onSave}
           type="button"
         >
-          이 선택으로 모두 저장
+          이 선택을 모든 후보에 저장
         </button>
       </div>
 
       <p className="mt-3 text-xs leading-5 text-slate-600">
-        이동 부담은 실제 거리나 시간이 아니라 본인이 느끼는 정도입니다. 저장하지
-        않은 내용은 반영되지 않습니다.
+        이동 부담은 실제 거리나 시간이 아니라 내가 느끼는 정도를 선택합니다. 저장하지
+        않은 내용은 추천 결과에 반영되지 않습니다.
       </p>
       {message && (
         <p

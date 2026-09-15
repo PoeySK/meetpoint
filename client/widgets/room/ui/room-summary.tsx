@@ -9,10 +9,10 @@ import { useState } from 'react';
 const statusLabels: Record<RoomStatus, string> = {
   DRAFT: '준비 중',
   OPEN: '의견 받는 중',
-  CALCULATING: '추천 결과 만드는 중',
+  CALCULATING: '추천 결과 준비 중',
   CALCULATED: '추천 결과 확인',
   CONFIRMED: '일정 확정',
-  CLOSED: '종료',
+  CLOSED: '종료됨',
 };
 
 export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
@@ -87,14 +87,14 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
         </div>
         {copyState === 'failed' && (
           <p className='mt-4 text-sm text-rose-600'>
-            코드를 자동으로 복사하지 못했습니다. 코드를 직접 선택해 복사해
+            방 코드를 자동으로 복사하지 못했습니다. 방 코드를 직접 선택해 복사해
             주세요.
           </p>
         )}
         {inviteCopyState === 'failed' && (
           <p className='mt-2 text-sm text-rose-600'>
-            초대 링크를 자동으로 복사하지 못했습니다. 방 코드를 직접 공유해
-            주세요.
+            초대 링크를 자동으로 복사하지 못했습니다. 방 코드나 링크를 직접
+            공유해 주세요.
           </p>
         )}
       </section>
@@ -120,19 +120,27 @@ export function RoomSummary({ room }: { room: RoomDetailsResponse }) {
           <p className='text-sm text-slate-500'>현재 단계</p>
           <p className='mt-2 font-semibold text-slate-950'>
             {room.room.status === 'CONFIRMED'
-                ? '일정 확정'
+              ? '일정 확정'
               : room.room.status === 'CALCULATED'
-                ? '추천 결과 확인'
-                : room.room.status === 'CALCULATING'
-                  ? '추천 결과 만드는 중'
-                  : '사람을 기다리는 중'}
+                ? '후보를 고르는 중'
+              : room.room.status === 'CALCULATING'
+                ? '추천 결과를 준비하는 중'
+                : room.room.status === 'DRAFT'
+                  ? '참여자와 후보를 준비하는 중'
+                  : room.room.status === 'CLOSED'
+                    ? '종료됨'
+                    : '후보와 의견을 준비하는 중'}
           </p>
           <p className='mt-1 text-xs text-slate-500'>
             {room.room.status === 'CONFIRMED'
               ? '확정된 일정을 확인할 수 있습니다'
               : room.room.status === 'CALCULATED'
-                ? '방장이 후보를 직접 고릅니다'
-                : '후보와 의견을 준비하는 단계입니다'}
+                ? '방장이 추천 결과를 보고 후보를 확정합니다'
+                : room.room.status === 'CALCULATING'
+                  ? '추천 결과가 준비되면 여기에서 확인할 수 있습니다'
+                  : room.room.status === 'CLOSED'
+                    ? '이 방의 모임 진행이 끝났습니다'
+                    : '후보를 정하고 참여자들의 의견을 모으는 단계입니다'}
           </p>
         </div>
       </section>

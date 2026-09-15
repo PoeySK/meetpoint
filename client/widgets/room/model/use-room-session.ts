@@ -22,7 +22,7 @@ function describeRoomError(error: unknown): RoomLoadError {
     if (error.code === "TOKEN_EXPIRED") {
       return {
         title: "방 입장 정보가 만료되었습니다.",
-        message: "방 코드로 다시 입장해 주세요.",
+        message: "방 코드와 이름을 입력해 다시 입장해 주세요.",
       };
     }
 

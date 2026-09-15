@@ -83,8 +83,9 @@ export function CandidateResponseCard({
             {responseStateLabel(responseState)}
           </span>
           {responseState === "missing" && (
-            <span className="text-xs text-slate-500">
-              아직 추천 결과에 반영될 저장된 의견이 없습니다.
+            <span className="text-xs leading-5 text-slate-500">
+              아직 이 후보에 의견을 남기지 않았습니다. 응답이 없으면 추천 결과에
+              0점으로 반영되고, 일정 확정이 막힙니다.
             </span>
           )}
         </div>
@@ -165,14 +166,14 @@ export function CandidateResponseCard({
             aria-live="polite"
             className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800"
           >
-            <p className="font-semibold">내 기준과 다른 점이 있어요.</p>
+            <p className="font-semibold">선택 조건과 다른 점이 있어요.</p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5">
               {conditionWarnings.map((warning) => (
                 <li key={warning}>{warning}</li>
               ))}
             </ul>
             <p className="mt-1 text-xs">
-              그래도 이 선택은 저장됩니다. 추천 결과에서 함께 확인할 수 있습니다.
+              그래도 이 의견은 저장됩니다. 추천 결과에서 확인할 수 있습니다.
             </p>
           </div>
         )}
@@ -190,7 +191,7 @@ export function CandidateResponseCard({
                 messageKind: null,
               })
             }
-            placeholder="함께 볼 메모"
+            placeholder="내가 참고할 메모"
             value={form.note}
           />
         </label>

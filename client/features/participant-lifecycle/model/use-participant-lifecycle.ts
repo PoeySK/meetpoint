@@ -20,17 +20,17 @@ function describeLifecycleError(error: unknown) {
       return "방장만 다른 사람을 내보낼 수 있습니다.";
     }
     if (error.code === "ROOM_STATE_CONFLICT") {
-      return "지금은 사람을 나가게 하거나 내보낼 수 없습니다.";
+      return "현재 방 상태에서는 참여자를 변경할 수 없습니다.";
     }
     if (error.code === "RESOURCE_NOT_FOUND") {
       return "참여자 또는 방을 찾을 수 없습니다. 방 정보를 다시 확인해 주세요.";
     }
     if (error.code === "TOKEN_EXPIRED" || error.code === "INVALID_TOKEN") {
-      return "방 입장 정보가 만료되었습니다. 방 코드로 다시 입장해 주세요.";
+      return "방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.";
     }
   }
 
-  return "참여자 정보를 바꾸지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return "참여자 정보를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.";
 }
 
 export function useParticipantLifecycle({
