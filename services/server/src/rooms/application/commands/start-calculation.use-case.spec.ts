@@ -10,6 +10,8 @@ import { Candidate } from '../../infrastructure/persistence/typeorm/entities/can
 import { ParticipantResponse } from '../../infrastructure/persistence/typeorm/entities/participant-response.entity';
 import { ParticipantCondition } from '../../infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { ScoreResult } from '../../infrastructure/persistence/typeorm/entities/score-result.entity';
+import { CalculationJob } from '../../infrastructure/persistence/typeorm/entities/calculation-job.entity';
+import { CalculationJobStatus } from '../../domain/calculation/calculation-job';
 import { Room } from '../../infrastructure/persistence/typeorm/entities/room.entity';
 import {
   ParticipantRole,
@@ -34,6 +36,7 @@ import { TypeOrmRoomAccessAdapter } from '../../infrastructure/persistence/typeo
 import { AccessTokenAdapter } from '../../infrastructure/security/access-token.adapter';
 import { SolverAdapter } from '../../infrastructure/solver/solver.adapter';
 import { SolverHttpClient } from '../../infrastructure/solver/solver-http-client';
+import { CalculationJobRunner } from '../calculation-job.runner';
 import { Decision } from '../../infrastructure/persistence/typeorm/entities/decision.entity';
 import {
   toStartCalculationResponse,
@@ -47,6 +50,7 @@ type CalculationStore = {
   responses: Map<string, ParticipantResponse>;
   conditions: Map<string, ParticipantCondition>;
   scoreResults: Map<string, ScoreResult>;
+  calculationJobs: Map<string, CalculationJob>;
 };
 
 function hashToken(token: string) {
@@ -89,6 +93,9 @@ function createCalculationDataSource(store: CalculationStore) {
     if (entity === ScoreResult) {
       return createRepository(store.scoreResults);
     }
+    if (entity === CalculationJob) {
+      return createCalculationJobRepository(store.calculationJobs);
+    }
     if (entity === Decision) {
       return createRepository(new Map<string, Decision>());
     }
@@ -113,16 +120,59 @@ function createCalculationService(dataSource: DataSource) {
     dataSource,
     new AccessTokenAdapter()
   );
+  const solver = new SolverAdapter(new SolverHttpClient());
+  const runner = new CalculationJobRunner(persistence, solver);
   const startCalculation = new StartCalculationUseCase(
     persistence,
     access,
-    new SolverAdapter(new SolverHttpClient())
+    runner
   );
 
   return {
     startCalculation: async (
       ...args: Parameters<StartCalculationUseCase['execute']>
     ) => toStartCalculationResponse(await startCalculation.execute(...args)),
+    runner,
+  };
+}
+
+function createCalculationJobRepository(store: Map<string, CalculationJob>) {
+  const repository = createRepository(store);
+  return {
+    ...repository,
+    createQueryBuilder() {
+      return {
+        setLock() {
+          return this;
+        },
+        setOnLocked() {
+          return this;
+        },
+        where() {
+          return this;
+        },
+        orderBy() {
+          return this;
+        },
+        addOrderBy() {
+          return this;
+        },
+        getOne() {
+          const now = new Date();
+          return [...store.values()]
+            .filter(
+              (job) =>
+                (job.status === CalculationJobStatus.REQUESTED &&
+                  job.nextAttemptAt <= now) ||
+                job.status === CalculationJobStatus.RUNNING
+            )
+            .sort(
+              (left, right) =>
+                left.nextAttemptAt.getTime() - right.nextAttemptAt.getTime()
+            )[0];
+        },
+      };
+    },
   };
 }
 
@@ -205,6 +255,7 @@ function createSeed() {
     responses: new Map(),
     conditions: new Map(),
     scoreResults: new Map(),
+    calculationJobs: new Map(),
   };
   const roomId = 'room-calculation';
   const hostToken = 'host-token';
@@ -423,11 +474,26 @@ async function waitForStatus(
   throw new Error(`ScoreResult did not become ${status}`);
 }
 
+async function waitForJobStatus(
+  store: CalculationStore,
+  status: CalculationJob['status']
+) {
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    const job = [...store.calculationJobs.values()][0];
+    if (job?.status === status) {
+      return job;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  throw new Error(`CalculationJob did not become ${status}`);
+}
+
 describe('StartCalculationUseCase flow', () => {
   const originalFetch = globalThis.fetch;
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
+    delete process.env.CALCULATION_JOB_MAX_ATTEMPTS;
     jest.restoreAllMocks();
   });
 
@@ -452,7 +518,7 @@ describe('StartCalculationUseCase flow', () => {
         clientRequestId: 'client-host-1',
       }
     );
-    expect(started.calculation.status).toBe(ScoreResultStatus.RUNNING);
+    expect(started.calculation.status).toBe(ScoreResultStatus.REQUESTED);
     await waitForStatus(
       seed.store,
       started.calculation.id,
@@ -467,6 +533,110 @@ describe('StartCalculationUseCase flow', () => {
         clientRequestId: 'client-member-1',
       })
     ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('reclaims an abandoned RUNNING job after a Server restart without double completion', async () => {
+    const seed = createSeed();
+    let finishFirstRequest!: (response: Response) => void;
+    globalThis.fetch = jest
+      .fn()
+      .mockImplementationOnce(
+        () =>
+          new Promise<Response>((resolve) => {
+            finishFirstRequest = resolve;
+          })
+      )
+      .mockImplementation((_input, init) => {
+        const snapshot = parseSolverSnapshot(init);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(solverResponseFromSnapshot(snapshot)),
+        } as Response);
+      }) as unknown as typeof fetch;
+    const service = createCalculationService(
+      createCalculationDataSource(seed.store)
+    );
+
+    const started = await service.startCalculation(
+      seed.roomId,
+      seed.hostToken,
+      {
+        clientRequestId: 'client-restart-recovery',
+      }
+    );
+    const runningJob = await waitForJobStatus(seed.store, 'RUNNING');
+    runningJob.lockedAt = new Date(Date.now() - 60_000);
+
+    expect(await service.runner.runOne()).toBe(true);
+    expect(
+      await waitForStatus(
+        seed.store,
+        started.calculation.id,
+        ScoreResultStatus.COMPLETED
+      )
+    ).toBeDefined();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
+    expect(await service.runner.runOne()).toBe(false);
+    finishFirstRequest({
+      ok: false,
+      status: 503,
+      json: () => Promise.resolve({ error: { retryable: true } }),
+    } as Response);
+  });
+
+  it('retries a transient Solver failure and preserves its failure reason before completion', async () => {
+    process.env.CALCULATION_JOB_MAX_ATTEMPTS = '2';
+    const seed = createSeed();
+    globalThis.fetch = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('network unavailable'))
+      .mockImplementation((_input, init) => {
+        const snapshot = parseSolverSnapshot(init);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(solverResponseFromSnapshot(snapshot)),
+        } as Response);
+      }) as unknown as typeof fetch;
+    const service = createCalculationService(
+      createCalculationDataSource(seed.store)
+    );
+
+    const started = await service.startCalculation(
+      seed.roomId,
+      seed.hostToken,
+      {
+        clientRequestId: 'client-transient-retry',
+      }
+    );
+    let retryJob!: CalculationJob;
+    for (let attempt = 0; attempt < 50; attempt += 1) {
+      const currentJob = [...seed.store.calculationJobs.values()][0];
+      if (
+        currentJob?.status === CalculationJobStatus.REQUESTED &&
+        currentJob.attemptCount === 1
+      ) {
+        retryJob = currentJob;
+        break;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 5));
+    }
+    expect(retryJob.lastError).toMatchObject({
+      code: 'SOLVER_UNAVAILABLE',
+      retryable: true,
+    });
+    retryJob.nextAttemptAt = new Date(Date.now() - 1);
+
+    expect(await service.runner.runOne()).toBe(true);
+    expect(
+      await waitForStatus(
+        seed.store,
+        started.calculation.id,
+        ScoreResultStatus.COMPLETED
+      )
+    ).toBeDefined();
+    expect(globalThis.fetch).toHaveBeenCalledTimes(2);
   });
 
   it('sends participant conditions and uses a completed result transition', async () => {
@@ -801,6 +971,7 @@ describe('StartCalculationUseCase flow', () => {
   ])(
     'recovers the Room as OPEN when Solver %s',
     async (_label, fetchResult, code) => {
+      process.env.CALCULATION_JOB_MAX_ATTEMPTS = '1';
       const seed = createSeed();
       globalThis.fetch = jest.fn(() =>
         fetchResult()

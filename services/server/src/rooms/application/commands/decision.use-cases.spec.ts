@@ -14,6 +14,7 @@ import { ParticipantResponse } from '../../infrastructure/persistence/typeorm/en
 import { ParticipantCondition } from '../../infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from '../../infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from '../../infrastructure/persistence/typeorm/entities/score-result.entity';
+import { CalculationJob } from '../../infrastructure/persistence/typeorm/entities/calculation-job.entity';
 import {
   ParticipantRole,
   ParticipantStatus,
@@ -46,6 +47,7 @@ type DecisionStore = {
   responses: Map<string, ParticipantResponse>;
   conditions: Map<string, ParticipantCondition>;
   scoreResults: Map<string, ScoreResult>;
+  calculationJobs: Map<string, CalculationJob>;
   decisions: Map<string, Decision>;
   failDecisionSave: boolean;
   failRoomSave: boolean;
@@ -151,6 +153,12 @@ function createDecisionDataSource(store: DecisionStore) {
           Object.assign(new ScoreResult(), attributes),
       });
     }
+    if (entity === CalculationJob) {
+      return createRepository(store.calculationJobs, {
+        createValue: (attributes) =>
+          Object.assign(new CalculationJob(), attributes),
+      });
+    }
     if (entity === Decision) {
       return createRepository(store.decisions, {
         createValue: (attributes) => Object.assign(new Decision(), attributes),
@@ -177,6 +185,7 @@ function createDecisionDataSource(store: DecisionStore) {
         candidates: cloneStoreMap(store.candidates),
         responses: cloneStoreMap(store.responses),
         scoreResults: cloneStoreMap(store.scoreResults),
+        calculationJobs: cloneStoreMap(store.calculationJobs),
         decisions: cloneStoreMap(store.decisions),
       };
 
@@ -269,6 +278,7 @@ function createSeed(): {
     responses: new Map(),
     conditions: new Map(),
     scoreResults: new Map(),
+    calculationJobs: new Map(),
     decisions: new Map(),
     failDecisionSave: false,
     failRoomSave: false,

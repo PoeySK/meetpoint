@@ -114,20 +114,10 @@ Server e2e가 계약의 성공·실패 사례를 검증한다.
 
 #### 4. 계산 실행의 내구성 확보
 
-현재 `StartCalculationUseCase`는 계산을 NestJS 프로세스 내부의 비동기로 실행한다.
-프로세스가 재시작되면 실행 중인 계산이 사라지고, 장시간 작업·재시도·운영 추적이
-어렵다.
-
-- 계산 상태 전이(`REQUESTED` → `RUNNING` → `COMPLETED`/`FAILED`)와 재시작 시
-  복구 규칙을 명시한다.
-- DB 기반 job/outbox를 사용할지 별도 queue를 사용할지 결정하고, 선택한 방식으로
-  retry·timeout·중복 실행 방지·실패 원인 보존을 구현한다.
-- Solver 연결 상태, 응답 timeout, 잘못된 결과 schema, Server 종료를 각각 재현하는
-  통합 테스트를 추가한다.
-- 계산 snapshot과 결과 metadata로 동일 결과를 다시 검증할 수 있게 한다.
+상태: 완료. `calculation_jobs` outbox table에 Solver snapshot과 시도 횟수·lease·마지막 오류를 저장한다. 요청 transaction은 Room·ScoreResult·Job을 함께 `REQUESTED`로 만들고, Server worker는 PostgreSQL row lock/lease로 하나의 job만 `RUNNING`으로 claim한다. lease가 만료된 작업은 Server 시작과 polling에서 다시 claim하며, 재시도 가능한 Solver 장애는 제한 횟수까지 재요청하고 영구 오류 또는 한도 초과만 `FAILED`로 확정한다.
 
 완료 조건: Server 재시작과 Solver 장애 뒤에도 계산이 유실되거나 중복 확정되지
-않으며, Client가 최종 상태와 재시도 가능 여부를 알 수 있다.
+않으며, Client가 기존 polling API로 `REQUESTED`·`RUNNING`·최종 상태를 확인할 수 있다.
 
 #### 5. 인증·남용 방지·데이터 lifecycle
 

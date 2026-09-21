@@ -5,6 +5,7 @@ import { ParticipantResponse } from '../entities/participant-response.entity';
 import { ParticipantCondition } from '../entities/participant-condition.entity';
 import { Room } from '../entities/room.entity';
 import { ScoreResult } from '../entities/score-result.entity';
+import { CalculationJob } from '../entities/calculation-job.entity';
 import type { CandidateRecord } from '../../../../domain/candidate/candidate';
 import type { DecisionRecord } from '../../../../domain/decision/decision';
 import type { ParticipantRecord } from '../../../../domain/participant/participant';
@@ -12,6 +13,7 @@ import type { ParticipantResponseRecord } from '../../../../domain/participant-r
 import type { ParticipantConditionRecord } from '../../../../domain/participant-condition/participant-condition';
 import type { RoomRecord } from '../../../../domain/room/room-status';
 import type { ScoreResultRecord } from '../../../../domain/calculation/score-result';
+import type { CalculationJobRecord } from '../../../../domain/calculation/calculation-job';
 
 export function toRoomRecord(entity: Room): RoomRecord {
   return {
@@ -176,6 +178,32 @@ export function toScoreResultEntity(record: ScoreResultRecord): ScoreResult {
     recommendationWarnings: [...record.recommendationWarnings],
     ranking: [...record.ranking],
   });
+}
+
+export function toCalculationJobRecord(
+  entity: CalculationJob
+): CalculationJobRecord {
+  return {
+    id: entity.id,
+    roomId: entity.roomId,
+    scoreResultId: entity.scoreResultId,
+    snapshot: entity.snapshot,
+    status: entity.status,
+    attemptCount: entity.attemptCount,
+    maxAttempts: entity.maxAttempts,
+    nextAttemptAt: entity.nextAttemptAt,
+    lockedAt: entity.lockedAt,
+    lastError: entity.lastError,
+    createdAt: entity.createdAt,
+    updatedAt: entity.updatedAt,
+    completedAt: entity.completedAt,
+  };
+}
+
+export function toCalculationJobEntity(
+  record: CalculationJobRecord
+): CalculationJob {
+  return Object.assign(new CalculationJob(), record);
 }
 
 export function toDecisionRecord(entity: Decision): DecisionRecord {

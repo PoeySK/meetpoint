@@ -22,12 +22,7 @@ import {
   ROOMS_PERSISTENCE,
   type RoomsPersistencePort,
 } from '../ports/rooms-persistence.port';
-import { SOLVER, type SolverPort } from '../ports/solver.port';
-import {
-  type SolverResponsePayload,
-  SolverCallError,
-  type SolverSnapshot,
-} from '../ports/solver-contract';
+import type { SolverSnapshot } from '../ports/solver-contract';
 import {
   CALCULATION_POLICY_VERSION,
   CALCULATION_SCORING_PROFILE,
@@ -37,6 +32,8 @@ import {
   createInitialCoverage,
   createSolverSnapshot,
 } from './calculation-snapshot';
+import { CalculationJobStatus } from '../../domain/calculation/calculation-job';
+import { CalculationJobRunner } from '../calculation-job.runner';
 
 @Injectable()
 export class StartCalculationUseCase {
@@ -44,7 +41,7 @@ export class StartCalculationUseCase {
     @Inject(ROOMS_PERSISTENCE)
     private readonly persistence: RoomsPersistencePort,
     @Inject(ROOM_ACCESS) private readonly access: RoomAccessPort,
-    @Inject(SOLVER) private readonly solver: SolverPort
+    private readonly calculationJobRunner: CalculationJobRunner
   ) {}
 
   async execute(
@@ -68,6 +65,7 @@ export class StartCalculationUseCase {
           responses,
           conditions,
           scoreResults,
+          calculationJobs,
         } = repositories;
         const room = await rooms.findById(roomId, { lock: true });
         if (!room) {
@@ -123,7 +121,7 @@ export class StartCalculationUseCase {
           id: randomUUID(),
           roomId: room.id,
           clientRequestId,
-          status: ScoreResultStatus.RUNNING,
+          status: ScoreResultStatus.REQUESTED,
           policyVersion: CALCULATION_POLICY_VERSION,
           scoringProfile: CALCULATION_SCORING_PROFILE,
           inputSnapshotHash: this.createSnapshotHash(snapshot),
@@ -147,16 +145,30 @@ export class StartCalculationUseCase {
           updatedAt: new Date(),
         });
         const savedScoreResult = await scoreResults.save(scoreResult);
+        await calculationJobs.save({
+          id: randomUUID(),
+          roomId: room.id,
+          scoreResultId: savedScoreResult.id,
+          snapshot,
+          status: CalculationJobStatus.REQUESTED,
+          attemptCount: 0,
+          maxAttempts: this.readPositiveIntegerEnv(
+            'CALCULATION_JOB_MAX_ATTEMPTS',
+            3
+          ),
+          nextAttemptAt: new Date(),
+          lockedAt: null,
+          lastError: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          completedAt: null,
+        });
         return { scoreResult: savedScoreResult, snapshot };
       }
     );
 
     if (prepared.snapshot) {
-      void this.executeCalculation(
-        prepared.scoreResult.id,
-        roomId,
-        prepared.snapshot
-      );
+      this.calculationJobRunner.trigger();
     }
 
     return {
@@ -188,107 +200,8 @@ export class StartCalculationUseCase {
       .digest('hex')}`;
   }
 
-  private async executeCalculation(
-    scoreResultId: string,
-    roomId: string,
-    snapshot: SolverSnapshot
-  ): Promise<void> {
-    try {
-      const solverResponse = await this.solver.solve(snapshot);
-      await this.completeCalculation(scoreResultId, roomId, solverResponse);
-    } catch (error) {
-      const failure =
-        error instanceof SolverCallError
-          ? error
-          : new SolverCallError(
-              'SOLVER_ERROR',
-              'Solver returned an invalid response.',
-              false,
-              {}
-            );
-      await this.failCalculation(scoreResultId, roomId, failure);
-    }
-  }
-
-  private async completeCalculation(
-    scoreResultId: string,
-    roomId: string,
-    response: SolverResponsePayload
-  ): Promise<void> {
-    await this.persistence.transaction(async ({ rooms, scoreResults }) => {
-      const scoreResult = await scoreResults.findById(scoreResultId, {
-        lock: true,
-      });
-      if (!scoreResult || scoreResult.status !== ScoreResultStatus.RUNNING) {
-        return;
-      }
-
-      const completed = {
-        ...scoreResult,
-        status: ScoreResultStatus.COMPLETED,
-        recommendationStatus: response.recommendationStatus,
-        recommendationWarnings: response.recommendationWarnings,
-        coverage: response.coverage,
-        ranking: response.ranking,
-        candidates: response.candidates,
-        metadata: response.metadata,
-        error: null,
-        completedAt: new Date(),
-      } satisfies ScoreResultRecord;
-      await scoreResults.save(completed);
-
-      const room = await rooms.findById(roomId);
-      if (
-        room &&
-        room.status === RoomStatus.CALCULATING &&
-        room.latestScoreResultId === scoreResult.id
-      ) {
-        await rooms.save({
-          ...room,
-          status: RoomStatus.CALCULATED,
-          updatedAt: new Date(),
-        });
-      }
-    });
-  }
-
-  private async failCalculation(
-    scoreResultId: string,
-    roomId: string,
-    error: SolverCallError
-  ): Promise<void> {
-    await this.persistence.transaction(async ({ rooms, scoreResults }) => {
-      const scoreResult = await scoreResults.findById(scoreResultId, {
-        lock: true,
-      });
-      if (!scoreResult || scoreResult.status !== ScoreResultStatus.RUNNING) {
-        return;
-      }
-
-      await scoreResults.save({
-        ...scoreResult,
-        status: ScoreResultStatus.FAILED,
-        error: {
-          code: error.code,
-          message: error.message,
-          retryable: error.retryable,
-          details: error.details,
-        },
-        completedAt: new Date(),
-      });
-
-      const room = await rooms.findById(roomId);
-      if (
-        room &&
-        room.status === RoomStatus.CALCULATING &&
-        room.latestScoreResultId === scoreResult.id
-      ) {
-        await rooms.save({
-          ...room,
-          status: RoomStatus.OPEN,
-          updatedAt: new Date(),
-        });
-      }
-    });
+  private readPositiveIntegerEnv(name: string, fallback: number): number {
+    const value = Number(process.env[name]);
+    return Number.isInteger(value) && value > 0 ? value : fallback;
   }
 }
