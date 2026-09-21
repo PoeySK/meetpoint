@@ -79,7 +79,7 @@ export function CandidateForm({
       <div className="rounded-xl border border-emerald-100 bg-white/70 px-3 py-2.5 text-xs text-emerald-800">
         {mode === "edit"
           ? `후보 ${nextCandidateNumber}번을 수정합니다.`
-          : `후보 ${nextCandidateNumber}번으로 저장됩니다.`} 모든 시간은 한국
+          : `후보 ${nextCandidateNumber}번으로 등록됩니다.`} 모임 시간은 한국
         시간 기준입니다.
       </div>
 
@@ -229,7 +229,7 @@ export function CandidateForm({
             className="mp-input"
             disabled={isSubmitting}
             onChange={(event) => onTagsChange(event.target.value)}
-            placeholder="쉼표로 구분 (예: 조용함, 커피)"
+            placeholder="쉼표로 구분해 입력 (예: 조용함, 커피)"
             value={tags}
           />
           {fieldErrors.tags && (

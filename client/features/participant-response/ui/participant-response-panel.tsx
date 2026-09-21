@@ -37,20 +37,20 @@ type ParticipantResponsePanelProps = {
 function describeResponseError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === "TOKEN_EXPIRED" || error.code === "INVALID_TOKEN") {
-      return "방 입장 정보가 만료되었습니다. 방에 다시 입장해 주세요.";
+      return "방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.";
     }
     if (error.code === "ROOM_STATE_CONFLICT") {
-      return "지금은 의견을 수정할 수 없습니다.";
+      return "현재 방 상태에서는 의견을 수정할 수 없습니다.";
     }
     if (error.code === "RESOURCE_NOT_FOUND") {
-      return "의견을 남길 후보를 찾을 수 없습니다.";
+      return "이 후보는 더 이상 의견을 받을 수 없습니다.";
     }
     if (error.code === "VALIDATION_ERROR") {
       return "의견 입력을 다시 확인해 주세요.";
     }
   }
 
-  return "의견을 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.";
+  return "의견을 저장하지 못했습니다. 입력은 남아 있으니 잠시 후 다시 시도해 주세요.";
 }
 
 export function ParticipantResponsePanel({
@@ -218,7 +218,7 @@ export function ParticipantResponsePanel({
       setSavedResponse(
         candidateId,
         result.response,
-        "저장한 의견이 반영되었습니다.",
+        "의견을 저장했습니다. 다음 추천 결과에 반영됩니다.",
       );
       await onRoomRefresh();
     } catch (error) {
@@ -266,7 +266,7 @@ export function ParticipantResponsePanel({
         return next;
       });
       setBulkMessage({
-        text: `모든 후보에 가능 여부와 이동 부담을 선택해 주세요. 아직 선택하지 않은 후보 ${incompleteForms.length}개가 있습니다.`,
+        text: `모든 후보에 참석 가능 여부와 이동 부담을 선택해 주세요. 아직 선택하지 않은 후보 ${incompleteForms.length}개가 있습니다.`,
         kind: "error",
       });
       return;
@@ -274,7 +274,7 @@ export function ParticipantResponsePanel({
 
     setIsBulkSubmitting(true);
     setBulkMessage({
-      text: `${candidates.length}개 후보의 의견을 저장하는 중입니다...`,
+      text: `후보 ${candidates.length}개의 의견을 저장하고 있습니다.`,
       kind: "info",
     });
     setForms((current) => {
@@ -283,7 +283,7 @@ export function ParticipantResponsePanel({
         const form = current[candidate.id] ?? getForm(candidate.id);
         next[candidate.id] = {
           ...form,
-          message: "일괄 저장 중...",
+          message: "의견을 저장하고 있습니다.",
           messageKind: "info",
         };
       }
@@ -316,7 +316,7 @@ export function ParticipantResponsePanel({
         setSavedResponse(
           candidateId,
           result.value.response,
-          "저장한 의견이 일괄 반영되었습니다.",
+          "의견을 저장했습니다.",
         );
       } else {
         failureCount += 1;
@@ -332,8 +332,8 @@ export function ParticipantResponsePanel({
     setBulkMessage({
       text:
         failureCount === 0
-          ? `${successCount}개 후보의 의견을 모두 저장했습니다.`
-          : `${successCount}개 저장 완료, ${failureCount}개 저장 실패입니다. 실패한 후보의 입력은 유지됩니다.`,
+          ? `후보 ${successCount}개의 의견을 모두 저장했습니다.`
+          : `후보 ${successCount}개는 저장했고 ${failureCount}개는 저장하지 못했습니다. 실패한 후보의 입력은 유지됩니다.`,
       kind: failureCount === 0 ? "success" : "error",
     });
     if (successCount > 0) {
@@ -344,7 +344,7 @@ export function ParticipantResponsePanel({
   function saveQuickResponses() {
     if (!fastAvailabilityStatus || !fastTravelBurden) {
       setBulkMessage({
-        text: "모든 후보에 저장하려면 가능 여부와 이동 부담을 모두 선택해 주세요.",
+        text: "모든 후보에 저장하려면 참석 가능 여부와 이동 부담을 모두 선택해 주세요.",
         kind: "error",
       });
       return;
@@ -364,13 +364,14 @@ export function ParticipantResponsePanel({
           후보별 의견
         </h2>
         <p className="text-sm leading-6 text-slate-500">
-          각 후보의 참석 가능 여부와 이동 부담을 선택하세요. 두 항목을 모두 고르면
-          내 의견이 바로 저장되고, 메모는 필요할 때만 추가하면 됩니다.
+          각 후보의 참석 가능 여부와 이동 부담을 선택해 주세요. 두 항목을 모두 고르면
+          의견이 바로 저장되고, 메모는 필요할 때만 추가하면 됩니다. 모든 후보에
+          응답해야 방장이 일정을 확정할 수 있습니다.
         </p>
         {isReadOnly && (
           <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600">
-            방이 확정되어 의견을 읽기 전용으로 표시합니다. 다시 바꾸려면 방장이
-            먼저 다시 살펴보기를 시작해야 합니다.
+            일정이 확정되어 의견을 수정할 수 없습니다. 다시 바꾸려면 방장이 먼저
+            확정 내용을 다시 검토해야 합니다.
           </p>
         )}
       </div>

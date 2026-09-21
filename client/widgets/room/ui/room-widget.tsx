@@ -73,7 +73,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
                 aria-live="polite"
                 className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800"
               >
-                최신 내용을 자동으로 불러오지 못했습니다. {refreshError.message}
+                최신 방 정보를 불러오지 못했습니다. {refreshError.message}
               </p>
             )}
             {accessToken && participantId ? (
@@ -90,7 +90,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
             ) : (
               <section className="mp-card border-amber-100 bg-amber-50/80 p-4 text-sm leading-5 text-amber-800">
                 이 브라우저에서 방 입장 정보를 찾을 수 없어 후보 등록과 의견 작성을
-                사용할 수 없습니다. 방 코드로 다시 입장하면 계속할 수 있습니다.
+                사용할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.
               </section>
             )}
             <RoomParticipantsWidget

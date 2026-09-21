@@ -33,7 +33,7 @@ function describeCalculationError(error: unknown) {
       return '방장만 추천 결과를 만들 수 있습니다.';
     }
     if (error.code === 'CALCULATION_IN_PROGRESS') {
-      return '추천 결과를 만드는 중입니다. 끝나면 결과를 보여드릴게요.';
+      return '추천 결과를 준비하고 있습니다. 준비되면 결과를 보여드릴게요.';
     }
     if (error.code === 'PARTICIPANT_COUNT_OUT_OF_RANGE') {
       return '추천 결과를 만들려면 현재 참여자가 3~6명이어야 합니다.';
@@ -42,10 +42,13 @@ function describeCalculationError(error: unknown) {
       return '추천 결과를 만들려면 후보가 2~5개 필요합니다.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
-      return '지금은 추천 결과를 만들 수 없습니다.';
+      return '현재 방 상태에서는 추천 결과를 만들 수 없습니다.';
     }
     if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-      return '방 입장 정보가 만료되었습니다. 방에 다시 입장해 주세요.';
+      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
+    }
+    if (error.code === 'SOLVER_UNAVAILABLE' || error.code === 'SOLVER_ERROR') {
+      return '추천 결과를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
     }
   }
 
@@ -144,11 +147,11 @@ export function CalculationResultPanel({
         <div className='space-y-1.5'>
           <p className='text-sm font-semibold text-emerald-700'>추천 결과</p>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-            모임 추천 결과
+            모임 추천 결과 확인
           </h2>
           <p className='text-sm leading-6 text-slate-500'>
-            입력한 기준과 후보별 의견을 함께 살펴 예산·시간·선호·이동 부담을
-            비교합니다. 기준을 입력하지 않은 사람도 의견을 남길 수 있습니다.
+            후보별 의견과 선택 조건을 함께 살펴 시간·예산·특징·이동 부담을
+            비교합니다. 선택 조건을 입력하지 않은 사람의 의견도 반영됩니다.
           </p>
         </div>
         {isHost && (
@@ -164,7 +167,7 @@ export function CalculationResultPanel({
             type='button'
           >
             {isStarting || isRunning(calculation?.status)
-              ? '결과 만드는 중...'
+              ? '결과 준비 중...'
               : '추천 결과 만들기'}
           </button>
         )}
@@ -187,14 +190,14 @@ export function CalculationResultPanel({
       {isLoadingResult && !calculation && (
         <div className='mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600'>
           <span className='h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600' />
-          추천 결과를 불러오는 중입니다.
+          추천 결과를 불러오고 있습니다.
         </div>
       )}
 
       {!room.room.latestScoreResultId && !isLoadingResult && !error && (
         <p className='mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-600'>
           아직 추천 결과가 없습니다. 참여자가 3명 이상이고 후보가 2개 이상이면
-          방장이 결과를 만들 수 있습니다.
+          방장이 추천 결과를 만들 수 있습니다.
         </p>
       )}
 

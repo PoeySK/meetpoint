@@ -20,19 +20,19 @@ type UseDecisionConfirmationOptions = {
 function describeDecisionError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === "HOST_ONLY") {
-      return "방장만 후보를 확정하거나 다시 살펴볼 수 있습니다.";
+      return "방장만 후보를 선택해 일정을 확정하거나 확정 내용을 다시 검토할 수 있습니다.";
     }
     if (error.code === "STALE_RESULT") {
-      return "최신 추천 결과가 아닙니다. 현재 내용으로 다시 만들어 주세요.";
+      return "후보·참여자·선택 조건·의견이 바뀌어 최신 추천 결과가 아닙니다. 현재 내용으로 다시 만들어 주세요.";
     }
     if (error.code === "BUSINESS_RULE_VIOLATION") {
-      return "의견 작성 여부 또는 확인할 점을 다시 살펴봐 주세요.";
+      return "모든 후보에 응답했는지, 선택한 후보의 확인할 점을 확인해 주세요.";
     }
     if (error.code === "ROOM_STATE_CONFLICT") {
-      return "지금은 일정을 바꿀 수 없습니다.";
+      return "현재 방 상태에서는 일정을 바꿀 수 없습니다.";
     }
     if (error.code === "TOKEN_EXPIRED" || error.code === "INVALID_TOKEN") {
-      return "방 입장 정보가 만료되었습니다. 방에 다시 입장해 주세요.";
+      return "방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.";
     }
   }
 
@@ -88,20 +88,20 @@ export function useDecisionConfirmation({
     }
 
     if (!selectedCandidate) {
-      setDecisionError("확정할 후보를 먼저 골라 주세요.");
+      setDecisionError("일정을 확정할 후보를 먼저 선택해 주세요.");
       return;
     }
 
     if (room.room.status !== "CALCULATED") {
       setDecisionError(
-        "지금은 확정할 수 없습니다. 추천 결과를 다시 만들어 주세요.",
+        "현재 내용으로 만든 추천 결과가 아닙니다. 최신 결과를 다시 만들어 주세요.",
       );
       return;
     }
 
     if (!coverageIsComplete) {
       setDecisionError(
-        "모든 참여자가 모든 후보에 의견을 남겨야 확정할 수 있습니다.",
+        "모든 참여자가 모든 후보에 응답해야 일정을 확정할 수 있습니다.",
       );
       return;
     }
@@ -114,7 +114,7 @@ export function useDecisionConfirmation({
         normalizedNote.length > 300)
     ) {
       setDecisionError(
-        "확인할 점이 있는 후보는 확인 표시와 1~300자의 확정 메모가 필요합니다.",
+        "확인할 점이 있는 후보는 내용을 확인했다는 표시와 1~300자의 메모가 필요합니다.",
       );
       return;
     }
@@ -131,7 +131,7 @@ export function useDecisionConfirmation({
           : false,
         decisionNote: normalizedNote || null,
       });
-      setDecisionNotice("일정이 확정되었습니다.");
+      setDecisionNotice("일정을 확정했습니다.");
       await onRoomReload();
     } catch (requestError) {
       setDecisionError(describeDecisionError(requestError));
@@ -143,7 +143,7 @@ export function useDecisionConfirmation({
   async function handleReopen() {
     const normalizedReason = reopenReason.trim();
     if (!normalizedReason || normalizedReason.length > 300) {
-      setDecisionError("다시 살펴볼 이유를 1~300자로 입력해 주세요.");
+      setDecisionError("다시 검토할 이유를 1~300자로 입력해 주세요.");
       return;
     }
 
@@ -156,7 +156,7 @@ export function useDecisionConfirmation({
       });
       setReopenReason("");
       setDecisionNotice(
-        "다시 살펴보기를 시작했습니다. 후보 또는 의견을 바꾼 뒤 추천 결과를 다시 만들어 주세요.",
+        "다시 검토를 시작했습니다. 후보나 의견을 바꾼 뒤 추천 결과를 다시 만들어 주세요.",
       );
       await onRoomReload();
     } catch (requestError) {

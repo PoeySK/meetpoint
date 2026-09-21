@@ -7,7 +7,7 @@ export function LoadingView() {
       <div className='mp-card px-5 py-4 text-center'>
         <div className='mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600' />
         <p className='text-sm font-medium text-slate-600'>
-          방 정보를 불러오는 중...
+          방을 준비하는 중...
         </p>
       </div>
     </div>
@@ -40,7 +40,7 @@ export function ErrorView({
             onClick={onRetry}
             type='button'
           >
-            다시 시도
+            다시 불러오기
           </button>
           <Link
             className='mp-button mp-button-secondary'

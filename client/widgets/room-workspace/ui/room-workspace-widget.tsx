@@ -25,7 +25,7 @@ type RoomWorkspaceWidgetProps = {
 const stepLabels: Record<WorkspaceStep, string> = {
   candidates: "후보 준비",
   responses: "내 의견",
-  condition: "내 기준 · 선택",
+  condition: "선택 조건",
   result: "결과 확인",
 };
 
@@ -53,10 +53,10 @@ function getStatusLabel(status: RoomDetailsResponse["room"]["status"]) {
   const labels = {
     DRAFT: "준비 중",
     OPEN: "의견 받는 중",
-    CALCULATING: "추천 결과 만드는 중",
+    CALCULATING: "추천 결과 준비 중",
     CALCULATED: "추천 결과 확인",
     CONFIRMED: "일정 확정",
-    CLOSED: "종료",
+    CLOSED: "종료됨",
   } as const;
 
   return labels[status];
@@ -91,10 +91,12 @@ export function RoomWorkspaceWidget({
   ).length;
   const progressLabel =
     room.candidates.length === 0
-      ? "후보 준비 필요"
+      ? isHost
+        ? "후보를 먼저 등록해 주세요"
+        : "방장이 후보를 준비하면 의견을 남길 수 있습니다"
       : isHost
-        ? `${respondedParticipantCount}/${room.participants.length}명 의견 작성 완료`
-        : `${responseCount}/${room.candidates.length}개 후보 의견 작성 완료`;
+        ? `${respondedParticipantCount}/${room.participants.length}명 응답 완료`
+        : `${responseCount}/${room.candidates.length}개 후보 응답 완료`;
   const completedSteps = [
     ...(isHost ? [room.candidates.length > 0] : []),
     responseComplete,
@@ -157,14 +159,14 @@ export function RoomWorkspaceWidget({
             </h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
               {isHost && room.candidates.length === 0
-                ? "후보를 준비하면 참여자들이 같은 기준으로 비교할 수 있습니다."
+                ? "후보를 준비하면 참여자들의 의견을 모을 수 있습니다."
                 : room.room.status === "CALCULATED" ||
                     room.room.status === "CONFIRMED"
                   ? "추천 결과와 확정된 일정을 확인할 수 있습니다."
                   : !responseComplete
-                    ? "후보별 의견을 먼저 저장해 주세요. 내 기준 입력은 선택 사항입니다."
+                    ? "후보마다 의견을 남겨 주세요. 선택 조건은 입력하지 않아도 됩니다."
                     : !room.myCondition
-                      ? "의견을 저장했습니다. 내 기준을 추가하면 예산·시간·특징 비교가 더 정확해집니다."
+                      ? "의견을 저장했습니다. 선택 조건을 추가하면 시간·예산·특징도 함께 비교합니다."
                       : "모든 준비가 끝나면 방장이 추천 결과를 만들 수 있습니다."}
             </p>
           </div>
@@ -173,7 +175,7 @@ export function RoomWorkspaceWidget({
               진행 현황
             </p>
             <p className="mt-1 text-lg font-bold">{progressLabel}</p>
-            <p className="mt-1 text-xs text-slate-400">후보 · 의견 · 내 기준</p>
+            <p className="mt-1 text-xs text-slate-400">후보 · 의견 · 선택 조건</p>
           </div>
         </div>
 
@@ -268,7 +270,7 @@ export function RoomWorkspaceWidget({
                     후보 관리
                   </span>
                   <span className="mt-1 block text-sm text-slate-600">
-                    {room.candidates.length} / 5개 후보 · 수정하거나 목록에서 뺄 수 있습니다.
+                    {room.candidates.length} / 5개 후보 · 수정하거나 새 추천에서 제외할 수 있습니다.
                   </span>
                 </span>
                 <span
@@ -364,7 +366,7 @@ export function RoomWorkspaceWidget({
           {mobileStep === "candidates"
             ? "의견 입력"
             : mobileStep === "responses"
-              ? "내 기준(선택)"
+              ? "선택 조건(선택)"
               : "추천 결과 보기"}
         </button>
       </div>
