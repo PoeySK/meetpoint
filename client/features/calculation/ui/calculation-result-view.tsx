@@ -28,7 +28,7 @@ const scoringProfileLabels: Record<ScoringProfile, string> = {
 const calculationCodeLabels: Record<string, string> = {
   LOW_SCORE: "점수가 낮아요",
   MISSING_RESPONSE: "아직 응답이 없어요",
-  MAYBE_RESPONSE: "참석 가능 여부가 확실하지 않아요",
+  MAYBE_RESPONSE: "참석 여부를 보류했어요",
   NO_FULL_MATCH: "모든 사람에게 맞는 후보가 없어요",
   SELF_REPORTED_TRAVEL_BURDEN: "직접 입력한 이동 부담",
   SOLVER_ERROR: "추천 결과를 만드는 중 문제가 생겼어요",

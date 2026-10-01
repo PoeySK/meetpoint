@@ -14,6 +14,7 @@ import {
   useDecisionConfirmation,
 } from '@/features/decision-confirmation';
 import { RoomApiError } from '@/shared/api/http-client';
+import { getRoomAccessErrorMessage } from '@/shared/lib/room-access-error';
 import { createClientRequestId } from '@/shared/lib/client-request-id';
 import { useEffect, useRef, useState } from 'react';
 
@@ -44,9 +45,8 @@ function describeCalculationError(error: unknown) {
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '현재 방 상태에서는 추천 결과를 만들 수 없습니다.';
     }
-    if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
-    }
+    const accessMessage = getRoomAccessErrorMessage(error);
+    if (accessMessage) return accessMessage;
     if (error.code === 'SOLVER_UNAVAILABLE' || error.code === 'SOLVER_ERROR') {
       return '추천 결과를 준비하지 못했습니다. 잠시 후 다시 시도해 주세요.';
     }

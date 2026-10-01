@@ -22,6 +22,7 @@ import {
   type CandidateFieldErrors,
 } from '@/features/candidate-management/ui/candidate-form';
 import { RoomApiError } from '@/shared/api/http-client';
+import { getRoomAccessErrorMessage } from '@/shared/lib/room-access-error';
 import { MEETPOINT_TIMEZONE } from '@/shared/config/meetpoint';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
@@ -153,9 +154,8 @@ function describeCandidateError(error: unknown) {
     if (error.code === 'NETWORK_ERROR') {
       return '네트워크 연결을 확인한 뒤 다시 시도해 주세요.';
     }
-    if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
-    }
+    const accessMessage = getRoomAccessErrorMessage(error);
+    if (accessMessage) return accessMessage;
   }
 
   return '후보를 변경하지 못했습니다. 잠시 후 다시 시도해 주세요.';
