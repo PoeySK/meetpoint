@@ -7,15 +7,15 @@ const vm = require('node:vm');
 const ts = require('typescript');
 
 // Exercise production TypeScript with Node's test runner, without adding a browser-test framework.
-function load(relativePath, imports, globals = {}) {
+function load(relativePath, imports, globals = {}, exposed = []) {
   const filename = path.resolve(__dirname, '..', relativePath);
-  const source = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+  const source = ts.transpileModule(fs.readFileSync(filename, 'utf8') + (exposed.length ? `\nexport { ${exposed.join(', ')} };` : ''), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
   }).outputText;
   const compiled = { exports: {} };
   vm.runInNewContext(source, {
     module: compiled, exports: compiled.exports,
-    require: (name) => name in imports ? imports[name] : require(name),
+    require: (name) => name in imports ? imports[name] : exposed.length && name.startsWith('@/') ? {} : require(name),
     ...globals,
   }, { filename });
   return compiled.exports;
@@ -133,4 +133,100 @@ test('recovery API includes browser credentials and serializes concurrent reques
   assert.equal(calls, 1);
   assert.equal(receivedOptions.credentials, 'include');
   assert.equal(receivedOptions.body, '{}');
+});
+
+const accessErrors = load('shared/lib/room-access-error.ts', { '@/shared/api/http-client': { RoomApiError } });
+test('all six feature error messages separate expiry/invalid access from permission or network failures', () => {
+  const features = [
+    ['features/participant-response/ui/participant-response-panel.tsx', 'describeResponseError'],
+    ['features/participant-condition/ui/participant-condition-panel.tsx', 'describeConditionError'],
+    ['features/candidate-management/ui/candidate-management-panel.tsx', 'describeCandidateError'],
+    ['features/calculation/ui/calculation-result-panel.tsx', 'describeCalculationError'],
+    ['features/decision-confirmation/model/use-decision-confirmation.ts', 'describeDecisionError'],
+    ['features/participant-lifecycle/model/use-participant-lifecycle.ts', 'describeLifecycleError'],
+  ];
+  for (const [file, name] of features) {
+    const describe = load(file, { '@/shared/api/http-client': { RoomApiError }, '@/shared/lib/room-access-error': accessErrors, './calculation-result-view': {} }, {}, [name])[name];
+    for (const [code, reason] of [['TOKEN_EXPIRED', '만료'], ['INVALID_TOKEN', '유효하지'], ['MISSING_TOKEN', '없습니다']]) {
+      const message = describe(new RoomApiError('Fixture', 401, code));
+      assert.match(message, new RegExp(reason), file); assert.match(message, /다시 불러오기/, file);
+      assert.match(message, /개인 복구 코드/, file); assert.match(message, /기존 권한 복구가 아닙니다/, file);
+      assert.match(message, /자동으로 다시 보내지 않습니다/, file);
+      assert.doesNotMatch(message, /이름을 입력해 다시 입장/, file);
+    }
+    for (const error of [new Error('Fixture network'), new RoomApiError('Fixture forbidden', 403, 'HOST_ONLY')]) {
+      assert.doesNotMatch(describe(error), /개인 복구 코드|토큰이 만료/, file);
+    }
+  }
+});
+test('MAYBE result explanation displays 보류 while other recommendation meanings remain unchanged', () => {
+  const { getCalculationCodeLabel } = load('features/calculation/ui/calculation-result-view.tsx', {});
+  assert.match(getCalculationCodeLabel('MAYBE_RESPONSE'), /보류/);
+});
+
+function sessionHarness() {
+  const slots = [], effects = [], timers = [], intervals = new Map();
+  let cursor = 0, effectIndex = 0, expired = false, failRecovery = false;
+  const calls = { get: 0, recover: 0 };
+  const storage = new Map([['token:one', 'fixture-valid']]);
+  const room = { room: { id: 'one', status: 'OPEN' }, currentParticipant: { id: 'original', role: 'HOST' }, myCondition: { updatedAt: 'unchanged' }, myResponses: [{ note: 'Stored' }] };
+  const data = { latestScoreResult: { id: 'result', status: 'COMPLETED' }, decision: { id: 'decision' } };
+  const hooks = {
+    useState(initial) { const i = cursor++; if (!(i in slots)) slots[i] = typeof initial === 'function' ? initial() : initial; return [slots[i], (next) => { slots[i] = typeof next === 'function' ? next(slots[i]) : next; }]; },
+    useRef(initial) { const i = cursor++; return slots[i] ?? (slots[i] = { current: initial }); },
+    useMemo(factory, deps) { const i = cursor++; if (!slots[i] || deps.some((value, j) => value !== slots[i].deps[j])) slots[i] = { deps, value: factory() }; return slots[i].value; },
+    useCallback(fn, deps) { return hooks.useMemo(() => fn, deps); },
+    useEffect(fn, deps) { const i = effectIndex++; if (!effects[i] || deps.some((value, j) => value !== effects[i].deps[j])) { effects[i]?.cleanup?.(); effects[i] = { deps, cleanup: fn() }; } },
+  };
+  const globals = { window: {
+    sessionStorage: { getItem: (key) => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
+    setTimeout: (fn) => { timers.push(fn); return timers.length; }, clearTimeout() {},
+    setInterval: (fn) => { const id = intervals.size + 1; intervals.set(id, fn); return id; }, clearInterval: (id) => intervals.delete(id),
+  }, document: { visibilityState: 'visible', addEventListener() {}, removeEventListener() {} } };
+  const controller = load('widgets/room/model/room-access-recovery.ts', {
+    '@/entities/room': {
+      getRoom: async () => { calls.get++; if (expired) throw new RoomApiError('Fixture expired', 401, 'TOKEN_EXPIRED'); return room; },
+      recoverRoomAccess: async () => { calls.recover++; if (failRecovery) throw new RoomApiError('Fixture recovery failure', 401, 'RECOVERY_UNAVAILABLE'); expired = false; return { access: { participantToken: 'fixture-recovered' } }; },
+    }, '@/shared/api/http-client': { RoomApiError }, '@/shared/lib/room-session': { getRoomTokenStorageKey: (id) => `token:${id}` },
+  }, globals);
+  const { useRoomSession } = load('widgets/room/model/use-room-session.ts', {
+    react: hooks, '@/entities/room': { registerRoomRecovery: async () => ({ recovery: { code: null } }) },
+    '@/shared/api/http-client': { RoomApiError }, '@/shared/lib/room-access-error': accessErrors,
+    '@/shared/lib/room-session': { getRoomTokenStorageKey: (id) => `token:${id}` },
+    './room-access-recovery': controller, './room-session-data': { loadRoomSessionData: async () => data },
+  }, globals);
+  function render() { cursor = 0; effectIndex = 0; return useRoomSession('one'); }
+  return { render, calls, room, data, storage, expire(fails = false) { expired = true; failRecovery = fails; }, restoreManually() { expired = false; storage.set('token:one', 'fixture-manual'); }, flush() { while (timers.length) timers.shift()(); }, poll() { for (const fn of intervals.values()) fn(); } };
+}
+const settle = () => new Promise((resolve) => setImmediate(resolve));
+test('explicit reload and personal recovery keep mounted room/condition/response/result state on success and failure', async () => {
+  const h = sessionHarness(); h.render(); h.flush(); await settle();
+  let session = h.render(); assert.equal(session.room, h.room); assert.equal(session.isLoading, false);
+  const retry = session.retryRoom(); session = h.render();
+  assert.equal(session.isLoading, false); assert.equal(session.room, h.room);
+  await retry;
+  h.expire(true); await h.render().refreshRoom(); session = h.render();
+  assert.equal(session.refreshError.requiresRecovery, true);
+  assert.equal(session.room, h.room); assert.equal(session.latestScoreResult, h.data.latestScoreResult); assert.equal(session.decision, h.data.decision);
+  const requests = h.calls.get; h.poll(); h.poll(); await settle(); assert.equal(h.calls.get, requests); assert.equal(h.calls.recover, 1);
+  await session.retryRoom(); session = h.render(); assert.equal(h.calls.recover, 2);
+  assert.equal(session.error, null); assert.equal(session.room, h.room); assert.equal(session.isLoading, false);
+  h.restoreManually(); await session.loadRoom(); session = h.render();
+  assert.equal(session.refreshError, null); assert.equal(session.participantId, 'original'); assert.equal(session.accessToken, 'fixture-manual');
+  assert.equal(session.room.myCondition, h.room.myCondition); assert.equal(session.room.myResponses, h.room.myResponses);
+  h.expire(); await session.refreshRoom(); assert.equal(h.calls.recover, 2); // manual load does not reset automatic policy
+});
+test('loaded room exposes the existing explicit retry action and keeps the workspace during recovery', () => {
+  const workspace = () => null; const recovery = () => null; let retries = 0;
+  const session = { room: { currentParticipant: {} }, accessToken: 'fixture', participantId: 'original', isLoading: false, error: null, refreshError: { requiresRecovery: true, message: 'Fixture' }, retryRoom: () => { retries++; }, loadRoom() {} };
+  const { RoomWidget } = load('widgets/room/ui/room-widget.tsx', {
+    react: { useCallback: (fn) => fn }, 'next/navigation': { useRouter: () => ({}) }, 'next/link': () => null,
+    '@/features/participant-lifecycle': { useParticipantLifecycle: () => ({}) }, '@/features/room-recovery': { RoomRecoveryPanel: recovery },
+    '@/shared/lib/room-session': {}, '@/widgets/room-participants': { RoomParticipantsWidget: () => null }, '@/widgets/room-workspace': { RoomWorkspaceWidget: workspace },
+    '../model/use-room-session': { useRoomSession: () => session }, './room-load-state': {}, './room-summary': { RoomSummary: () => null },
+  });
+  function flatten(node, result = []) { if (!node || typeof node !== 'object') return result; if (Array.isArray(node)) node.forEach((child) => flatten(child, result)); else { result.push(node); flatten(node.props?.children, result); } return result; }
+  const tree = flatten(RoomWidget({ roomId: 'one' }));
+  tree.find((node) => node.type === 'button' && node.props.children === '다시 불러오기').props.onClick(); assert.equal(retries, 1);
+  assert.equal(tree.some((node) => node.type === workspace), true); assert.equal(tree.find((node) => node.type === recovery).props.token, null);
 });

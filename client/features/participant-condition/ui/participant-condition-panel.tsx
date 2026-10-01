@@ -3,6 +3,7 @@
 import { upsertParticipantCondition } from '@/entities/participant-condition';
 import type { ParticipantCondition } from '@/entities/participant-condition';
 import { RoomApiError } from '@/shared/api/http-client';
+import { getRoomAccessErrorMessage } from '@/shared/lib/room-access-error';
 import { MEETPOINT_TIMEZONE } from '@/shared/config/meetpoint';
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 
@@ -128,15 +129,14 @@ function validateDraft(
 }
 
 function describeConditionError(error: unknown) {
+  const accessMessage = getRoomAccessErrorMessage(error);
+  if (accessMessage) return accessMessage;
   if (error instanceof RoomApiError) {
     if (error.code === 'CONDITION_INCOMPLETE') {
       return '가능한 시간·예산·특징 입력을 다시 확인해 주세요.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '일정이 확정되었거나 종료된 방에서는 선택 조건을 수정할 수 없습니다.';
-    }
-    if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
     }
   }
 

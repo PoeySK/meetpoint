@@ -3,6 +3,7 @@
 import type { RoomDetailsResponse } from '@/entities/room';
 import { registerRoomRecovery } from '@/entities/room';
 import { RoomApiError } from '@/shared/api/http-client';
+import { getRoomAccessErrorMessage } from '@/shared/lib/room-access-error';
 import {
   getRoomRecoveryStorageKey,
   getRoomTokenStorageKey,
@@ -21,13 +22,17 @@ export type RoomLoadError = {
 
 function describeRoomError(error: unknown): RoomLoadError {
   if (error instanceof RoomApiError) {
-    if (error.code === 'RECOVERY_UNAVAILABLE' || error.status === 401) {
+    if (error.code === 'RECOVERY_UNAVAILABLE') {
       return {
         title: '기존 참여자의 접근을 복구할 수 없습니다.',
         requiresRecovery: true,
         message:
-          '이 브라우저의 복구 정보가 없거나 만료·폐기되었습니다. 보관한 개인 복구 코드를 입력해 주세요. 모든 인증 정보를 잃었다면 기존 권한은 복구할 수 없습니다. 방 코드 입장은 새 MEMBER를 만들며 기존 조건·응답과 HOST 권한을 복구하지 않습니다.',
+          '자동 복구를 완료하지 못했습니다. 복구 정보가 없거나 만료·폐기되었거나, 이 화면의 자동 복구 시도를 이미 사용했을 수 있습니다. 다시 불러오기로 명시적으로 재시도하거나 보관한 개인 복구 코드를 입력해 주세요. 모든 인증 정보를 잃었다면 기존 권한은 복구할 수 없습니다. 방 코드 입장은 새 MEMBER를 만들며 기존 조건·응답과 HOST 권한을 복구하지 않습니다.',
       };
+    }
+    const accessMessage = getRoomAccessErrorMessage(error);
+    if (accessMessage) {
+      return { title: '방 접근 정보를 확인해 주세요.', requiresRecovery: true, message: accessMessage };
     }
     if (error.status === 404) {
       return {
@@ -74,22 +79,27 @@ export function useRoomSession(roomId: string) {
   const pollingStoppedRef = useRef(false);
 
   const loadRoom = useCallback(async () => {
-    setIsLoading(true);
+    const previousSnapshot = sessionSnapshotRef.current?.room.room.id === roomId
+      ? sessionSnapshotRef.current : null;
+    if (!previousSnapshot) {
+      setIsLoading(true);
+      setRoom(null);
+      setLatestScoreResult(null);
+      setDecision(null);
+      setAccessToken(null);
+      setParticipantId(null);
+      sessionSnapshotRef.current = null;
+    }
     setError(null);
-    setRefreshError(null);
+    if (!previousSnapshot) setRefreshError(null);
     setRecoveryRegistrationError(null);
-    setRoom(null);
-    setLatestScoreResult(null);
-    setDecision(null);
-    setAccessToken(null);
-    setParticipantId(null);
-    sessionSnapshotRef.current = null;
 
     let token: string | null = null;
     try {
       token = window.sessionStorage.getItem(getRoomTokenStorageKey(roomId));
     } catch {
-      setError({
+      const setLoadError = previousSnapshot ? setRefreshError : setError;
+      setLoadError({
         title: '브라우저에 입장 정보를 저장할 수 없습니다.',
         message: '브라우저 설정을 확인한 뒤 다시 시도해 주세요.',
       });
@@ -101,13 +111,14 @@ export function useRoomSession(roomId: string) {
       const loaded = await recoveryController.load(token);
       const response = loaded.room;
       token = loaded.token;
-      const data = await loadRoomSessionData(response, token, null, null);
+      const data = await loadRoomSessionData(response, token, previousSnapshot?.room ?? null, previousSnapshot?.data ?? null);
       sessionSnapshotRef.current = { room: response, data };
       setRoom(response);
       setLatestScoreResult(data.latestScoreResult);
       setDecision(data.decision);
       setAccessToken(token);
       setParticipantId(response.currentParticipant.id);
+      setRefreshError(null);
       pollingStoppedRef.current = false;
       // Register legacy participants using their still-valid token; never rotate automatically.
       await registerRoomRecovery(roomId, token)
@@ -124,7 +135,13 @@ export function useRoomSession(roomId: string) {
           );
         });
     } catch (requestError) {
-      setError(describeRoomError(requestError));
+      if (previousSnapshot) {
+        if (requestError instanceof RoomApiError && requestError.status === 401)
+          pollingStoppedRef.current = true;
+        setRefreshError(describeRoomError(requestError));
+      } else {
+        setError(describeRoomError(requestError));
+      }
     } finally {
       setIsLoading(false);
     }

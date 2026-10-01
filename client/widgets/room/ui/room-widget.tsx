@@ -84,6 +84,10 @@ export function RoomWidget({ roomId }: { roomId: string }) {
               token={refreshError?.requiresRecovery ? null : accessToken}
               onRecovered={() => void loadRoom()}
             />
+            <button type='button' className='mp-button mp-button-secondary'
+              onClick={() => void retryRoom()}>
+              다시 불러오기
+            </button>
             {recoveryRegistrationError && (
               <p aria-live='polite' className='text-sm text-amber-800'>
                 {recoveryRegistrationError}

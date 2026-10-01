@@ -21,6 +21,10 @@ function load(file, imports = {}, globals = {}) {
 const model = load('features/participant-response/model/response-form.ts', {
   '@/shared/config/meetpoint': { MEETPOINT_TIMEZONE: 'Asia/Seoul' },
 });
+class RoomApiError extends Error {
+  constructor(message, status, code) { super(message); this.status = status; this.code = code; }
+}
+const accessErrors = load('shared/lib/room-access-error.ts', { '@/shared/api/http-client': { RoomApiError } });
 const candidate = (id = 'one', start = '2026-10-02T09:00:00Z', end = '2026-10-02T10:00:00Z') => ({
   id, status: 'ACTIVE', time: { startsAt: start, endsAt: end, timezone: 'Asia/Seoul' },
   place: { name: id, address: 'Test address', area: 'Test' },
@@ -135,9 +139,10 @@ function panelHarness({ saved = [], criteria = condition(), readOnly = false } =
     ...imports, react: hooks,
     '@/features/participant-response/ui/candidate-response-card': card,
     '@/features/participant-response/ui/quick-response-panel': quick,
-    '@/shared/api/http-client': { RoomApiError: class extends Error {} },
+    '@/shared/api/http-client': { RoomApiError },
+    '@/shared/lib/room-access-error': accessErrors,
     '@/entities/participant-response': { upsertParticipantResponse: async (_room, _participant, id, _token, input) => {
-      calls.push({ id, input }); if (fail) throw new Error('Fixture failure');
+      calls.push({ id, input }); if (fail) throw fail instanceof Error ? fail : new Error('Fixture failure');
       if (pending) await pending;
       return { response: { ...response(id), ...input } };
     } },
@@ -240,4 +245,37 @@ test('condition conflicts remain visible for unavailable responses and do not cl
   assert.match(markup, /저장된 내 가능 시간 안/);
   assert.match(markup, /예산 한도/); assert.match(markup, /PARKING/);
   assert.doesNotMatch(markup, /완전 일치/);
+});
+
+test('condition time warnings use the same UTC containment rules as automatic fill', () => {
+  const c = condition();
+  c.availabilityWindows = [{ startsAt: '2026-10-02T18:00:00+09:00', endsAt: '2026-10-02T19:00:00+09:00' }];
+  assert.equal(model.getConditionWarnings(candidate(), c).length, 0);
+  for (const entry of [candidate('partial', '2026-10-02T09:30:00Z', '2026-10-02T10:30:00Z'), candidate('outside', '2026-10-02T12:00:00Z', '2026-10-02T13:00:00Z')]) {
+    assert.equal(model.getTimeMatch(entry, c), 'outside');
+    assert.match(model.getConditionWarnings(entry, c)[0], /가능 시간/);
+    assert.equal(model.fillFormsFromCondition({}, [entry], [], c).forms[entry.id].availabilityStatus, 'MAYBE');
+  }
+  assert.equal(model.getTimeMatch(candidate('invalid', 'invalid'), c), 'unknown');
+  assert.equal(model.getConditionWarnings(candidate('invalid', 'invalid'), c).length, 0);
+  assert.match(model.timeMatchDescription('unknown'), /판단할 수 없습니다/);
+});
+test('candidate and quick options expose MAYBE as 보류 including accessible pressed selection', () => {
+  const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
+  const h = panelHarness();
+  assert.equal(model.availabilityOptions.find((option) => option.value === 'MAYBE').label, '보류');
+  const cardHtml = renderToStaticMarkup(React.createElement(h.card.CandidateResponseCard, h.cards()[0].props));
+  const quick = h.quick(); const quickHtml = renderToStaticMarkup(React.createElement(quick.type, { ...quick.props, availabilityStatus: 'MAYBE' }));
+  for (const html of [cardHtml, quickHtml]) { assert.match(html, /aria-pressed="true"[^>]*>보류<\/button>/); assert.doesNotMatch(html, /아마 가능/); }
+});
+test('authentication failure retains response draft and requires recovery before an explicit retry', async () => {
+  const h = panelHarness(); h.fill().props.onClick(); h.cards()[0].props.onUpdate({ travelBurden: 'NORMAL', note: 'Auth failure draft' });
+  h.fail(new RoomApiError('Fixture expiry', 401, 'TOKEN_EXPIRED')); h.cards()[0].props.onSave(); await settle();
+  const form = h.cards()[0].props.form;
+  assert.match(form.message, /토큰이 만료/); assert.match(form.message, /다시 불러오기/); assert.match(form.message, /기존 참여자/);
+  assert.equal(form.savedResponseId, null); assert.equal(form.note, 'Auth failure draft');
+  h.props.token = 'fixture-recovered-token'; h.render(); h.flush(); await settle();
+  assert.equal(h.calls.length, 1);
+  h.fail(false); h.cards()[0].props.onSave(); await settle(); assert.equal(h.calls.length, 2);
+  assert.equal(model.getResponseState(h.cards()[0].props.form), 'saved');
 });

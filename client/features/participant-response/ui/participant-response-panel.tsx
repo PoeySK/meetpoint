@@ -23,6 +23,7 @@ import {
 import { CandidateResponseCard } from '@/features/participant-response/ui/candidate-response-card';
 import { QuickResponsePanel } from '@/features/participant-response/ui/quick-response-panel';
 import { RoomApiError } from '@/shared/api/http-client';
+import { getRoomAccessErrorMessage } from '@/shared/lib/room-access-error';
 import { useEffect, useState } from 'react';
 
 type ParticipantResponsePanelProps = {
@@ -37,10 +38,9 @@ type ParticipantResponsePanelProps = {
 };
 
 function describeResponseError(error: unknown) {
+  const accessMessage = getRoomAccessErrorMessage(error);
+  if (accessMessage) return accessMessage;
   if (error instanceof RoomApiError) {
-    if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
-    }
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '현재 방 상태에서는 의견을 수정할 수 없습니다.';
     }

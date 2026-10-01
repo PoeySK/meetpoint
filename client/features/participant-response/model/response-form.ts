@@ -42,7 +42,7 @@ export const availabilityOptions: Array<{
   label: string;
 }> = [
   { value: 'AVAILABLE', label: '가능' },
-  { value: 'MAYBE', label: '아마 가능' },
+  { value: 'MAYBE', label: '보류' },
   { value: 'UNAVAILABLE', label: '불가' },
 ];
 
@@ -162,20 +162,7 @@ export function getConditionWarnings(
 
   const warnings: string[] = [];
 
-  if (
-    !Number.isNaN(candidateStart) &&
-    !Number.isNaN(candidateEnd) &&
-    !condition.availabilityWindows.some((window) => {
-      const windowStart = new Date(window.startsAt).getTime();
-      const windowEnd = new Date(window.endsAt).getTime();
-      return (
-        !Number.isNaN(windowStart) &&
-        !Number.isNaN(windowEnd) &&
-        candidateStart >= windowStart &&
-        candidateEnd <= windowEnd
-      );
-    })
-  ) {
+  if (getTimeMatch(candidate, condition) === 'outside') {
     warnings.push('선택 조건에 입력한 가능 시간과 다릅니다.');
   }
 

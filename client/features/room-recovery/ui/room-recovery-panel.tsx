@@ -62,7 +62,7 @@ export function RoomRecoveryPanel({ roomId, token, onRecovered }: {
       <label className="block text-sm" htmlFor="personal-recovery-code">개인 복구 코드 (초대 방 코드와 다릅니다)</label>
       <input id="personal-recovery-code" type="password" autoComplete="off" value={code} onChange={(event) => setCode(event.target.value)} required className="w-full rounded border p-2" />
       <button type="submit" className="mp-button mp-button-primary" disabled={busy}>기존 참여자로 복구</button>
-      <p className="text-sm">모든 자격 증명을 분실한 HOST는 새 방을 만들어야 합니다. MEMBER의 일반 재입장은 입장이 열린 방에서만 가능하며 새 참여자로 등록됩니다.</p>
+      <p className="text-sm">모든 자격 증명을 분실한 HOST는 새 방을 만들어야 합니다. MEMBER의 일반 재입장은 입장이 열린 방에서만 가능하며 새 참여자로 등록됩니다. 일반 방 코드 입장은 기존 역할·조건·응답을 복구하지 않습니다. 복구 후에는 실패한 작업을 직접 다시 시도해 주세요.</p>
     </form>}
     <p aria-live="polite" className="text-sm">{notice}</p>
   </section>;
