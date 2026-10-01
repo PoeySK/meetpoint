@@ -7,16 +7,16 @@ export function HomeHero() {
       </div>
       <div className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-          친구들과 약속을 시작해 보세요
+          친구들과 약속을 정해 보세요
         </p>
         <h1 className="max-w-xl text-3xl font-semibold leading-[1.15] tracking-tight sm:text-5xl">
-          모임의 시작점을
+          모두의 시간을
           <br />
-          가볍게 만들어 보세요
+          한곳에서 맞춰 보세요
         </h1>
         <p className="max-w-xl text-sm leading-6 text-slate-600 sm:text-base">
-          방을 만들고 초대 링크를 공유하면, 모두의 시간과 장소를 함께 맞춰갈 수
-          있습니다.
+          방을 만들고 초대 링크를 공유하면, 모두의 가능한 시간과 장소를 한눈에
+          비교할 수 있습니다.
         </p>
       </div>
       <div className="grid max-w-xl gap-2 text-xs text-slate-600 sm:grid-cols-3">
@@ -26,11 +26,11 @@ export function HomeHero() {
         </p>
         <p className="rounded-xl border border-slate-200/80 bg-white/65 p-3">
           <span className="mb-1 block text-[11px] font-semibold text-emerald-700">02</span>
-          초대하기
+          참여자 초대
         </p>
         <p className="rounded-xl border border-slate-200/80 bg-white/65 p-3">
           <span className="mb-1 block text-[11px] font-semibold text-emerald-700">03</span>
-          의견 모으기
+          의견 남기기
         </p>
       </div>
     </section>

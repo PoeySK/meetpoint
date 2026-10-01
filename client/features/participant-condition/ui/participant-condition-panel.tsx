@@ -130,17 +130,17 @@ function validateDraft(
 function describeConditionError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === 'CONDITION_INCOMPLETE') {
-      return '가능 시간·예산·특징 입력을 다시 확인해 주세요.';
+      return '가능한 시간·예산·특징 입력을 다시 확인해 주세요.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
-      return '확정되거나 종료된 방에서는 내 기준을 수정할 수 없습니다.';
+      return '일정이 확정되었거나 종료된 방에서는 선택 조건을 수정할 수 없습니다.';
     }
     if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
-      return '방 입장 정보가 만료되었습니다. 방에 다시 입장해 주세요.';
+      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
     }
   }
 
-  return '내 기준을 저장하지 못했습니다. 입력을 유지했으니 잠시 후 다시 시도해 주세요.';
+  return '선택 조건을 저장하지 못했습니다. 입력은 남아 있으니 잠시 후 다시 시도해 주세요.';
 }
 
 export function ParticipantConditionPanel({
@@ -250,7 +250,7 @@ export function ParticipantConditionPanel({
     setIsSubmitting(true);
     void upsertParticipantCondition(roomId, participantId, token, input)
       .then(async () => {
-        setFormMessage('내 기준을 저장했습니다. 추천 결과에 참고로 반영됩니다.');
+        setFormMessage('선택 조건을 저장했습니다. 추천 결과에 참고로 반영됩니다.');
         await onRoomRefresh();
       })
       .catch((error: unknown) => {
@@ -264,10 +264,10 @@ export function ParticipantConditionPanel({
   return (
     <section className='mp-card border-sky-100 bg-sky-50/55 p-4 sm:p-6'>
       <div className='space-y-1.5'>
-        <p className='text-sm font-semibold text-sky-700'>내 기준</p>
+        <p className='text-sm font-semibold text-sky-700'>선택 조건</p>
         <div className='flex flex-wrap items-center gap-2'>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-            원하는 기준을 알려주세요
+            원하는 조건을 알려주세요
           </h2>
           <span className='rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-sky-700'>
             선택 사항
@@ -275,20 +275,20 @@ export function ParticipantConditionPanel({
         </div>
         <p className='text-sm leading-6 text-slate-600'>
           원하는 시간, 1인 예산, 선호하는 특징을 입력하면 추천 결과에 참고로
-          반영됩니다. 입력하지 않아도 후보별 의견을 남기고 추천 결과를 만들 수 있으며, 다른
-          참여자에게는 내 상세 조건이 공개되지 않습니다.
+          반영됩니다. 입력하지 않아도 후보별 의견을 남기고 추천 결과를 만들 수 있으며, 자세한
+          선택 조건은 다른 참여자에게 공개되지 않습니다.
         </p>
       </div>
 
       {isReadOnly ? (
         <p className='mt-4 rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          확정되거나 종료된 방에서는 내 기준을 수정할 수 없습니다.
+          일정이 확정되었거나 종료된 방에서는 선택 조건을 수정할 수 없습니다.
         </p>
       ) : (
         <form className='mt-5 space-y-5' onSubmit={handleSubmit}>
           <fieldset className='space-y-3'>
             <legend className='text-sm font-semibold text-slate-800'>
-              내가 가능한 시간 <span className='font-normal text-slate-500'>맞지 않는 후보도 선택할 수 있고 추천 결과에서 알려드립니다.</span>
+              내가 가능한 시간 <span className='font-normal text-slate-500'>입력한 시간과 다른 후보도 의견으로 남길 수 있으며 추천 결과에서 확인할 수 있습니다.</span>
             </legend>
             {windows.map((window, index) => (
               <div
@@ -370,7 +370,7 @@ export function ParticipantConditionPanel({
           </fieldset>
 
           <fieldset className='space-y-2'>
-            <legend className='text-sm font-semibold text-slate-800'>예산 <span className='font-normal text-slate-500'>예산을 넘는 후보도 선택할 수 있습니다.</span></legend>
+            <legend className='text-sm font-semibold text-slate-800'>예산 <span className='font-normal text-slate-500'>예산을 넘는 후보도 의견으로 남길 수 있습니다.</span></legend>
             <label className='flex items-center gap-2 text-sm text-slate-700'>
               <input
                 checked={noBudgetLimit}
@@ -410,7 +410,7 @@ export function ParticipantConditionPanel({
           </fieldset>
 
           <fieldset className='space-y-3'>
-            <legend className='text-sm font-semibold text-slate-800'>선호하는 특징 <span className='font-normal text-slate-500'>추천 결과에 참고합니다. 쉼표로 구분해 입력합니다.</span></legend>
+            <legend className='text-sm font-semibold text-slate-800'>선호하는 특징 <span className='font-normal text-slate-500'>추천 결과에 참고합니다. 쉼표로 구분해 입력해 주세요.</span></legend>
             <label className='block space-y-1 text-sm font-medium text-slate-700'>
               꼭 필요한 특징
               <input
@@ -457,17 +457,17 @@ export function ParticipantConditionPanel({
             type='submit'
           >
             {isSubmitting
-              ? '내 기준 저장 중...'
+              ? '선택 조건 저장 중...'
               : condition
-                ? '내 기준 수정 저장'
-                : '내 기준 저장'}
+                ? '선택 조건 수정 저장'
+                : '선택 조건 저장'}
           </button>
         </form>
       )}
 
       {!isReadOnly && !condition && !formMessage && (
         <p className='mt-4 text-xs leading-5 text-slate-500'>
-          내 기준은 나중에 입력해도 됩니다. 먼저 후보별 의견을 남겨 보세요.
+          선택 조건은 나중에 입력해도 됩니다. 먼저 후보별 의견을 남겨 보세요.
         </p>
       )}
     </section>

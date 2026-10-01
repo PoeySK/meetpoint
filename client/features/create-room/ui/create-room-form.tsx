@@ -106,7 +106,7 @@ export function CreateRoomForm() {
         <p className="text-sm font-semibold text-emerald-700">새 방</p>
         <h2 className="text-xl font-semibold tracking-tight">모임 정보 입력</h2>
         <p className="text-sm leading-6 text-slate-500">
-          방을 만든 사람이 자동으로 방장이 됩니다.
+          방을 만든 사람이 방장이 되어 후보와 참여자를 관리합니다.
         </p>
       </div>
 
@@ -133,7 +133,7 @@ export function CreateRoomForm() {
         </div>
 
         <p className="rounded-xl bg-emerald-50 px-3 py-2.5 text-xs leading-5 text-emerald-800">
-          모든 시간은 한국 시간으로 입력하고 표시합니다.
+          모임 시간은 한국 시간 기준으로 입력하고 표시합니다.
         </p>
 
         <div className="space-y-2">
@@ -183,7 +183,7 @@ export function CreateRoomForm() {
           방장 입장 정보는 이 브라우저에만 저장됩니다.
         </p>
         <p className="text-center text-sm text-slate-500">
-          초대받은 참가자라면?{" "}
+          초대받은 분이라면?{" "}
           <Link
             className="font-semibold text-emerald-700 hover:text-emerald-800"
             href="/join"

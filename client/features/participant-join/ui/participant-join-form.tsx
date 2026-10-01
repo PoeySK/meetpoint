@@ -139,7 +139,7 @@ export function ParticipantJoinForm({
               초대받은 방에 입장하기
             </h1>
             <p className='text-sm leading-6 text-slate-500'>
-              방 코드와 이름을 입력하면 바로 대기 화면으로 이동합니다.
+              방 코드와 이름을 입력하면 모임 방으로 바로 이동합니다.
             </p>
           </div>
 

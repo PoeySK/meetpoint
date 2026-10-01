@@ -110,7 +110,7 @@ function validateCandidateForm(
     address.trim().length > 120 ||
     !area.trim()
   ) {
-    errors.place = '장소명·주소는 1~120자, 지역은 필수입니다.';
+    errors.place = '장소명과 주소는 1~120자, 지역은 반드시 입력해 주세요.';
   }
 
   if (
@@ -136,13 +136,13 @@ function validateCandidateForm(
 function describeCandidateError(error: unknown) {
   if (error instanceof RoomApiError) {
     if (error.code === 'CANDIDATE_LIMIT_EXCEEDED') {
-      return '후보는 최대 5개까지 등록할 수 있습니다.';
+      return '후보는 최대 5개까지 등록할 수 있습니다. 다른 후보를 제외한 뒤 추가해 주세요.';
     }
     if (error.code === 'HOST_ONLY') {
       return '방장만 후보를 등록할 수 있습니다.';
     }
     if (error.code === 'ROOM_STATE_CONFLICT') {
-      return '지금은 후보를 바꿀 수 없습니다.';
+      return '현재 방 상태에서는 후보를 바꿀 수 없습니다.';
     }
     if (error.code === 'CANDIDATE_VERSION_CONFLICT') {
       return '다른 사람이 후보를 먼저 변경했습니다. 최신 정보를 확인한 뒤 다시 저장해 주세요.';
@@ -152,6 +152,9 @@ function describeCandidateError(error: unknown) {
     }
     if (error.code === 'NETWORK_ERROR') {
       return '네트워크 연결을 확인한 뒤 다시 시도해 주세요.';
+    }
+    if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
+      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
     }
   }
 
@@ -341,12 +344,12 @@ export function CandidateManagementPanel({
         setEditingCandidateId(null);
         clearCandidateForm();
         setFormNotice(
-          '후보를 수정했습니다. 새 추천 결과가 있다면 다시 만들어 주세요.',
+          '후보를 수정했습니다. 기존 추천 결과가 있다면 최신 내용으로 다시 만들어 주세요.',
         );
       } else {
         await createCandidate(roomId, token, input);
         clearCandidateForm();
-        setFormNotice('후보를 등록했습니다. 참여자들에게 의견을 남겨 달라고 알려주세요.');
+        setFormNotice('후보를 등록했습니다. 참여자들에게 의견을 남겨 달라고 알려 주세요.');
       }
       await onRoomRefresh();
     } catch (error) {
@@ -392,7 +395,7 @@ export function CandidateManagementPanel({
       }
       setArchiveCandidateId(null);
       setFormNotice(
-        '후보를 목록에서 뺐습니다. 기존 추천 결과의 기록은 그대로 남아 있습니다.',
+        '후보를 새 추천에서 제외했습니다. 기존 추천 결과의 기록은 그대로 남아 있습니다.',
       );
       await onRoomRefresh();
     } catch (error) {
@@ -417,12 +420,11 @@ export function CandidateManagementPanel({
             모임 후보 관리
           </h2>
           <p className='text-sm leading-6 text-slate-600'>
-            참여자들이 비교할 시간과 장소를 최대 5개까지 등록할 수
-            있습니다.
+            참여자들이 비교할 시간과 장소를 최대 5개까지 등록할 수 있습니다.
           </p>
         </div>
         <span className='w-fit rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600'>
-          {room.candidates.length} / 5개
+          {room.candidates.length} / 5개 후보
         </span>
       </div>
 
@@ -431,8 +433,7 @@ export function CandidateManagementPanel({
           <div>
             <p className='text-sm font-semibold text-slate-950'>빠른 입력</p>
             <p className='mt-1 text-xs leading-5 text-slate-500'>
-              예시를 채워 입력 방법을 확인하거나 테스트용 시간을 준비할 수
-              있습니다.
+              예시를 채워 입력 방법을 확인할 수 있습니다.
             </p>
           </div>
           <div className='flex flex-wrap gap-2'>
@@ -538,7 +539,7 @@ export function CandidateManagementPanel({
                     }}
                     type='button'
                   >
-                    목록에서 빼기
+                    새 추천에서 제외
                   </button>
                 </div>
               </div>
@@ -546,8 +547,8 @@ export function CandidateManagementPanel({
               {archiveCandidateId === candidate.id && (
                 <div className='mt-3 rounded-xl border border-rose-100 bg-rose-50/80 p-3'>
                   <p className='text-sm leading-5 text-rose-800'>
-                    이 후보를 새 추천과 의견 대상에서 뺍니다. 기존 추천 결과에는 기록이
-                    남습니다. 뺄까요?
+                    이 후보를 새 추천과 의견 대상에서 제외합니다. 기존 추천 결과에는
+                    기록이 남습니다. 제외할까요?
                   </p>
                   <div className='mt-3 flex flex-wrap gap-2'>
                     <button
@@ -556,7 +557,7 @@ export function CandidateManagementPanel({
                       onClick={() => void handleArchive(candidate)}
                       type='button'
                     >
-                      {isArchiving ? '처리 중...' : '목록에서 빼기'}
+                      {isArchiving ? '처리 중...' : '새 추천에서 제외'}
                     </button>
                     <button
                       className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
@@ -577,12 +578,12 @@ export function CandidateManagementPanel({
       {isCandidateMutationDisabled ? (
         <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
           {room.room.status === 'CALCULATING'
-            ? '추천 결과를 만드는 중이라 후보를 바꿀 수 없습니다.'
-            : '확정되거나 종료된 방에서는 후보를 변경할 수 없습니다.'}
+            ? '추천 결과를 준비 중이라 후보를 바꿀 수 없습니다.'
+            : '일정이 확정되었거나 종료된 방에서는 후보를 변경할 수 없습니다.'}
         </p>
       ) : hasReachedCandidateLimit && !editingCandidate ? (
         <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          후보 5개가 이미 등록되어 더 추가할 수 없습니다.
+          후보 5개가 이미 등록되어 더 추가할 수 없습니다. 기존 후보를 제외하면 새 후보를 등록할 수 있습니다.
         </p>
       ) : (
         <CandidateForm

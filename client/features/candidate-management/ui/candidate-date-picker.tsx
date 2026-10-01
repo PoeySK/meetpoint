@@ -92,7 +92,7 @@ export function getKstWeekdayDate(targetWeekday: number) {
 
 function formatDateLabel(value: string) {
   if (!parseDateValue(value)) {
-    return "날짜를 선택하세요";
+    return "모임 날짜를 선택해 주세요";
   }
 
   return new Date(`${value}T00:00:00+09:00`).toLocaleDateString("ko-KR", {
