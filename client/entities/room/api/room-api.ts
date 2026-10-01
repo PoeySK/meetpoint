@@ -42,6 +42,37 @@ export function getRoom(roomId: string, token: string) {
   );
 }
 
+export type RecoveredRoomAccess = {
+  participant: RoomDetailsResponse["currentParticipant"];
+  access: { participantToken: string };
+  recoveryExpiresAt: string;
+};
+
+const pendingRecoveries = new Map<string, Promise<RecoveredRoomAccess>>();
+
+export function recoverRoomAccess(roomId: string, recoveryCode?: string) {
+  const pending = pendingRecoveries.get(roomId);
+  if (pending) return pending;
+  const recovery = request<RecoveredRoomAccess>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/recovery`,
+    { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(recoveryCode ? { recoveryCode } : {}) },
+  );
+  pendingRecoveries.set(roomId, recovery);
+  void recovery.finally(() => {
+    if (pendingRecoveries.get(roomId) === recovery) pendingRecoveries.delete(roomId);
+  }).catch(() => {});
+  return recovery;
+}
+
+export function registerRoomRecovery(roomId: string, token: string, replace = false) {
+  return request<{ recovery: { code: string | null; expiresAt: string } }>(
+    `/api/v1/rooms/${encodeURIComponent(roomId)}/recovery/register`,
+    { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ replace }) },
+  );
+}
+
 export function leaveRoom(roomId: string, token: string) {
   return request<ParticipantLifecycleResponse>(
     `/api/v1/rooms/${encodeURIComponent(roomId)}/leave`,

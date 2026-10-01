@@ -52,6 +52,8 @@ export class LeaveRoomUseCase {
       const changedParticipant = await participants.save({
         ...participant,
         status: ParticipantStatus.LEFT,
+        recoveryHash: null,
+        recoveryExpiresAt: null,
         tokenRevokedAt: new Date(),
         updatedAt: new Date(),
       });

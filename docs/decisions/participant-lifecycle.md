@@ -40,6 +40,8 @@
 
 ### 4. 재입장
 
+활성 참가자의 접근 토큰 만료·분실 복구는 새 참가자 재입장과 별개이며, "docs/decisions/room-access-recovery.md"를 따른다. 유효한 개인 복구 자격 증명으로만 기존 ID/역할을 유지한다. 아래 재입장은 새 MEMBER 생성 정책이다.
+
 - `LEFT`·`REMOVED` Participant를 같은 Participant ID로 복구하거나 활성 상태로 되돌리지 않는다.
 - 방 코드로 다시 입장하면 새로운 Participant ID와 새로운 room-scoped token을 발급한다.
 - 새 Participant는 이전 Participant의 응답, 상태, 계산 근거를 상속하지 않는다.

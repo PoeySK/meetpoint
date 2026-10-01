@@ -8,8 +8,10 @@ import { createRoom } from "@/entities/room";
 import { RoomApiError } from "@/shared/api/http-client";
 import { MEETPOINT_TIMEZONE } from "@/shared/config/meetpoint";
 import {
+  getRoomRecoveryStorageKey,
   getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
+  rememberRoomAddress,
 } from "@/shared/lib/room-session";
 
 type FieldErrors = {
@@ -84,6 +86,8 @@ export function CreateRoomForm() {
         return;
       }
 
+      try { window.sessionStorage.setItem(getRoomRecoveryStorageKey(response.room.id), JSON.stringify(response.recovery)); } catch { /* Recovery cookie remains available. */ }
+      rememberRoomAddress(response.room.roomCode, response.room.id);
       router.push(`/rooms/${encodeURIComponent(response.room.id)}`);
     } catch (error) {
       if (error instanceof RoomApiError && error.status === 400) {

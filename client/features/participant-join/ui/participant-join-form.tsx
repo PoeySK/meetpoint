@@ -3,12 +3,15 @@
 import { joinRoom } from '@/entities/room';
 import { RoomApiError } from '@/shared/api/http-client';
 import {
+  getRoomRecoveryStorageKey,
   getRoomParticipantStorageKey,
   getRoomTokenStorageKey,
+  rememberRoomAddress,
+  getRememberedRoomAddress,
 } from '@/shared/lib/room-session';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 
 type ParticipantJoinFormProps = {
   initialRoomCode?: string;
@@ -62,6 +65,11 @@ export function ParticipantJoinForm({
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [existingRoomId, setExistingRoomId] = useState<string | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setExistingRoomId(getRememberedRoomAddress(roomCode.trim().toUpperCase())), 0);
+    return () => window.clearTimeout(timer);
+  }, [roomCode]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -100,6 +108,8 @@ export function ParticipantJoinForm({
         return;
       }
 
+      try { window.sessionStorage.setItem(getRoomRecoveryStorageKey(response.room.id), JSON.stringify(response.recovery)); } catch { /* Recovery cookie remains available. */ }
+      rememberRoomAddress(response.room.roomCode, response.room.id);
       router.push(`/rooms/${encodeURIComponent(response.room.id)}`);
     } catch (error) {
       setFormError(describeJoinError(error));
@@ -119,6 +129,10 @@ export function ParticipantJoinForm({
         </div>
 
         <section className='mp-card mp-card-raised p-4 sm:p-6'>
+          {existingRoomId && <p className="mb-4 text-sm">
+            이 브라우저에서 방문한 방입니다. <Link className="underline" href={`/rooms/${encodeURIComponent(existingRoomId)}`}>기존 참여자로 복구하기</Link>
+            . 아래 입장은 새 MEMBER를 만들며 기존 권한과 응답을 복구하지 않습니다.
+          </p>}
           <div className='mb-5 space-y-1.5'>
             <p className='text-sm font-semibold text-emerald-700'>참여자</p>
             <h1 className='text-2xl font-semibold tracking-tight'>

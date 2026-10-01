@@ -9,6 +9,8 @@ import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
 
 const ERROR_MESSAGES = {
+  RECOVERY_UNAVAILABLE:
+    '복구 정보가 없거나 만료·폐기되어 기존 참여자로 복구할 수 없습니다.',
   INVALID_JSON: '요청 본문이 올바른 JSON 형식이 아닙니다.',
   VALIDATION_ERROR: '요청 입력값이 올바르지 않습니다.',
   MISSING_TOKEN: 'Room 접근 토큰이 필요합니다.',

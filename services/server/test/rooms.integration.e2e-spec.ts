@@ -1,4 +1,11 @@
 import { INestApplication, Module } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
+import { DecisionStatus } from '../src/rooms/domain/decision/decision';
+import {
+  completedScoreResult,
+  validConditionPayload,
+} from '../src/rooms/test/rooms-http-test-harness';
 import { Test, TestingModule } from '@nestjs/testing';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
@@ -95,6 +102,261 @@ describe('Room Candidate and ParticipantResponse integration', () => {
 
   afterAll(async () => {
     await app.close();
+  });
+
+  it('recovers expired HOST/MEMBER credentials while preserving conditions, responses, results and Decision history', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send({
+        title: 'Recovery integration fixture',
+        timezone: 'Asia/Seoul',
+        host: { displayName: 'Recovery host' },
+      })
+      .expect(201);
+    roomId = created.body.room.id;
+    const member = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+      .send({ displayName: 'Recovery member' })
+      .expect(201);
+    const candidate = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/candidates`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .send(candidatePayload())
+      .expect(201);
+    await request(app.getHttpServer())
+      .put(
+        `/api/v1/rooms/${roomId}/participants/${member.body.participant.id}/conditions`
+      )
+      .set('Authorization', `Bearer ${member.body.access.participantToken}`)
+      .send(validConditionPayload({ maxBudgetKrw: 25000 }))
+      .expect(200);
+    const responsePath = `/api/v1/rooms/${roomId}/participants/${member.body.participant.id}/responses/${candidate.body.candidate.id}`;
+    await request(app.getHttpServer())
+      .put(responsePath)
+      .set('Authorization', `Bearer ${member.body.access.participantToken}`)
+      .send({
+        availabilityStatus: 'AVAILABLE',
+        travelBurden: 'EASY',
+        note: 'Preserved in PostgreSQL',
+      })
+      .expect(200);
+    const scoreFixture = completedScoreResult(randomUUID(), roomId!);
+    scoreFixture.ranking = [candidate.body.candidate.id];
+    scoreFixture.candidates = [
+      {
+        candidateId: candidate.body.candidate.id,
+        rank: 1,
+        overallScore: 90,
+        eligible: true,
+        matchLevel: 'FULL',
+        hardConflictCount: 0,
+        coverage: { submittedResponses: 1, expectedResponses: 2 },
+        participantBreakdown: [],
+        reasons: [],
+        conflicts: [],
+        blockingIssues: [],
+        explanationFlags: [],
+      },
+    ];
+    const score = await dataSource
+      .getRepository(ScoreResult)
+      .save(scoreFixture);
+    const oldDecision = await dataSource.getRepository(Decision).save({
+      id: randomUUID(),
+      roomId: roomId!,
+      candidateId: candidate.body.candidate.id,
+      scoreResultId: score.id,
+      decidedByParticipantId: created.body.hostParticipant.id,
+      status: DecisionStatus.SUPERSEDED,
+      acknowledgeIssues: false,
+      decisionNote: 'History retained',
+      confirmedAt: new Date(),
+      replacedDecisionId: null,
+      reopenedAt: null,
+      reopenReason: null,
+    });
+    const decision = await dataSource.getRepository(Decision).save({
+      ...oldDecision,
+      id: randomUUID(),
+      status: DecisionStatus.CONFIRMED,
+      replacedDecisionId: oldDecision.id,
+    });
+    await dataSource.getRepository(Room).update(roomId!, {
+      status: RoomStatus.CALCULATED,
+      latestScoreResultId: score.id,
+      currentDecisionId: decision.id,
+    });
+    const conditionsBefore = await dataSource
+      .getRepository(ParticipantCondition)
+      .findBy({ roomId });
+    const responsesBefore = await dataSource
+      .getRepository(ParticipantResponse)
+      .findBy({ roomId });
+    const scoresBefore = await dataSource
+      .getRepository(ScoreResult)
+      .findBy({ roomId });
+    const decisionsBefore = await dataSource
+      .getRepository(Decision)
+      .find({ where: { roomId }, order: { id: 'ASC' } });
+    const countBefore = await dataSource
+      .getRepository(Participant)
+      .countBy({ roomId });
+    await dataSource
+      .getRepository(Participant)
+      .update({ roomId }, { tokenExpiresAt: new Date(Date.now() - 1) });
+    const hostRecovery = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/recovery`)
+      .send({ recoveryCode: created.body.recovery.code })
+      .expect(201);
+    expect(hostRecovery.body.participant).toMatchObject({
+      id: created.body.hostParticipant.id,
+      role: 'HOST',
+    });
+    expect(
+      (await dataSource.getRepository(Room).findOneByOrFail({ id: roomId! }))
+        .status
+    ).toBe(RoomStatus.CALCULATED);
+    await dataSource
+      .getRepository(Room)
+      .update(roomId!, { status: RoomStatus.CONFIRMED });
+    const roomBefore = await dataSource
+      .getRepository(Room)
+      .findOneByOrFail({ id: roomId! });
+    const memberRecovery = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/recovery`)
+      .send({ recoveryCode: member.body.recovery.code })
+      .expect(201);
+    expect(memberRecovery.body.participant).toMatchObject({
+      id: member.body.participant.id,
+      role: 'MEMBER',
+      status: 'RESPONDED',
+    });
+    const details = await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${roomId}`)
+      .set(
+        'Authorization',
+        `Bearer ${memberRecovery.body.access.participantToken}`
+      )
+      .expect(200);
+    expect(details.body.myCondition.maxBudgetKrw).toBe(25000);
+    expect(details.body.myResponses[0].note).toBe('Preserved in PostgreSQL');
+    await request(app.getHttpServer())
+      .put(responsePath)
+      .set(
+        'Authorization',
+        `Bearer ${memberRecovery.body.access.participantToken}`
+      )
+      .send({ availabilityStatus: 'MAYBE', travelBurden: 'HARD' })
+      .expect(409);
+    await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${roomId}/decision`)
+      .set(
+        'Authorization',
+        `Bearer ${hostRecovery.body.access.participantToken}`
+      )
+      .expect(200);
+    expect(
+      await dataSource.getRepository(Participant).countBy({ roomId })
+    ).toBe(countBefore);
+    expect(
+      await dataSource.getRepository(Room).findOneByOrFail({ id: roomId! })
+    ).toEqual(roomBefore);
+    expect(
+      await dataSource.getRepository(ParticipantCondition).findBy({ roomId })
+    ).toEqual(conditionsBefore);
+    expect(
+      await dataSource.getRepository(ParticipantResponse).findBy({ roomId })
+    ).toEqual(responsesBefore);
+    expect(
+      await dataSource.getRepository(ScoreResult).findBy({ roomId })
+    ).toEqual(scoresBefore);
+    expect(
+      await dataSource
+        .getRepository(Decision)
+        .find({ where: { roomId }, order: { id: 'ASC' } })
+    ).toEqual(decisionsBefore);
+  });
+
+  it('serializes actual PostgreSQL recovery locks and permits credential reuse with only the final token valid', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send({
+        title: 'Concurrent recovery fixture',
+        timezone: 'Asia/Seoul',
+        host: { displayName: 'Concurrent recovery host' },
+      })
+      .expect(201);
+    roomId = created.body.room.id;
+    const recover = () =>
+      request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/recovery`)
+        .send({ recoveryCode: created.body.recovery.code })
+        .expect(201);
+    const results = await Promise.all([recover(), recover()]);
+    const statuses = await Promise.all(
+      results.map((result) =>
+        request(app.getHttpServer())
+          .get(`/api/v1/rooms/${roomId}`)
+          .set('Authorization', `Bearer ${result.body.access.participantToken}`)
+          .then((response) => response.status)
+      )
+    );
+    expect(statuses.sort()).toEqual([200, 401]);
+    await recover();
+    expect(
+      await dataSource.getRepository(Participant).countBy({ roomId })
+    ).toBe(1);
+  });
+
+  it('rolls back recovery if PostgreSQL rejects a token replacement after UPDATE', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send({
+        title: 'Recovery rollback fixture',
+        timezone: 'Asia/Seoul',
+        host: { displayName: 'Rollback host' },
+      })
+      .expect(201);
+    roomId = created.body.room.id;
+    const before = await dataSource
+      .getRepository(Participant)
+      .findOneByOrFail({ id: created.body.hostParticipant.id });
+    const suffix = randomUUID().replaceAll('-', '');
+    const name = `recovery_test_${suffix}`;
+    try {
+      await dataSource.query(
+        `CREATE FUNCTION "${name}"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.id = '${before.id}' THEN RAISE EXCEPTION 'Recovery test failure'; END IF; RETURN NEW; END $$`
+      );
+      await dataSource.query(
+        `CREATE TRIGGER "${name}" AFTER UPDATE ON participants FOR EACH ROW EXECUTE FUNCTION "${name}"()`
+      );
+      const failed = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/recovery`)
+        .send({ recoveryCode: created.body.recovery.code })
+        .expect(500);
+      expect(failed.body.error.code).toBe('INTERNAL_ERROR');
+      expect(
+        isDeepStrictEqual(
+          await dataSource
+            .getRepository(Participant)
+            .findOneByOrFail({ id: before.id }),
+          before
+        )
+      ).toBe(true);
+    } finally {
+      await dataSource.query(
+        `DROP TRIGGER IF EXISTS "${name}" ON participants`
+      );
+      await dataSource.query(`DROP FUNCTION IF EXISTS "${name}"()`);
+    }
+    await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${roomId}`)
+      .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/recovery`)
+      .send({ recoveryCode: created.body.recovery.code })
+      .expect(201);
   });
 
   it('persists a Candidate and creates then updates one ParticipantResponse over HTTP', async () => {

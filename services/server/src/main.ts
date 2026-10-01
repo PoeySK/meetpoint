@@ -13,6 +13,7 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.enableCors({
+    credentials: true,
     origin: clientOrigins.length === 1 ? clientOrigins[0] : clientOrigins,
   });
 

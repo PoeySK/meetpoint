@@ -301,6 +301,7 @@ export function RoomWorkspaceWidget({
               candidates={room.candidates}
               condition={room.myCondition}
               isReadOnly={
+                room.room.status === "CALCULATING" ||
                 room.room.status === "CONFIRMED" || room.room.status === "CLOSED"
               }
               onRoomRefresh={onRoomRefresh}

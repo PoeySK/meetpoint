@@ -1,27 +1,29 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { upsertParticipantResponse } from "@/entities/participant-response";
+import type { Candidate } from '@/entities/candidate';
+import type { ParticipantCondition } from '@/entities/participant-condition';
 import type {
   AvailabilityStatus,
   ParticipantResponsePayload,
   TravelBurden,
-} from "@/entities/participant-response";
-import type { Candidate } from "@/entities/candidate";
-import type { ParticipantCondition } from "@/entities/participant-condition";
-import { RoomApiError } from "@/shared/api/http-client";
+} from '@/entities/participant-response';
+import { upsertParticipantResponse } from '@/entities/participant-response';
 import {
   createInitialForms,
   createResponseForm,
+  editResponseForm,
+  fillFormsFromCondition,
   getMissingFields,
   getMissingFieldsMessage,
-  isFormDirty,
-  type ResponseSaveOverrides,
+  synchronizeResponseForms,
   type PanelMessage,
   type ResponseForm,
-} from "@/features/participant-response/model/response-form";
-import { CandidateResponseCard } from "@/features/participant-response/ui/candidate-response-card";
-import { QuickResponsePanel } from "@/features/participant-response/ui/quick-response-panel";
+  type ResponseSaveOverrides,
+} from '@/features/participant-response/model/response-form';
+import { CandidateResponseCard } from '@/features/participant-response/ui/candidate-response-card';
+import { QuickResponsePanel } from '@/features/participant-response/ui/quick-response-panel';
+import { RoomApiError } from '@/shared/api/http-client';
+import { useEffect, useState } from 'react';
 
 type ParticipantResponsePanelProps = {
   roomId: string;
@@ -36,21 +38,21 @@ type ParticipantResponsePanelProps = {
 
 function describeResponseError(error: unknown) {
   if (error instanceof RoomApiError) {
-    if (error.code === "TOKEN_EXPIRED" || error.code === "INVALID_TOKEN") {
-      return "방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.";
+    if (error.code === 'TOKEN_EXPIRED' || error.code === 'INVALID_TOKEN') {
+      return '방 입장 정보를 확인할 수 없습니다. 방 코드와 이름을 입력해 다시 입장해 주세요.';
     }
-    if (error.code === "ROOM_STATE_CONFLICT") {
-      return "현재 방 상태에서는 의견을 수정할 수 없습니다.";
+    if (error.code === 'ROOM_STATE_CONFLICT') {
+      return '현재 방 상태에서는 의견을 수정할 수 없습니다.';
     }
-    if (error.code === "RESOURCE_NOT_FOUND") {
-      return "이 후보는 더 이상 의견을 받을 수 없습니다.";
+    if (error.code === 'RESOURCE_NOT_FOUND') {
+      return '이 후보는 더 이상 의견을 받을 수 없습니다.';
     }
-    if (error.code === "VALIDATION_ERROR") {
-      return "의견 입력을 다시 확인해 주세요.";
+    if (error.code === 'VALIDATION_ERROR') {
+      return '의견 입력을 다시 확인해 주세요.';
     }
   }
 
-  return "의견을 저장하지 못했습니다. 입력은 남아 있으니 잠시 후 다시 시도해 주세요.";
+  return '의견을 저장하지 못했습니다. 입력은 남아 있으니 잠시 후 다시 시도해 주세요.';
 }
 
 export function ParticipantResponsePanel({
@@ -64,66 +66,34 @@ export function ParticipantResponsePanel({
   onRoomRefresh,
 }: ParticipantResponsePanelProps) {
   const [forms, setForms] = useState<Record<string, ResponseForm>>(() =>
-    createInitialForms(candidates, responses),
+    createInitialForms(candidates, responses)
   );
   const [fastAvailabilityStatus, setFastAvailabilityStatus] =
     useState<AvailabilityStatus | null>(null);
-  const [fastTravelBurden, setFastTravelBurden] =
-    useState<TravelBurden | null>(null);
+  const [fastTravelBurden, setFastTravelBurden] = useState<TravelBurden | null>(
+    null
+  );
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<PanelMessage | null>(null);
+  const [fillMessage, setFillMessage] = useState<string | null>(null);
+  const activeCandidates = candidates.filter(
+    (candidate) => candidate.status === 'ACTIVE'
+  );
 
   const responsesByCandidateId = new Map(
-    responses.map((response) => [response.candidateId, response]),
+    responses.map((response) => [response.candidateId, response])
   );
   const hasSubmittingForm = Object.values(forms).some(
-    (form) => form.isSubmitting,
+    (form) => form.isSubmitting
   );
   const isInteractionDisabled =
     isReadOnly || isBulkSubmitting || hasSubmittingForm;
 
   useEffect(() => {
-    const incomingResponsesByCandidateId = new Map(
-      responses.map((response) => [response.candidateId, response]),
-    );
-
     const timerId = window.setTimeout(() => {
-      setForms((current) => {
-        let next = current;
-
-        for (const candidate of candidates) {
-          const existing = current[candidate.id];
-          if (!existing) {
-            next = {
-              ...next,
-              [candidate.id]: createResponseForm(
-                incomingResponsesByCandidateId.get(candidate.id),
-              ),
-            };
-            continue;
-          }
-
-          if (existing.isSubmitting || isFormDirty(existing)) {
-            continue;
-          }
-
-          const hydrated = createResponseForm(
-            incomingResponsesByCandidateId.get(candidate.id),
-          );
-          const savedSnapshotChanged =
-            existing.savedResponseId !== hydrated.savedResponseId ||
-            existing.savedAvailabilityStatus !==
-              hydrated.savedAvailabilityStatus ||
-            existing.savedTravelBurden !== hydrated.savedTravelBurden ||
-            existing.savedNote !== hydrated.savedNote;
-
-          if (savedSnapshotChanged) {
-            next = { ...next, [candidate.id]: hydrated };
-          }
-        }
-
-        return next;
-      });
+      setForms((current) =>
+        synchronizeResponseForms(current, candidates, responses)
+      );
     }, 0);
 
     return () => window.clearTimeout(timerId);
@@ -147,31 +117,32 @@ export function ParticipantResponsePanel({
     }));
   }
 
+  function fillFromCondition() {
+    if (isInteractionDisabled || !condition) return;
+    const result = fillFormsFromCondition(
+      forms,
+      activeCandidates,
+      responses,
+      condition
+    );
+    setForms(result.forms);
+    setFillMessage(
+      `${result.applied}개 후보의 가능 여부를 초안으로 채웠습니다. ${result.excluded}개는 저장된 의견·직접 편집·저장 중 상태로 제외했습니다. 아직 제출되지 않았습니다.`
+    );
+  }
+
   function setSavedResponse(
     candidateId: string,
     response: ParticipantResponsePayload,
-    message: string,
+    message: string
   ) {
-    const note = response.note ?? "";
-
     setForms((current) => {
-      const form =
-        current[candidateId] ??
-        createResponseForm(responsesByCandidateId.get(candidateId));
-
       return {
         ...current,
         [candidateId]: {
-          ...form,
-          availabilityStatus: response.availabilityStatus,
-          travelBurden: response.travelBurden,
-          note,
-          savedResponseId: response.id,
-          savedAvailabilityStatus: response.availabilityStatus,
-          savedTravelBurden: response.travelBurden,
-          savedNote: note,
+          ...createResponseForm(response),
           message,
-          messageKind: "success",
+          messageKind: 'success',
           isSubmitting: false,
         },
       };
@@ -180,9 +151,14 @@ export function ParticipantResponsePanel({
 
   async function saveResponse(
     candidateId: string,
-    overrides: ResponseSaveOverrides = {},
+    overrides: ResponseSaveOverrides = {}
   ) {
-    if (isReadOnly || isBulkSubmitting) {
+    if (
+      isReadOnly ||
+      isBulkSubmitting ||
+      getForm(candidateId).isSubmitting ||
+      !activeCandidates.some((candidate) => candidate.id === candidateId)
+    ) {
       return;
     }
 
@@ -191,7 +167,7 @@ export function ParticipantResponsePanel({
     if (missingFieldsMessage) {
       updateForm(candidateId, {
         message: missingFieldsMessage,
-        messageKind: "error",
+        messageKind: 'error',
         isSubmitting: false,
       });
       return;
@@ -199,7 +175,7 @@ export function ParticipantResponsePanel({
 
     updateForm(candidateId, {
       isSubmitting: true,
-      message: "",
+      message: '',
       messageKind: null,
     });
 
@@ -213,19 +189,19 @@ export function ParticipantResponsePanel({
           availabilityStatus: form.availabilityStatus!,
           travelBurden: form.travelBurden!,
           note: form.note.trim() || null,
-        },
+        }
       );
       setSavedResponse(
         candidateId,
         result.response,
-        "의견을 저장했습니다. 다음 추천 결과에 반영됩니다.",
+        '의견을 저장했습니다. 다음 추천 결과에 반영됩니다.'
       );
       await onRoomRefresh();
     } catch (error) {
       updateForm(candidateId, {
         isSubmitting: false,
         message: describeResponseError(error),
-        messageKind: "error",
+        messageKind: 'error',
       });
     }
   }
@@ -233,14 +209,14 @@ export function ParticipantResponsePanel({
   async function saveAllResponses(
     quickResponse?: Pick<
       ResponseSaveOverrides,
-      "availabilityStatus" | "travelBurden"
-    >,
+      'availabilityStatus' | 'travelBurden'
+    >
   ) {
-    if (isInteractionDisabled || candidates.length === 0) {
+    if (isInteractionDisabled || activeCandidates.length === 0) {
       return;
     }
 
-    const formsToSave = candidates.map((candidate) => ({
+    const formsToSave = activeCandidates.map((candidate) => ({
       candidate,
       form: {
         ...getForm(candidate.id),
@@ -248,7 +224,7 @@ export function ParticipantResponsePanel({
       },
     }));
     const incompleteForms = formsToSave.filter(
-      ({ form }) => getMissingFields(form).length > 0,
+      ({ form }) => getMissingFields(form).length > 0
     );
 
     if (incompleteForms.length > 0) {
@@ -259,7 +235,7 @@ export function ParticipantResponsePanel({
           next[candidate.id] = {
             ...form,
             message: getMissingFieldsMessage(form),
-            messageKind: "error",
+            messageKind: 'error',
           };
         }
 
@@ -267,24 +243,25 @@ export function ParticipantResponsePanel({
       });
       setBulkMessage({
         text: `모든 후보에 참석 가능 여부와 이동 부담을 선택해 주세요. 아직 선택하지 않은 후보 ${incompleteForms.length}개가 있습니다.`,
-        kind: "error",
+        kind: 'error',
       });
       return;
     }
 
     setIsBulkSubmitting(true);
     setBulkMessage({
-      text: `후보 ${candidates.length}개의 의견을 저장하고 있습니다.`,
-      kind: "info",
+      text: `${activeCandidates.length}개 후보의 의견을 저장하는 중입니다...`,
+      kind: 'info',
     });
     setForms((current) => {
       const next = { ...current };
-      for (const { candidate } of formsToSave) {
-        const form = current[candidate.id] ?? getForm(candidate.id);
+      for (const { candidate, form } of formsToSave) {
         next[candidate.id] = {
           ...form,
-          message: "의견을 저장하고 있습니다.",
-          messageKind: "info",
+          manuallyEdited: true,
+          autoFill: quickResponse ? null : form.autoFill,
+          message: '일괄 저장 중...',
+          messageKind: 'info',
         };
       }
       return next;
@@ -292,18 +269,12 @@ export function ParticipantResponsePanel({
 
     const results = await Promise.allSettled(
       formsToSave.map(({ candidate, form }) =>
-        upsertParticipantResponse(
-          roomId,
-          participantId,
-          candidate.id,
-          token,
-          {
-            availabilityStatus: form.availabilityStatus!,
-            travelBurden: form.travelBurden!,
-            note: form.note.trim() || null,
-          },
-        ),
-      ),
+        upsertParticipantResponse(roomId, participantId, candidate.id, token, {
+          availabilityStatus: form.availabilityStatus!,
+          travelBurden: form.travelBurden!,
+          note: form.note.trim() || null,
+        })
+      )
     );
 
     let successCount = 0;
@@ -311,19 +282,19 @@ export function ParticipantResponsePanel({
     results.forEach((result, index) => {
       const candidateId = formsToSave[index].candidate.id;
 
-      if (result.status === "fulfilled") {
+      if (result.status === 'fulfilled') {
         successCount += 1;
         setSavedResponse(
           candidateId,
           result.value.response,
-          "의견을 저장했습니다.",
+          '의견을 저장했습니다.'
         );
       } else {
         failureCount += 1;
         updateForm(candidateId, {
           isSubmitting: false,
           message: describeResponseError(result.reason),
-          messageKind: "error",
+          messageKind: 'error',
         });
       }
     });
@@ -334,7 +305,7 @@ export function ParticipantResponsePanel({
         failureCount === 0
           ? `후보 ${successCount}개의 의견을 모두 저장했습니다.`
           : `후보 ${successCount}개는 저장했고 ${failureCount}개는 저장하지 못했습니다. 실패한 후보의 입력은 유지됩니다.`,
-      kind: failureCount === 0 ? "success" : "error",
+      kind: failureCount === 0 ? 'success' : 'error',
     });
     if (successCount > 0) {
       await onRoomRefresh();
@@ -344,8 +315,8 @@ export function ParticipantResponsePanel({
   function saveQuickResponses() {
     if (!fastAvailabilityStatus || !fastTravelBurden) {
       setBulkMessage({
-        text: "모든 후보에 저장하려면 참석 가능 여부와 이동 부담을 모두 선택해 주세요.",
-        kind: "error",
+        text: '모든 후보에 저장하려면 참석 가능 여부와 이동 부담을 모두 선택해 주세요.',
+        kind: 'error',
       });
       return;
     }
@@ -357,31 +328,52 @@ export function ParticipantResponsePanel({
   }
 
   return (
-    <section className="space-y-4">
-      <div className="space-y-2">
-        <p className="text-sm font-semibold text-emerald-700">내 의견</p>
-        <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+    <section className='space-y-4'>
+      <div className='space-y-2'>
+        <p className='text-sm font-semibold text-emerald-700'>내 의견</p>
+        <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
           후보별 의견
         </h2>
-        <p className="text-sm leading-6 text-slate-500">
-          각 후보의 참석 가능 여부와 이동 부담을 선택해 주세요. 두 항목을 모두 고르면
-          의견이 바로 저장되고, 메모는 필요할 때만 추가하면 됩니다. 모든 후보에
-          응답해야 방장이 일정을 확정할 수 있습니다.
+        <p className='text-sm leading-6 text-slate-500'>
+          미응답 후보는 보류로 표시하지만 아직 미제출입니다. 참석 가능 여부와
+          이동 부담을 확인한 뒤 의견 저장을 누르세요. 메모는 선택 사항입니다.
         </p>
         {isReadOnly && (
-          <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600">
-            일정이 확정되어 의견을 수정할 수 없습니다. 다시 바꾸려면 방장이 먼저
-            확정 내용을 다시 검토해야 합니다.
+          <p className='rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600'>
+            현재 방 상태에서는 의견을 수정할 수 없습니다. 계산 중에는 완료를
+            기다리고, 확정된 방은 방장이 다시 살펴보기를 시작해야 합니다.
           </p>
         )}
       </div>
 
-      {candidates.length === 0 ? (
-        <div className="rounded-xl border border-dashed border-slate-300 bg-white/65 p-4 text-sm leading-5 text-slate-500">
+      {activeCandidates.length === 0 ? (
+        <div className='rounded-xl border border-dashed border-slate-300 bg-white/65 p-4 text-sm leading-5 text-slate-500'>
           방장이 후보를 등록하면 이곳에서 의견을 남길 수 있습니다.
         </div>
       ) : (
         <>
+          <div className='rounded-xl border border-sky-100 bg-sky-50/55 p-4 space-y-2'>
+            <button
+              className='mp-button mp-button-secondary'
+              type='button'
+              disabled={isInteractionDisabled || !condition}
+              onClick={fillFromCondition}
+            >
+              {Object.values(forms).some((form) => form.autoFill)
+                ? '내 기준으로 다시 채우기'
+                : '내 기준으로 의견 채우기'}
+            </button>
+            <p className='text-xs leading-5 text-slate-600'>
+              {condition
+                ? '서버에서 불러온 저장된 내 기준을 사용합니다. 가능 여부만 초안으로 채우며, 저장된 의견과 직접 편집한 후보는 유지합니다. 내 기준을 바꿔도 초안을 자동으로 덮어쓰지 않습니다.'
+                : '저장된 내 기준이 없습니다. 내 기준을 먼저 저장해 주세요. 저장하지 않은 입력은 사용할 수 없습니다.'}
+            </p>
+            {fillMessage && (
+              <p role='status' className='text-sm text-slate-700'>
+                {fillMessage}
+              </p>
+            )}
+          </div>
           <QuickResponsePanel
             availabilityStatus={fastAvailabilityStatus}
             isDisabled={isInteractionDisabled}
@@ -392,8 +384,8 @@ export function ParticipantResponsePanel({
             travelBurden={fastTravelBurden}
           />
 
-          <div className="grid gap-3 lg:grid-cols-2">
-            {candidates.map((candidate) => (
+          <div className='grid gap-3 lg:grid-cols-2'>
+            {activeCandidates.map((candidate) => (
               <CandidateResponseCard
                 candidate={candidate}
                 condition={condition}
@@ -404,7 +396,15 @@ export function ParticipantResponsePanel({
                 onSave={(overrides) =>
                   void saveResponse(candidate.id, overrides)
                 }
-                onUpdate={(update) => updateForm(candidate.id, update)}
+                onUpdate={(update) =>
+                  setForms((current) => ({
+                    ...current,
+                    [candidate.id]: editResponseForm(
+                      current[candidate.id] ?? getForm(candidate.id),
+                      update
+                    ),
+                  }))
+                }
               />
             ))}
           </div>

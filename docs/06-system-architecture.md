@@ -74,7 +74,7 @@ NestJS 내부 서비스도 기능 단위로 책임을 나눈다. `RoomService`�
 - 로컬 개발에서 client는 `http://localhost:3001/api/v1`를 호출한다.
 - Server는 `http://localhost:10081`을 허용 origin으로 설정한다. 실제 CORS 설정값은 환경 변수로 둔다.
 - 브라우저가 보내는 Origin은 사용자가 접속한 주소이므로 Docker 내부 서비스명(`client`)을 CORS origin으로 임의 지정하지 않는다. 호스트 실행에서는 `http://localhost:10081`, 배포에서는 실제 공개 Client origin을 사용한다.
-- 현재 인증은 쿠키 세션이 아닌 Bearer 토큰이므로 CORS 요청에 `credentials`를 요구하지 않는다.
+- 방 데이터 API는 Bearer 접근 토큰을 사용하고, 기존 참여자 복구에는 별도의 HttpOnly 쿠키를 사용한다. CORS는 CLIENT_ORIGIN 허용 목록과 credentials=true, Client는 credentials=include를 사용한다. 운영 Client/API는 같은 site의 HTTPS 주소로 배포한다. 복구 쿠키는 SameSite=Strict와 production Secure를 사용하며 쿠키 복구에는 허용 Origin을 필수로 검증한다. 상세 정책은 `docs/decisions/room-access-recovery.md`를 따른다.
 - API 오류는 `docs/04-api-contract.md`의 공통 오류 envelope와 `requestId`를 사용한다.
 - 서버는 계산 요청을 받은 뒤 `calculationId`를 반환하고, Client는 계산 상태·결과 API를 조회한다.
 
