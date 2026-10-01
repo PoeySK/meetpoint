@@ -11,6 +11,7 @@ import { ParticipantResponse } from '../src/rooms/infrastructure/persistence/typ
 import { ParticipantCondition } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from '../src/rooms/infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from '../src/rooms/infrastructure/persistence/typeorm/entities/score-result.entity';
+import { CalculationJob } from '../src/rooms/infrastructure/persistence/typeorm/entities/calculation-job.entity';
 import { RoomsModule } from '../src/rooms/rooms.module';
 
 const runCalculationE2e = process.env.RUN_CALCULATION_E2E === 'true';
@@ -31,6 +32,7 @@ const databaseUrl =
         Decision,
         ParticipantResponse,
         ScoreResult,
+        CalculationJob,
         ParticipantCondition,
       ],
       synchronize: false,

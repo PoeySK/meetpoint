@@ -583,7 +583,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
   "calculation": {
     "id": "score_20260813_02",
     "roomId": "room_01",
-    "status": "RUNNING",
+    "status": "REQUESTED",
     "policyVersion": "condition-aware-1",
     "scoringProfile": "CONDITION_AWARE",
     "createdAt": "2026-08-13T04:50:00Z"
@@ -601,6 +601,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - 개인 조건은 선택 사항이다. 미입력 참여자의 `condition`은 `null`로 Solver에 전달하며 응답과 후보 정보로 계산한다. 결과의 `explanationFlags`에 `CONDITION_NOT_PROVIDED`를 표시한다.
 - 후보별 응답 누락은 계산을 거부하지 않고 결과의 `coverage`와 `MISSING_RESPONSE`로 표시한다.
 - `clientRequestId`가 같은 재시도 요청은 동일 계산을 재사용하도록 설계하지만, 이 키의 보존 기간은 미결정이다.
+- 요청 transaction은 `ScoreResult`, Room 상태, `calculation_jobs` outbox row를 함께 `REQUESTED`로 저장한다. Server worker는 PostgreSQL row lock과 lease로 작업을 claim해 `RUNNING`으로 전환한다.
+- worker가 중단되어 lease가 만료된 `RUNNING` 작업은 다음 worker가 다시 claim한다. Solver의 timeout·연결 실패처럼 재시도 가능한 오류는 설정된 최대 시도 횟수까지 `REQUESTED`로 되돌리고, 응답 schema 오류 또는 재시도 한도 초과는 `FAILED`로 확정한다.
 
 ### 12. 계산 결과 조회
 

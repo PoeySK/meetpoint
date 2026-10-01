@@ -5,6 +5,10 @@ import type { ParticipantConditionRecord } from '../../domain/participant-condit
 import type { ParticipantResponseRecord } from '../../domain/participant-response/participant-response';
 import type { RoomRecord } from '../../domain/room/room-status';
 import type { ScoreResultRecord } from '../../domain/calculation/score-result';
+import type {
+  CalculationJobRecord,
+  CalculationJobStatus,
+} from '../../domain/calculation/calculation-job';
 
 export type RepositoryLookupOptions = {
   lock?: boolean;
@@ -76,6 +80,19 @@ export interface ScoreResultRepositoryPort {
   save(scoreResult: ScoreResultRecord): Promise<ScoreResultRecord>;
 }
 
+export interface CalculationJobRepositoryPort {
+  findById(
+    id: string,
+    options?: RepositoryLookupOptions
+  ): Promise<CalculationJobRecord | null>;
+  save(job: CalculationJobRecord): Promise<CalculationJobRecord>;
+  claimNextRunnable(
+    now: Date,
+    leaseExpiredBefore: Date
+  ): Promise<CalculationJobRecord | null>;
+  countByStatus(status: CalculationJobStatus): Promise<number>;
+}
+
 export interface DecisionRepositoryPort {
   findById(id: string, roomId: string): Promise<DecisionRecord | null>;
   findConfirmedByRoomId(roomId: string): Promise<DecisionRecord | null>;
@@ -89,6 +106,7 @@ export interface RoomsRepositories {
   responses: ParticipantResponseRepositoryPort;
   conditions: ParticipantConditionRepositoryPort;
   scoreResults: ScoreResultRepositoryPort;
+  calculationJobs: CalculationJobRepositoryPort;
   decisions: DecisionRepositoryPort;
 }
 

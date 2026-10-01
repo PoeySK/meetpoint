@@ -7,6 +7,8 @@ import { ParticipantResponse } from './infrastructure/persistence/typeorm/entiti
 import { ParticipantCondition } from './infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from './infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from './infrastructure/persistence/typeorm/entities/score-result.entity';
+import { CalculationJob } from './infrastructure/persistence/typeorm/entities/calculation-job.entity';
+import { CalculationJobRunner } from './application/calculation-job.runner';
 import { CandidateController } from './presentation/http/controllers/candidate.controller';
 import { CalculationController } from './presentation/http/controllers/calculation.controller';
 import { DecisionController } from './presentation/http/controllers/decision.controller';
@@ -52,6 +54,7 @@ import { SOLVER } from './application/ports/solver.port';
       ParticipantResponse,
       ParticipantCondition,
       ScoreResult,
+      CalculationJob,
     ]),
   ],
   controllers: [
@@ -74,6 +77,7 @@ import { SOLVER } from './application/ports/solver.port';
     LeaveRoomUseCase,
     KickParticipantUseCase,
     StartCalculationUseCase,
+    CalculationJobRunner,
     ConfirmDecisionUseCase,
     ReopenDecisionUseCase,
     GetRoomQuery,

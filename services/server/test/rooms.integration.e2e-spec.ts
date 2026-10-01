@@ -11,6 +11,7 @@ import { ParticipantResponse } from '../src/rooms/infrastructure/persistence/typ
 import { ParticipantCondition } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant-condition.entity';
 import { Room } from '../src/rooms/infrastructure/persistence/typeorm/entities/room.entity';
 import { ScoreResult } from '../src/rooms/infrastructure/persistence/typeorm/entities/score-result.entity';
+import { CalculationJob } from '../src/rooms/infrastructure/persistence/typeorm/entities/calculation-job.entity';
 import { ParticipantStatus } from '../src/rooms/domain/participant/participant';
 import { CandidateStatus } from '../src/rooms/domain/candidate/candidate';
 import {
@@ -19,6 +20,7 @@ import {
 } from '../src/rooms/domain/participant-response/participant-response';
 import { RoomStatus } from '../src/rooms/domain/room/room-status';
 import { RoomsModule } from '../src/rooms/rooms.module';
+import { CalculationJobRunner } from '../src/rooms/application/calculation-job.runner';
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -36,6 +38,7 @@ const databaseUrl =
         Decision,
         ParticipantResponse,
         ScoreResult,
+        CalculationJob,
         ParticipantCondition,
       ],
       synchronize: false,
@@ -72,7 +75,10 @@ describe('Room Candidate and ParticipantResponse integration', () => {
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [RoomsIntegrationModule],
-    }).compile();
+    })
+      .overrideProvider(CalculationJobRunner)
+      .useValue({ trigger: jest.fn() })
+      .compile();
 
     app = moduleFixture.createNestApplication();
     app.useLogger(false);

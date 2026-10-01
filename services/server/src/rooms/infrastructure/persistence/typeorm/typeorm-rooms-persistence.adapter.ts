@@ -8,7 +8,9 @@ import { ParticipantResponse } from './entities/participant-response.entity';
 import { ParticipantCondition } from './entities/participant-condition.entity';
 import { Room } from './entities/room.entity';
 import { ScoreResult } from './entities/score-result.entity';
+import { CalculationJob } from './entities/calculation-job.entity';
 import { CandidateStatus } from '../../../domain/candidate/candidate';
+import { CalculationJobStatus } from '../../../domain/calculation/calculation-job';
 import { DecisionStatus } from '../../../domain/decision/decision';
 import type {
   CandidateRepositoryPort,
@@ -20,6 +22,7 @@ import type {
   RoomsPersistencePort,
   RoomsRepositories,
   ScoreResultRepositoryPort,
+  CalculationJobRepositoryPort,
 } from '../../../application/ports/rooms-persistence.port';
 import {
   toCandidateEntity,
@@ -36,6 +39,8 @@ import {
   toRoomRecord,
   toScoreResultEntity,
   toScoreResultRecord,
+  toCalculationJobEntity,
+  toCalculationJobRecord,
 } from './mappers/record-mappers';
 
 @Injectable()
@@ -58,6 +63,7 @@ export class TypeOrmRoomsPersistenceAdapter implements RoomsPersistencePort {
       responses: this.createParticipantResponseRepository(manager),
       conditions: this.createParticipantConditionRepository(manager),
       scoreResults: this.createScoreResultRepository(manager),
+      calculationJobs: this.createCalculationJobRepository(manager),
       decisions: this.createDecisionRepository(manager),
     };
   }
@@ -256,6 +262,59 @@ export class TypeOrmRoomsPersistenceAdapter implements RoomsPersistencePort {
         return toScoreResultRecord(
           await repository.save(toScoreResultEntity(scoreResult))
         );
+      },
+    };
+  }
+
+  private createCalculationJobRepository(
+    manager: EntityManager
+  ): CalculationJobRepositoryPort {
+    const repository = manager.getRepository(CalculationJob);
+
+    return {
+      async findById(id, options) {
+        const entity = await repository.findOne({
+          where: { id },
+          ...(options?.lock
+            ? { lock: { mode: 'pessimistic_write' as const } }
+            : {}),
+        });
+        return entity ? toCalculationJobRecord(entity) : null;
+      },
+      async save(job) {
+        return toCalculationJobRecord(
+          await repository.save(toCalculationJobEntity(job))
+        );
+      },
+      async claimNextRunnable(now, leaseExpiredBefore) {
+        const entity = await repository
+          .createQueryBuilder('job')
+          .setLock('pessimistic_write')
+          .setOnLocked('skip_locked')
+          .where(
+            '(job.status = :requested AND job.nextAttemptAt <= :now) OR (job.status = :running AND job.lockedAt <= :leaseExpiredBefore)',
+            {
+              requested: 'REQUESTED',
+              running: 'RUNNING',
+              now,
+              leaseExpiredBefore,
+            }
+          )
+          .orderBy('job.nextAttemptAt', 'ASC')
+          .addOrderBy('job.createdAt', 'ASC')
+          .getOne();
+        if (!entity) {
+          return null;
+        }
+
+        entity.status = CalculationJobStatus.RUNNING;
+        entity.attemptCount += 1;
+        entity.lockedAt = now;
+        entity.updatedAt = now;
+        return toCalculationJobRecord(await repository.save(entity));
+      },
+      async countByStatus(status) {
+        return repository.countBy({ status });
       },
     };
   }

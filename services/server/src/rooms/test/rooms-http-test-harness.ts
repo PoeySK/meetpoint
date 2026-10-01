@@ -28,6 +28,7 @@ import { UpsertParticipantConditionUseCase } from '../application/commands/upser
 import { LeaveRoomUseCase } from '../application/commands/leave-room.use-case';
 import { KickParticipantUseCase } from '../application/commands/kick-participant.use-case';
 import { StartCalculationUseCase } from '../application/commands/start-calculation.use-case';
+import { CalculationJobRunner } from '../application/calculation-job.runner';
 import { ConfirmDecisionUseCase } from '../application/commands/confirm-decision.use-case';
 import { ReopenDecisionUseCase } from '../application/commands/reopen-decision.use-case';
 import { GetRoomQuery } from '../application/queries/get-room.query';
@@ -707,6 +708,10 @@ export async function createRoomsTestContext(): Promise<RoomsTestContext> {
       LeaveRoomUseCase,
       KickParticipantUseCase,
       StartCalculationUseCase,
+      {
+        provide: CalculationJobRunner,
+        useValue: { trigger: jest.fn() },
+      },
       ConfirmDecisionUseCase,
       ReopenDecisionUseCase,
       GetRoomQuery,
