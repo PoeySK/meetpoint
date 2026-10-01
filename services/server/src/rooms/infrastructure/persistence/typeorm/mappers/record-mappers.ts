@@ -42,6 +42,8 @@ export function toParticipantRecord(entity: Participant): ParticipantRecord {
     displayName: entity.displayName,
     role: entity.role,
     status: entity.status,
+    recoveryHash: entity.recoveryHash,
+    recoveryExpiresAt: entity.recoveryExpiresAt,
     tokenHash: entity.tokenHash,
     tokenExpiresAt: entity.tokenExpiresAt,
     tokenRevokedAt: entity.tokenRevokedAt,

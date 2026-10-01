@@ -54,6 +54,7 @@ export async function request<T>(path: string, options: RequestInit = {}) {
   try {
     response = await fetch(`${API_BASE_URL}${path}`, {
       ...options,
+      credentials: "include",
       cache: "no-store",
     });
   } catch {

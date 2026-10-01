@@ -18,6 +18,9 @@ import { RoomsController } from '../presentation/http/controllers/rooms.controll
 import { ParticipantLifecycleController } from '../presentation/http/controllers/participant-lifecycle.controller';
 import { ParticipantResponseController } from '../presentation/http/controllers/participant-response.controller';
 import { ParticipantConditionController } from '../presentation/http/controllers/participant-condition.controller';
+import { RecoverRoomAccessUseCase } from '../application/commands/recover-room-access.use-case';
+import { RECOVERY_CREDENTIAL } from '../application/ports/recovery-credential.port';
+import { RecoveryCredentialAdapter } from '../infrastructure/security/recovery-credential.adapter';
 import { CreateRoomUseCase } from '../application/commands/create-room.use-case';
 import { JoinParticipantUseCase } from '../application/commands/join-participant.use-case';
 import { CreateCandidateUseCase } from '../application/commands/create-candidate.use-case';
@@ -698,6 +701,9 @@ export async function createRoomsTestContext(): Promise<RoomsTestContext> {
       ParticipantLifecycleController,
     ],
     providers: [
+      RecoverRoomAccessUseCase,
+      RecoveryCredentialAdapter,
+      { provide: RECOVERY_CREDENTIAL, useExisting: RecoveryCredentialAdapter },
       CreateRoomUseCase,
       JoinParticipantUseCase,
       CreateCandidateUseCase,

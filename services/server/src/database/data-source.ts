@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { AddParticipantRecovery20261001000000 } from './migrations/20261001000000-add-participant-recovery';
 import { DataSource } from 'typeorm';
 import { Participant } from '../rooms/infrastructure/persistence/typeorm/entities/participant.entity';
 import { Candidate } from '../rooms/infrastructure/persistence/typeorm/entities/candidate.entity';
@@ -33,6 +34,7 @@ const dataSource = new DataSource({
     ParticipantCondition,
   ],
   migrations: [
+    AddParticipantRecovery20261001000000,
     CreateRoomsAndParticipants20260814000000,
     CreateCandidatesAndResponses20260815000000,
     CreateScoreResults20260816000000,

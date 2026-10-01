@@ -1,4 +1,8 @@
 import { ConflictException, Inject, Injectable } from '@nestjs/common';
+import {
+  RECOVERY_CREDENTIAL,
+  type RecoveryCredentialPort,
+} from '../ports/recovery-credential.port';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { ACCESS_TOKEN, type AccessTokenPort } from '../ports/room-access.port';
 import {
@@ -25,7 +29,9 @@ export class CreateRoomUseCase {
   constructor(
     @Inject(ROOMS_PERSISTENCE)
     private readonly persistence: RoomsPersistencePort,
-    @Inject(ACCESS_TOKEN) private readonly accessToken: AccessTokenPort
+    @Inject(ACCESS_TOKEN) private readonly accessToken: AccessTokenPort,
+    @Inject(RECOVERY_CREDENTIAL)
+    private readonly recovery: RecoveryCredentialPort
   ) {}
 
   async execute(input: unknown) {
@@ -33,6 +39,7 @@ export class CreateRoomUseCase {
     const roomId = randomUUID();
     const hostParticipantId = randomUUID();
     const issuedToken = this.accessToken.issue();
+    const issuedRecovery = this.recovery.issue();
 
     let created:
       | { room: RoomRecord; participant: ParticipantRecord; roomCode: string }
@@ -64,6 +71,8 @@ export class CreateRoomUseCase {
               displayName: normalizedInput.displayName,
               role: ParticipantRole.HOST,
               status: ParticipantStatus.JOINED,
+              recoveryHash: issuedRecovery.hash,
+              recoveryExpiresAt: issuedRecovery.expiresAt,
               tokenHash: issuedToken.tokenHash,
               tokenExpiresAt: issuedToken.tokenExpiresAt,
               tokenRevokedAt: null,
@@ -91,6 +100,10 @@ export class CreateRoomUseCase {
     }
 
     return {
+      recovery: {
+        code: issuedRecovery.code,
+        expiresAt: issuedRecovery.expiresAt,
+      },
       room: created.room,
       participant: created.participant,
       hostToken: issuedToken.token,

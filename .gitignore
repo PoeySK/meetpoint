@@ -22,6 +22,8 @@
 # Environment variables
 **/.env
 **/.env.*
+!services/server/.env.example
+!client/.env.example
 
 # Logs
 **/*.log

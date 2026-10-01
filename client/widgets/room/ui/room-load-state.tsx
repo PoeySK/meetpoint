@@ -44,9 +44,15 @@ export function ErrorView({
           </button>
           <Link
             className='mp-button mp-button-secondary'
+            href='/'
+          >
+            새 방 만들기
+          </Link>
+          <Link
+            className='mp-button mp-button-secondary'
             href='/join'
           >
-            방 코드로 다시 입장
+            새 MEMBER로 입장
           </Link>
         </div>
       </section>

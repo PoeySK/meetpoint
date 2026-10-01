@@ -62,7 +62,7 @@
 | `MAYBE` | 20 | 조정하면 가능하지만 확정적이지 않음 | 없음. 단, 설명 플래그 표시 |
 | `UNAVAILABLE` | 0 | 참여할 수 없음 | `TIME_UNAVAILABLE` |
 
-- `AVAILABLE`은 후보 시간이 적어도 하나의 가능한 시간 구간 안에 완전히 포함되어야 한다. Server가 응답 저장 시 먼저 검증하고 Solver도 snapshot을 방어적으로 검증한다.
+- Server는 가능한 시간 밖의 `AVAILABLE` 응답도 저장한다. 조건을 반영하는 계산 정책에서 Solver는 후보 시간이 어느 가능 구간에도 완전히 포함되지 않으면 시간 점수를 0으로 두고 `TIME_CONDITION_CONFLICT`를 표시한다. Client 입력 보조는 포함된 후보만 `AVAILABLE` 초안으로 채우며 시간 밖은 `MAYBE`로 둔다. 예산·특징 충돌을 `UNAVAILABLE`로 자동 변환하지 않는다.
 - `MAYBE`는 투표의 반쪽 찬성이 아니라 불확실성으로 표시한다. 20점을 주지만 “모두가 확실히 가능”으로 설명하지 않는다.
 - `UNAVAILABLE`인 참가자가 한 명이라도 있으면 후보는 `eligible=false`다.
 - 시간 구간의 날짜와 시간대는 후보의 `time`과 같은 기준으로 비교한다. 시간대 변환 후 실제 순간의 겹침을 계산한다.

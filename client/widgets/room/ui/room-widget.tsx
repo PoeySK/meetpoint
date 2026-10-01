@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import { RoomWorkspaceWidget } from "@/widgets/room-workspace";
 import { RoomParticipantsWidget } from "@/widgets/room-participants";
 import { useParticipantLifecycle } from "@/features/participant-lifecycle";
+import { RoomRecoveryPanel } from "@/features/room-recovery";
 import { ErrorView, LoadingView } from "./room-load-state";
 import { RoomSummary } from "./room-summary";
 import { useRoomSession } from "../model/use-room-session";
 import {
   getRoomParticipantStorageKey,
+  getRoomRecoveryStorageKey,
   getRoomTokenStorageKey,
 } from "@/shared/lib/room-session";
 
@@ -25,13 +27,16 @@ export function RoomWidget({ roomId }: { roomId: string }) {
     latestScoreResult,
     participantId,
     refreshError,
+    recoveryRegistrationError,
     refreshRoom,
+    retryRoom,
     room,
   } = useRoomSession(roomId);
   const handleLeft = useCallback(() => {
     try {
       window.sessionStorage.removeItem(getRoomTokenStorageKey(roomId));
       window.sessionStorage.removeItem(getRoomParticipantStorageKey(roomId));
+      window.sessionStorage.removeItem(getRoomRecoveryStorageKey(roomId));
     } catch {
       // The room is already left on the Server; navigation still ends this session.
     }
@@ -63,11 +68,16 @@ export function RoomWidget({ roomId }: { roomId: string }) {
 
         {isLoading && <LoadingView />}
         {!isLoading && error && (
-          <ErrorView error={error} onRetry={() => void loadRoom()} />
+          <>
+            <ErrorView error={error} onRetry={() => void retryRoom()} />
+            <RoomRecoveryPanel roomId={roomId} onRecovered={() => void loadRoom()} />
+          </>
         )}
         {!isLoading && !error && room && (
           <div className="space-y-4">
             <RoomSummary room={room} />
+            <RoomRecoveryPanel roomId={roomId} token={refreshError?.requiresRecovery ? null : accessToken} onRecovered={() => void loadRoom()} />
+            {recoveryRegistrationError && <p aria-live="polite" className="text-sm text-amber-800">{recoveryRegistrationError}</p>}
             {refreshError && (
               <p
                 aria-live="polite"
@@ -90,7 +100,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
             ) : (
               <section className="mp-card border-amber-100 bg-amber-50/80 p-4 text-sm leading-5 text-amber-800">
                 이 브라우저에서 방 입장 정보를 찾을 수 없어 후보 등록과 의견 작성을
-                사용할 수 없습니다. 방 코드로 다시 입장하면 계속할 수 있습니다.
+                사용할 수 없습니다. 개인 복구 수단으로 기존 참여자의 접근을 복구해 주세요.
               </section>
             )}
             <RoomParticipantsWidget

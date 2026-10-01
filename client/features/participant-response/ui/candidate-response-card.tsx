@@ -6,6 +6,9 @@ import {
   availabilityOptions,
   formatCandidateTime,
   getConditionWarnings,
+  getTimeMatch,
+  timeMatchDescription,
+  getAutoFillDescription,
   getMissingFieldsDescription,
   getMissingFieldsMessage,
   getResponseState,
@@ -39,22 +42,16 @@ export function CandidateResponseCard({
   const responseState = getResponseState(form);
   const missingFieldsMessage = getMissingFieldsMessage(form);
   const missingFieldsDescription = getMissingFieldsDescription(form);
-  const conditionWarnings = getConditionWarnings(
+  const conditionWarnings = getConditionWarnings(candidate, condition);
+  const autoFillDescription = getAutoFillDescription(
+    form,
     candidate,
     condition,
-    form.availabilityStatus,
   );
   const isDisabled = isReadOnly || form.isSubmitting || isBulkSubmitting;
 
   function updateResponse(update: ResponseSaveOverrides) {
     onUpdate({ ...update, message: "", messageKind: null });
-
-    const availabilityStatus =
-      update.availabilityStatus ?? form.availabilityStatus;
-    const travelBurden = update.travelBurden ?? form.travelBurden;
-    if (availabilityStatus && travelBurden && !isDisabled) {
-      onSave({ availabilityStatus, travelBurden });
-    }
   }
 
   return (
@@ -80,7 +77,11 @@ export function CandidateResponseCard({
           <span
             className={`rounded-full px-2.5 py-1 text-xs font-semibold ${responseStateClassName(responseState)}`}
           >
-            {responseStateLabel(responseState)}
+            {responseState === "dirty" && !form.savedResponseId
+              ? form.autoFill && !form.manuallyEdited
+                ? "자동 초안 · 미제출"
+                : "편집 초안 · 미제출"
+              : responseStateLabel(responseState)}
           </span>
           {responseState === "missing" && (
             <span className="text-xs text-slate-500">
@@ -136,6 +137,12 @@ export function CandidateResponseCard({
           </div>
         </fieldset>
 
+        {autoFillDescription && (
+          <p className="text-sm leading-5 text-sky-800">
+            {autoFillDescription} 아직 저장하지 않은 초안입니다.
+          </p>
+        )}
+
         <fieldset className="space-y-2">
           <legend className="text-sm font-semibold text-slate-800">
             이동 부담
@@ -160,19 +167,24 @@ export function CandidateResponseCard({
           </div>
         </fieldset>
 
-        {conditionWarnings.length > 0 && (
+        {condition && (
           <div
             aria-live="polite"
             className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800"
           >
-            <p className="font-semibold">내 기준과 다른 점이 있어요.</p>
+            <p className="font-semibold">저장된 내 기준과 비교</p>
+            <p className="mt-1">
+              {timeMatchDescription(getTimeMatch(candidate, condition))}
+            </p>
             <ul className="mt-1 list-disc space-y-0.5 pl-5">
               {conditionWarnings.map((warning) => (
                 <li key={warning}>{warning}</li>
               ))}
             </ul>
             <p className="mt-1 text-xs">
-              그래도 이 선택은 저장됩니다. 추천 결과에서 함께 확인할 수 있습니다.
+              시간·예산·특징에 대한 안내입니다. 이동 부담과 실제 참석 가능
+              여부를 확인해 주세요. 충돌이 있어도 직접 선택한 의견은 저장할 수
+              있습니다.
             </p>
           </div>
         )}

@@ -51,6 +51,7 @@ export type PublicParticipant = {
 };
 
 export type CreatedRoomResponse = {
+  recovery: { code: string; expiresAt: string };
   requestId: string;
   room: RoomPayload;
   hostParticipant: PublicParticipant;
@@ -61,6 +62,7 @@ export type CreatedRoomResponse = {
 };
 
 export type JoinedParticipantResponse = {
+  recovery: { code: string; expiresAt: string };
   requestId: string;
   room: {
     id: string;

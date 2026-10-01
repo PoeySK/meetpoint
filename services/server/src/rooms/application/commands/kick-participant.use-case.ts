@@ -77,6 +77,8 @@ export class KickParticipantUseCase {
       const changedParticipant = await participants.save({
         ...target,
         status: ParticipantStatus.REMOVED,
+        recoveryHash: null,
+        recoveryExpiresAt: null,
         tokenRevokedAt: new Date(),
         updatedAt: new Date(),
       });

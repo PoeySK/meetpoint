@@ -16,6 +16,8 @@ export interface ParticipantRecord {
   displayName: string;
   role: ParticipantRole;
   status: ParticipantStatus;
+  recoveryHash?: string | null;
+  recoveryExpiresAt?: Date | null;
   tokenHash: string;
   tokenExpiresAt: Date;
   tokenRevokedAt: Date | null;

@@ -15,7 +15,9 @@ import {
   createResponseForm,
   getMissingFields,
   getMissingFieldsMessage,
-  isFormDirty,
+  editResponseForm,
+  fillFormsFromCondition,
+  synchronizeResponseForms,
   type ResponseSaveOverrides,
   type PanelMessage,
   type ResponseForm,
@@ -72,6 +74,10 @@ export function ParticipantResponsePanel({
     useState<TravelBurden | null>(null);
   const [isBulkSubmitting, setIsBulkSubmitting] = useState(false);
   const [bulkMessage, setBulkMessage] = useState<PanelMessage | null>(null);
+  const [fillMessage, setFillMessage] = useState<string | null>(null);
+  const activeCandidates = candidates.filter(
+    (candidate) => candidate.status === "ACTIVE",
+  );
 
   const responsesByCandidateId = new Map(
     responses.map((response) => [response.candidateId, response]),
@@ -83,47 +89,10 @@ export function ParticipantResponsePanel({
     isReadOnly || isBulkSubmitting || hasSubmittingForm;
 
   useEffect(() => {
-    const incomingResponsesByCandidateId = new Map(
-      responses.map((response) => [response.candidateId, response]),
-    );
-
     const timerId = window.setTimeout(() => {
-      setForms((current) => {
-        let next = current;
-
-        for (const candidate of candidates) {
-          const existing = current[candidate.id];
-          if (!existing) {
-            next = {
-              ...next,
-              [candidate.id]: createResponseForm(
-                incomingResponsesByCandidateId.get(candidate.id),
-              ),
-            };
-            continue;
-          }
-
-          if (existing.isSubmitting || isFormDirty(existing)) {
-            continue;
-          }
-
-          const hydrated = createResponseForm(
-            incomingResponsesByCandidateId.get(candidate.id),
-          );
-          const savedSnapshotChanged =
-            existing.savedResponseId !== hydrated.savedResponseId ||
-            existing.savedAvailabilityStatus !==
-              hydrated.savedAvailabilityStatus ||
-            existing.savedTravelBurden !== hydrated.savedTravelBurden ||
-            existing.savedNote !== hydrated.savedNote;
-
-          if (savedSnapshotChanged) {
-            next = { ...next, [candidate.id]: hydrated };
-          }
-        }
-
-        return next;
-      });
+      setForms((current) =>
+        synchronizeResponseForms(current, candidates, responses),
+      );
     }, 0);
 
     return () => window.clearTimeout(timerId);
@@ -147,29 +116,30 @@ export function ParticipantResponsePanel({
     }));
   }
 
+  function fillFromCondition() {
+    if (isInteractionDisabled || !condition) return;
+    const result = fillFormsFromCondition(
+      forms,
+      activeCandidates,
+      responses,
+      condition,
+    );
+    setForms(result.forms);
+    setFillMessage(
+      `${result.applied}개 후보의 가능 여부를 초안으로 채웠습니다. ${result.excluded}개는 저장된 의견·직접 편집·저장 중 상태로 제외했습니다. 아직 제출되지 않았습니다.`,
+    );
+  }
+
   function setSavedResponse(
     candidateId: string,
     response: ParticipantResponsePayload,
     message: string,
   ) {
-    const note = response.note ?? "";
-
     setForms((current) => {
-      const form =
-        current[candidateId] ??
-        createResponseForm(responsesByCandidateId.get(candidateId));
-
       return {
         ...current,
         [candidateId]: {
-          ...form,
-          availabilityStatus: response.availabilityStatus,
-          travelBurden: response.travelBurden,
-          note,
-          savedResponseId: response.id,
-          savedAvailabilityStatus: response.availabilityStatus,
-          savedTravelBurden: response.travelBurden,
-          savedNote: note,
+          ...createResponseForm(response),
           message,
           messageKind: "success",
           isSubmitting: false,
@@ -182,7 +152,12 @@ export function ParticipantResponsePanel({
     candidateId: string,
     overrides: ResponseSaveOverrides = {},
   ) {
-    if (isReadOnly || isBulkSubmitting) {
+    if (
+      isReadOnly ||
+      isBulkSubmitting ||
+      getForm(candidateId).isSubmitting ||
+      !activeCandidates.some((candidate) => candidate.id === candidateId)
+    ) {
       return;
     }
 
@@ -236,11 +211,11 @@ export function ParticipantResponsePanel({
       "availabilityStatus" | "travelBurden"
     >,
   ) {
-    if (isInteractionDisabled || candidates.length === 0) {
+    if (isInteractionDisabled || activeCandidates.length === 0) {
       return;
     }
 
-    const formsToSave = candidates.map((candidate) => ({
+    const formsToSave = activeCandidates.map((candidate) => ({
       candidate,
       form: {
         ...getForm(candidate.id),
@@ -274,15 +249,16 @@ export function ParticipantResponsePanel({
 
     setIsBulkSubmitting(true);
     setBulkMessage({
-      text: `${candidates.length}개 후보의 의견을 저장하는 중입니다...`,
+      text: `${activeCandidates.length}개 후보의 의견을 저장하는 중입니다...`,
       kind: "info",
     });
     setForms((current) => {
       const next = { ...current };
-      for (const { candidate } of formsToSave) {
-        const form = current[candidate.id] ?? getForm(candidate.id);
+      for (const { candidate, form } of formsToSave) {
         next[candidate.id] = {
           ...form,
+          manuallyEdited: true,
+          autoFill: quickResponse ? null : form.autoFill,
           message: "일괄 저장 중...",
           messageKind: "info",
         };
@@ -364,23 +340,45 @@ export function ParticipantResponsePanel({
           후보별 의견
         </h2>
         <p className="text-sm leading-6 text-slate-500">
-          각 후보의 참석 가능 여부와 이동 부담을 선택하세요. 두 항목을 모두 고르면
-          내 의견이 바로 저장되고, 메모는 필요할 때만 추가하면 됩니다.
+          미응답 후보는 보류로 표시하지만 아직 미제출입니다. 참석 가능 여부와
+          이동 부담을 확인한 뒤 의견 저장을 누르세요. 메모는 선택 사항입니다.
         </p>
         {isReadOnly && (
           <p className="rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600">
-            방이 확정되어 의견을 읽기 전용으로 표시합니다. 다시 바꾸려면 방장이
-            먼저 다시 살펴보기를 시작해야 합니다.
+            현재 방 상태에서는 의견을 수정할 수 없습니다. 계산 중에는 완료를
+            기다리고, 확정된 방은 방장이 다시 살펴보기를 시작해야 합니다.
           </p>
         )}
       </div>
 
-      {candidates.length === 0 ? (
+      {activeCandidates.length === 0 ? (
         <div className="rounded-xl border border-dashed border-slate-300 bg-white/65 p-4 text-sm leading-5 text-slate-500">
           방장이 후보를 등록하면 이곳에서 의견을 남길 수 있습니다.
         </div>
       ) : (
         <>
+          <div className="rounded-xl border border-sky-100 bg-sky-50/55 p-4 space-y-2">
+            <button
+              className="mp-button mp-button-secondary"
+              type="button"
+              disabled={isInteractionDisabled || !condition}
+              onClick={fillFromCondition}
+            >
+              {Object.values(forms).some((form) => form.autoFill)
+                ? "내 기준으로 다시 채우기"
+                : "내 기준으로 의견 채우기"}
+            </button>
+            <p className="text-xs leading-5 text-slate-600">
+              {condition
+                ? "서버에서 불러온 저장된 내 기준을 사용합니다. 가능 여부만 초안으로 채우며, 저장된 의견과 직접 편집한 후보는 유지합니다. 내 기준을 바꿔도 초안을 자동으로 덮어쓰지 않습니다."
+                : "저장된 내 기준이 없습니다. 내 기준을 먼저 저장해 주세요. 저장하지 않은 입력은 사용할 수 없습니다."}
+            </p>
+            {fillMessage && (
+              <p role="status" className="text-sm text-slate-700">
+                {fillMessage}
+              </p>
+            )}
+          </div>
           <QuickResponsePanel
             availabilityStatus={fastAvailabilityStatus}
             isDisabled={isInteractionDisabled}
@@ -392,7 +390,7 @@ export function ParticipantResponsePanel({
           />
 
           <div className="grid gap-3 lg:grid-cols-2">
-            {candidates.map((candidate) => (
+            {activeCandidates.map((candidate) => (
               <CandidateResponseCard
                 candidate={candidate}
                 condition={condition}
@@ -403,7 +401,15 @@ export function ParticipantResponsePanel({
                 onSave={(overrides) =>
                   void saveResponse(candidate.id, overrides)
                 }
-                onUpdate={(update) => updateForm(candidate.id, update)}
+                onUpdate={(update) =>
+                  setForms((current) => ({
+                    ...current,
+                    [candidate.id]: editResponseForm(
+                      current[candidate.id] ?? getForm(candidate.id),
+                      update,
+                    ),
+                  }))
+                }
               />
             ))}
           </div>

@@ -120,7 +120,11 @@ describeCalculation(
           });
         });
 
-      const members = [] as Array<{ token: string; id: string }>;
+      const members = [] as Array<{
+        token: string;
+        id: string;
+        recoveryCode: string;
+      }>;
       for (const displayName of ['Member one', 'Member two']) {
         const joined = await request(app.getHttpServer())
           .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
@@ -129,6 +133,7 @@ describeCalculation(
         members.push({
           token: joined.body.access.participantToken,
           id: joined.body.participant.id,
+          recoveryCode: joined.body.recovery.code,
         });
       }
 
@@ -203,7 +208,7 @@ describeCalculation(
         .expect(202);
       expect(started.body.calculation).toMatchObject({
         roomId,
-        status: 'RUNNING',
+        status: 'REQUESTED',
         policyVersion: 'condition-aware-1',
         scoringProfile: 'CONDITION_AWARE',
       });
@@ -216,7 +221,9 @@ describeCalculation(
           )
           .set('Authorization', `Bearer ${members[0].token}`)
           .expect(200);
-        if (completed.body.calculation.status !== 'RUNNING') {
+        if (
+          !['REQUESTED', 'RUNNING'].includes(completed.body.calculation.status)
+        ) {
           break;
         }
         await wait(100);
@@ -247,6 +254,43 @@ describeCalculation(
         scoringProfile: 'CONDITION_AWARE',
       });
 
+      const calculatedRoom = await dataSource
+        .getRepository(Room)
+        .findOneByOrFail({ id: roomId! });
+      const calculatedScore = await dataSource
+        .getRepository(ScoreResult)
+        .findOneByOrFail({ id: started.body.calculation.id });
+      await dataSource
+        .getRepository(Participant)
+        .update(created.body.hostParticipant.id, {
+          tokenExpiresAt: new Date(Date.now() - 1),
+        });
+      const recoveredHost = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/recovery`)
+        .send({ recoveryCode: created.body.recovery.code })
+        .expect(201);
+      expect(recoveredHost.body.participant).toMatchObject({
+        id: created.body.hostParticipant.id,
+        role: 'HOST',
+      });
+      await request(app.getHttpServer())
+        .get(`/api/v1/rooms/${roomId}`)
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .expect(401);
+      created.body.access.hostToken =
+        recoveredHost.body.access.participantToken;
+      expect(
+        await dataSource.getRepository(Room).findOneByOrFail({ id: roomId! })
+      ).toEqual(calculatedRoom);
+      expect(
+        await dataSource
+          .getRepository(ScoreResult)
+          .findOneByOrFail({ id: started.body.calculation.id })
+      ).toEqual(calculatedScore);
+      expect(
+        await dataSource.getRepository(Participant).countBy({ roomId })
+      ).toBe(3);
+
       const selectedCandidateId =
         completed.body.calculation.candidates[0].candidateId;
       const confirmed = await request(app.getHttpServer())
@@ -266,6 +310,49 @@ describeCalculation(
         },
         roomStatus: 'CONFIRMED',
       });
+
+      const confirmedRoom = await dataSource
+        .getRepository(Room)
+        .findOneByOrFail({ id: roomId! });
+      const confirmedDecision = await dataSource
+        .getRepository(Decision)
+        .findOneByOrFail({ id: confirmed.body.decision.id });
+      const responsesBeforeRecovery = await dataSource
+        .getRepository(ParticipantResponse)
+        .find({ where: { roomId }, order: { id: 'ASC' } });
+      const conditionsBeforeRecovery = await dataSource
+        .getRepository(ParticipantCondition)
+        .find({ where: { roomId }, order: { participantId: 'ASC' } });
+      await dataSource
+        .getRepository(Participant)
+        .update(members[0].id, { tokenExpiresAt: new Date(Date.now() - 1) });
+      const recoveredMember = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/recovery`)
+        .send({ recoveryCode: members[0].recoveryCode })
+        .expect(201);
+      expect(recoveredMember.body.participant).toMatchObject({
+        id: members[0].id,
+        role: 'MEMBER',
+      });
+      members[0].token = recoveredMember.body.access.participantToken;
+      expect(
+        await dataSource.getRepository(Room).findOneByOrFail({ id: roomId! })
+      ).toEqual(confirmedRoom);
+      expect(
+        await dataSource
+          .getRepository(Decision)
+          .findOneByOrFail({ id: confirmed.body.decision.id })
+      ).toEqual(confirmedDecision);
+      expect(
+        await dataSource
+          .getRepository(ParticipantResponse)
+          .find({ where: { roomId }, order: { id: 'ASC' } })
+      ).toEqual(responsesBeforeRecovery);
+      expect(
+        await dataSource
+          .getRepository(ParticipantCondition)
+          .find({ where: { roomId }, order: { participantId: 'ASC' } })
+      ).toEqual(conditionsBeforeRecovery);
 
       const decision = await request(app.getHttpServer())
         .get(`/api/v1/rooms/${roomId}/decision`)

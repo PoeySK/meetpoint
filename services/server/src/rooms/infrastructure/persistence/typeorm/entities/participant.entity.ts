@@ -41,6 +41,12 @@ export class Participant {
   @Column({ type: 'varchar', length: 20, default: ParticipantStatus.JOINED })
   status!: ParticipantStatus;
 
+  @Column({ type: 'varchar', length: 64, nullable: true })
+  recoveryHash!: string | null;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  recoveryExpiresAt!: Date | null;
+
   @Column({ type: 'varchar', length: 128 })
   tokenHash!: string;
 

@@ -6,7 +6,7 @@
 - **확정**: 외부 클라이언트용 API와 내부 Rust Solver API를 분리한다. PostgreSQL은 NestJS 서버만 접근한다.
 - **확정**: 모든 날짜·시간은 ISO 8601 문자열로 전달하고, 시간대가 필요한 값에는 `timezone`을 함께 둔다.
 - **확정**: 금액은 부동소수점이 아닌 KRW 정수(`estimatedCostPerPersonKrw`, `maxBudgetKrw`)로 전달한다.
-- **확정**: 현재 token은 방 코드와 별개의 불투명 난수로 발급하고 서버에는 해시만 저장한다. Client는 방별 `sessionStorage`에 보관하며 URL·로그에는 넣지 않는다. token은 발급 후 24시간 유효하고 현재 갱신 API는 제공하지 않는다.
+- **확정**: 현재 token은 방 코드와 별개의 불투명 난수로 발급하고 서버에는 해시만 저장한다. Client는 방별 `sessionStorage`에 보관하며 URL·로그에는 넣지 않는다. token은 발급 후 24시간 유효하다. 별도의 30일 개인 복구 자격 증명으로 기존 참가자의 새 접근 토큰을 발급하며, 원문은 HttpOnly 쿠키와 사용자가 보관하는 개인 복구 파일에 보관한다. 정책은 `docs/decisions/room-access-recovery.md`를 따른다.
 - **확정**: 현재 외부 API에는 `CLOSED` 전환 endpoint를 제공하지 않는다. Room 자체는 자동 만료되지 않으며, 현재 시간에 따른 `CLOSED` 전환도 구현하지 않는다.
 - **확정**: 방 생성 API는 Room과 최소 HOST Participant를 하나의 트랜잭션으로 생성한다. 호스트 토큰 원문은 응답에서 한 번만 반환하고 서버에는 해시와 만료 정보만 저장한다.
 - **미결정**: API 문서 도구(OpenAPI 등), 방 데이터 삭제·보존 기간은 추후 확정한다.
@@ -16,7 +16,7 @@
 - 외부 API 기본 경로: `/api/v1`
 - 요청·응답 본문: `application/json; charset=utf-8`
 - ID: 문서에서는 `room_01` 같은 문자열 예시를 사용한다.
-- 방 생성과 방 코드 입장을 제외한 방 데이터 API는 `Authorization: Bearer <room-scoped-token>` 헤더를 사용한다.
+- 방 생성·방 코드 입장·개인 자격 증명 복구를 제외한 방 데이터 API는 `Authorization: Bearer <room-scoped-token>` 헤더를 사용한다.
 - 토큰에는 계정 권한이 아니라 `roomId`, `participantId`, `role(HOST|MEMBER)` 범위만 부여한다.
 - 호스트 작업은 `role=HOST`, 자기 조건·응답 변경은 토큰의 `participantId`와 경로의 참여자 ID가 일치해야 한다.
 - 후보·조건·응답이 변경되면 관련 최신 `ScoreResult`는 `STALE`로 표시된다.
@@ -37,6 +37,46 @@
 - `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
 - Decision 확정은 최신 `COMPLETED` ScoreResult만 사용하며, `STALE`·`FAILED` 결과와 100% 미만 응답 coverage는 거부한다. 서버는 점수·순위를 다시 계산하지 않고 snapshot의 ID·상태·응답 존재만 재검증한다.
 - `POST /decision`과 `POST /decision/reopen`은 HOST만 수행할 수 있고, `GET /decision`은 유효한 Room Participant가 읽을 수 있다. 결정이 없을 때의 `404 DECISION_NOT_FOUND`는 정상적인 미확정 상태다.
+
+## 개인 복구 API
+
+생성 및 일반 입장의 응답에 `recovery: { code, expiresAt }`를 추가한다. code는
+32바이트 난수의 43자리 base64url이며 예시 문자열은 실제 사용 가능한 코드가 아니다.
+서버는 방별 HttpOnly 쿠키를 함께 설정하고 응답에 `Cache-Control: no-store`를 적용한다.
+이 정보는 초대용이 아니고 공개 Room/Participant 조회 응답에는 포함되지 않는다.
+
+**`POST /api/v1/rooms/{roomId}/recovery` → `201 Created`**
+
+- 자동 복구 본문 `{}`: 해당 방 개인 복구 쿠키와 허용된 `Origin`이 필요하다.
+- 수동 복구 본문 `{ "recoveryCode": "personal-recovery-code-example" }`:
+  보관한 개인 코드로 인증한다. Origin이 있으면 CLIENT_ORIGIN 허용 목록을 검증한다.
+- participantId/role/표시 이름/방 코드는 인증 입력으로 사용하지 않는다.
+- 성공: `{ requestId, participant: { id, displayName, role, status },
+  access: { participantToken }, recoveryExpiresAt }`. 기존 ID/역할을 유지하는
+  새 24시간 접근 토큰을 반환하고, 같은 코드·고정 만료 시각의 쿠키를 설정한다.
+- `401 RECOVERY_UNAVAILABLE`: 누락/잘못된/만료/폐기/다른 방 자격 증명 또는
+  비활성 참가자. 모두 동일 메시지·빈 details를 반환한다.
+- `403 FORBIDDEN`: 허용되지 않은 Origin 또는 쿠키 복구의 Origin 누락.
+- `400 VALIDATION_ERROR`: roomId가 UUID 형식이 아님. 그 외 잘못된 코드는 401이다.
+- DRAFT/OPEN/CALCULATING/CALCULATED/CONFIRMED/CLOSED에서 활성 참가자만 허용한다.
+  기존 상태별 변경 권한은 유지하고 참가자/Room/결과/Decision을 생성·변경하지 않는다.
+- Room row lock과 트랜잭션으로 토큰 교체를 직렬화한다. 개인 코드는 만료 전 재사용
+  가능하며 복구로 연장하지 않는다. 이전 접근 토큰은 폐기되고 마지막 커밋의 토큰만 유효하다.
+
+**`POST /api/v1/rooms/{roomId}/recovery/register` → `201 Created`**
+
+- 유효한 기존 Bearer 접근 토큰 필수. 본문 `{}` 또는 `{ "replace": false }`로
+  기존 참가자의 복구 수단을 등록한다. `{ "replace": true }`는 명시적 재발급이다.
+- 성공: `{ requestId, recovery: { code, expiresAt } }`. code가 발급되면 새 쿠키를 설정한다.
+  유효한 기존 복구 수단이 있고 replace=false이면 code=null이며 쿠키를 교체하지 않는다.
+- replace=true이면 새 30일 코드를 발급하고 기존 코드/복구 쿠키를 서버에서 무효화한다.
+  기존 접근 토큰은 유지한다. 해시만 보관하므로 이전 코드 원문을 조회할 수 없다.
+- `401 INVALID_TOKEN`: 접근 토큰 없음/만료/폐기/다른 방/비활성 참가자.
+  `403 FORBIDDEN`: 허용되지 않은 Origin. `400 VALIDATION_ERROR`: 잘못된 roomId/replace 타입.
+- leave/kick 시 복구 해시·만료도 지운다. LEFT/REMOVED는 복구로 되살리지 않는다.
+
+쿠키 속성·보관·기존 데이터 전환·완전 분실 정책은
+`docs/decisions/room-access-recovery.md`를 따른다. 방 데이터 보존 기간은 변경하지 않는다.
 
 ## 공통 오류 응답
 
@@ -63,7 +103,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | HTTP 상태 | 코드 | 의미 |
 | --- | --- | --- |
 | 400 | `INVALID_JSON`, `VALIDATION_ERROR` | JSON 형식 또는 필드 형식 오류 |
-| 401 | `MISSING_TOKEN`, `INVALID_TOKEN`, `TOKEN_EXPIRED` | 방 범위 토큰이 없거나 유효하지 않거나 만료됨 |
+| 401 | `MISSING_TOKEN`, `INVALID_TOKEN`, `TOKEN_EXPIRED`, `RECOVERY_UNAVAILABLE` | 접근 토큰 또는 개인 복구 정보가 없거나 유효하지 않음 |
 | 403 | `HOST_ONLY`, `PARTICIPANT_ONLY`, `FORBIDDEN` | 역할 또는 본인 범위를 벗어난 요청 |
 | 404 | `ROOM_NOT_FOUND_OR_INVALID_CODE`, `RESOURCE_NOT_FOUND`, `SCORE_RESULT_NOT_FOUND`, `DECISION_NOT_FOUND` | 방 또는 하위 객체가 없음 |
 | 409 | `ROOM_STATE_CONFLICT`, `CALCULATION_IN_PROGRESS`, `STALE_RESULT`, `DUPLICATE_RESPONSE`, `CANDIDATE_VERSION_CONFLICT` | 현재 상태 또는 오래된 Candidate 버전과 충돌 |
@@ -97,6 +137,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 ```json
 {
   "requestId": "req_20260813_001",
+  "recovery": { "code": "personal-recovery-code-example", "expiresAt": "2026-10-31T00:00:00.000Z" },
   "room": {
     "id": "room_01",
     "roomCode": "A7K9P2",
@@ -198,6 +239,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 ```json
 {
   "requestId": "req_20260813_003",
+  "recovery": { "code": "personal-recovery-code-example", "expiresAt": "2026-10-31T00:00:00.000Z" },
   "room": {
     "id": "room_01",
     "roomCode": "A7K9P2",

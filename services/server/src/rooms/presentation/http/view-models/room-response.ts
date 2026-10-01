@@ -45,6 +45,7 @@ export interface RoomPayload {
 }
 
 export interface CreatedRoomResponse {
+  recovery: { code: string; expiresAt: Date };
   requestId: string;
   room: RoomPayload;
   hostParticipant: PublicParticipant;
@@ -167,6 +168,7 @@ export interface LatestScoreResultResponse {
 }
 
 export type CreatedRoomResult = {
+  recovery: { code: string; expiresAt: Date };
   room: RoomRecord;
   participant: ParticipantRecord;
   hostToken: string;
@@ -174,6 +176,7 @@ export type CreatedRoomResult = {
 };
 
 export type JoinedParticipantResult = {
+  recovery: { code: string; expiresAt: Date };
   room: RoomRecord;
   participant: ParticipantRecord;
   participantToken: string;
@@ -216,6 +219,7 @@ export type ParticipantLifecycleResult = {
 };
 
 export interface JoinedParticipantResponse {
+  recovery: { code: string; expiresAt: Date };
   requestId: string;
   room: {
     id: string;
@@ -335,6 +339,7 @@ export function toCreatedRoomResponse(
   result: CreatedRoomResult
 ): CreatedRoomResponse {
   return {
+    recovery: result.recovery,
     requestId: createRequestId(),
     room: toRoomPayload(result.room),
     hostParticipant: toPublicParticipant(result.participant),
@@ -349,6 +354,7 @@ export function toJoinedParticipantResponse(
   result: JoinedParticipantResult
 ): JoinedParticipantResponse {
   return {
+    recovery: result.recovery,
     requestId: createRequestId(),
     room: {
       id: result.room.id,
