@@ -2,14 +2,14 @@ const ROOM_TOKEN_STORAGE_PREFIX = "meetpoint:room-token:";
 const ROOM_PARTICIPANT_STORAGE_PREFIX = "meetpoint:room-participant:";
 const ROOM_RECOVERY_STORAGE_PREFIX = "meetpoint:room-recovery-backup:";
 
-// Only an ephemeral backup for the download UI. Persistent recovery uses HttpOnly cookies.
+// 파일 다운로드용 임시 백업이다. 탭 종료 후 복구에는 HttpOnly 쿠키를 사용한다.
 export function getRoomRecoveryStorageKey(roomId: string) {
   return `${ROOM_RECOVERY_STORAGE_PREFIX}${roomId}`;
 }
 
 export function rememberRoomAddress(roomCode: string, roomId: string) {
   try { window.localStorage.setItem(`meetpoint:room-address:${roomCode}`, roomId); }
-  catch { /* Non-secret address history is optional. */ }
+  catch { /* 주소 기록 실패는 접근 권한에 영향을 주지 않는다. */ }
 }
 
 export function getRememberedRoomAddress(roomCode: string) {

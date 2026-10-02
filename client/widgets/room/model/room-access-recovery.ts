@@ -2,7 +2,7 @@ import { getRoom, recoverRoomAccess } from "@/entities/room";
 import { RoomApiError } from "@/shared/api/http-client";
 import { getRoomTokenStorageKey } from "@/shared/lib/room-session";
 
-// One automatic attempt per mounted room session, shared by initial load and polling.
+// 최초 조회와 polling을 합쳐 화면 세션당 자동 복구를 한 번만 시도한다.
 export function createRoomAccessRecovery(roomId: string) {
   let attempted = false;
   let pending: Promise<string> | null = null;

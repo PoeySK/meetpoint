@@ -79,7 +79,7 @@ export class CalculationJobRunner
     this.isDraining = true;
     try {
       while (await this.runOne()) {
-        // A bounded poll interval prevents an idle worker from holding resources.
+        // 작업 처리는 반복 조건의 runOne에서 수행한다.
       }
     } finally {
       this.isDraining = false;

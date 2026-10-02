@@ -35,8 +35,6 @@ export default tseslint.config(
   {
     files: ['src/**/*.spec.ts', 'test/**/*.ts'],
     rules: {
-      // @types/superagent exposes response.body as any. Keep this escape hatch
-      // at the HTTP test boundary instead of weakening application code.
       '@typescript-eslint/no-base-to-string': 'off',
       '@typescript-eslint/no-unnecessary-type-assertion': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off',

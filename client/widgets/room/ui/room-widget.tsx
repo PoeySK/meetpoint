@@ -38,7 +38,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
       window.sessionStorage.removeItem(getRoomParticipantStorageKey(roomId));
       window.sessionStorage.removeItem(getRoomRecoveryStorageKey(roomId));
     } catch {
-      // The room is already left on the Server; navigation still ends this session.
+      // 서버의 탈퇴는 완료됐으므로 저장소 정리 실패와 관계없이 화면을 이동한다.
     }
     router.replace('/');
   }, [roomId, router]);

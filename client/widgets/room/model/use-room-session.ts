@@ -120,7 +120,7 @@ export function useRoomSession(roomId: string) {
       setParticipantId(response.currentParticipant.id);
       setRefreshError(null);
       pollingStoppedRef.current = false;
-      // Register legacy participants using their still-valid token; never rotate automatically.
+      // 기존 참여자는 유효한 토큰으로 복구 수단을 등록하며 자동 재발급하지 않는다.
       await registerRoomRecovery(roomId, token)
         .then(({ recovery }) => {
           if (recovery.code)

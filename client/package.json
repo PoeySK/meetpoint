@@ -6,7 +6,10 @@
     "dev": "next dev -p 10081",
     "build": "next build",
     "start": "next start -p 10081",
-    "lint": "eslint"
+    "lint": "eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "test": "node test/participant-response.test.cjs && node test/room-recovery.test.cjs",
+    "test:e2e": "node test/run-browser-e2e.cjs"
   },
   "dependencies": {
     "next": "16.3.0",
@@ -14,6 +17,7 @@
     "react-dom": "19.2.8"
   },
   "devDependencies": {
+    "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

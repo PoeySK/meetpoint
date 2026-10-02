@@ -86,7 +86,7 @@ export function CreateRoomForm() {
         return;
       }
 
-      try { window.sessionStorage.setItem(getRoomRecoveryStorageKey(response.room.id), JSON.stringify(response.recovery)); } catch { /* Recovery cookie remains available. */ }
+      try { window.sessionStorage.setItem(getRoomRecoveryStorageKey(response.room.id), JSON.stringify(response.recovery)); } catch { /* 복구 쿠키는 계속 사용할 수 있다. */ }
       rememberRoomAddress(response.room.roomCode, response.room.id);
       router.push(`/rooms/${encodeURIComponent(response.room.id)}`);
     } catch (error) {

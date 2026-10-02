@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: meetpoint_test
+      POSTGRES_PASSWORD: test-only-password
+    ports:
+      - "127.0.0.1:${MEETPOINT_TEST_DB_PORT:?test runner must supply a port}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meetpoint_test -d postgres"]
+      interval: 1s
+      timeout: 3s
+      retries: 30
