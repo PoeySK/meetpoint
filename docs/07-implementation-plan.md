@@ -116,6 +116,10 @@ Server e2e가 계약의 성공·실패 사례를 검증한다.
 
 상태: 완료. `calculation_jobs` outbox table에 Solver snapshot과 시도 횟수·lease·마지막 오류를 저장한다. 요청 transaction은 Room·ScoreResult·Job을 함께 `REQUESTED`로 만들고, Server worker는 PostgreSQL row lock/lease로 하나의 job만 `RUNNING`으로 claim한다. lease가 만료된 작업은 Server 시작과 polling에서 다시 claim하며, 재시도 가능한 Solver 장애는 제한 횟수까지 재요청하고 영구 오류 또는 한도 초과만 `FAILED`로 확정한다.
 
+claim·완료·실패 상태 저장의 DB 오류는 Solver 오류와 분리한다. 실패한 transaction은 rollback하고 drain을 종료해 즉시 반복하지 않는다. 다음 polling에서 claim을 재시도하며, 이미 claim된 작업은 lease 만료 후 재처리한다. 로그에는 단계·안전한 오류 코드와 가능한 job/결과 ID만 남긴다. 일시적 오류는 경고, 그 밖의 오류는 오류로 기록하며 지속되는 장애는 원인 조치가 필요하다.
+
+완료 transaction은 Room·ScoreResult·Job을 함께 반영하며 잠금 시각과 시도 횟수로 오래된 claim을 차단한다. 시도 횟수는 DB 장애 뒤 재claim에도 증가한다. 같은 snapshot의 Solver 재호출은 가능하므로 외부 호출의 exactly-once를 보장하지 않는다. SIGINT/SIGTERM 또는 모듈 종료 시 polling과 새 drain/claim을 중지한다. 진행 중 작업의 완료를 기다리는 별도 종료 대기는 없으며, 저장하지 못한 작업은 기존 lease로 복구한다. 단위 fault injection과 격리 PostgreSQL transaction 오류 주입 테스트로 rollback·재처리·오래된 claim 차단을 검증한다.
+
 완료 조건: Server 재시작과 Solver 장애 뒤에도 계산이 유실되거나 중복 확정되지
 않으며, Client가 기존 polling API로 `REQUESTED`·`RUNNING`·최종 상태를 확인할 수 있다.
 

@@ -1,6 +1,7 @@
 import {
   Inject,
   Injectable,
+  Logger,
   OnApplicationBootstrap,
   OnModuleDestroy,
 } from '@nestjs/common';
@@ -29,6 +30,8 @@ export class CalculationJobRunner
   implements OnApplicationBootstrap, OnModuleDestroy
 {
   private isDraining = false;
+  private stopped = false;
+  private readonly logger = new Logger(CalculationJobRunner.name);
   private timer: ReturnType<typeof setInterval> | undefined;
 
   constructor(
@@ -49,28 +52,50 @@ export class CalculationJobRunner
   }
 
   onModuleDestroy() {
+    this.stopped = true;
     if (this.timer) {
       clearInterval(this.timer);
     }
   }
 
   trigger() {
-    if (!this.isDraining) {
-      void this.drain();
+    if (!this.stopped && !this.isDraining) {
+      void this.drain().catch((error: unknown) => {
+        this.logWorkerFailure('drain', error);
+      });
     }
   }
 
   async runOne(): Promise<boolean> {
-    const claimed = await this.claimNextJob();
+    if (this.stopped) return false;
+    let claimed: CalculationJobRecord | null;
+    try {
+      claimed = await this.claimNextJob();
+    } catch (error) {
+      this.logWorkerFailure('claim', error);
+      return false;
+    }
     if (!claimed) {
       return false;
     }
 
+    let response: SolverResponsePayload;
     try {
-      const response = await this.solver.solve(claimed.snapshot);
+      response = await this.solver.solve(claimed.snapshot);
+    } catch (error) {
+      try {
+        await this.handleFailure(claimed, this.toSolverError(error));
+      } catch (storageError) {
+        this.logWorkerFailure('failure', storageError, claimed);
+        return false;
+      }
+      return true;
+    }
+    try {
       await this.complete(claimed, response);
     } catch (error) {
-      await this.handleFailure(claimed, this.toSolverError(error));
+      this.logWorkerFailure('complete', error, claimed);
+      return false;
     }
     return true;
   }
@@ -78,7 +103,7 @@ export class CalculationJobRunner
   private async drain() {
     this.isDraining = true;
     try {
-      while (await this.runOne()) {
+      while (!this.stopped && (await this.runOne())) {
         // 작업 처리는 반복 조건의 runOne에서 수행한다.
       }
     } finally {
@@ -278,6 +303,7 @@ export class CalculationJobRunner
   ): currentJob is CalculationJobRecord {
     return (
       currentJob?.status === CalculationJobStatus.RUNNING &&
+      currentJob.attemptCount === claimedJob.attemptCount &&
       currentJob.lockedAt?.getTime() === claimedJob.lockedAt?.getTime()
     );
   }
@@ -291,6 +317,53 @@ export class CalculationJobRunner
           false,
           {}
         );
+  }
+
+  private logWorkerFailure(
+    stage: 'claim' | 'complete' | 'failure' | 'drain',
+    error: unknown,
+    job?: CalculationJobRecord
+  ) {
+    const record =
+      typeof error === 'object' && error !== null
+        ? (error as { code?: unknown; driverError?: { code?: unknown } })
+        : undefined;
+    const rawCode = record?.driverError?.code ?? record?.code;
+    const code =
+      typeof rawCode === 'string' &&
+      /^(?:[0-9A-Z]{5}|ECONNRESET|ECONNREFUSED|ETIMEDOUT|EPIPE|ENOTFOUND|EAI_AGAIN)$/.test(
+        rawCode
+      )
+        ? rawCode
+        : 'UNKNOWN';
+    const transient =
+      code.startsWith('08') ||
+      [
+        '40001',
+        '40P01',
+        '53300',
+        '57P01',
+        '57P02',
+        '57P03',
+        'ECONNRESET',
+        'ECONNREFUSED',
+        'ETIMEDOUT',
+        'EPIPE',
+        'ENOTFOUND',
+        'EAI_AGAIN',
+      ].includes(code);
+    const diagnostic = {
+      stage,
+      code,
+      kind: transient
+        ? 'transient-persistence'
+        : code === 'UNKNOWN'
+          ? 'unexpected'
+          : 'persistence-error',
+      ...(job ? { jobId: job.id, scoreResultId: job.scoreResultId } : {}),
+    };
+    if (transient) this.logger.warn(diagnostic);
+    else this.logger.error(diagnostic);
   }
 
   private readPositiveIntegerEnv(name: string, fallback: number) {

@@ -4,6 +4,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableShutdownHooks(['SIGINT', 'SIGTERM']);
   const configService = app.get(ConfigService);
   const clientOrigins = (
     configService.get<string>('CLIENT_ORIGIN') ?? 'http://localhost:10081'
