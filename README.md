@@ -139,3 +139,67 @@ pnpm dev
 | PostgreSQL    | `localhost:5432`        | Docker healthcheck |
 
 현재 Compose 파일은 PostgreSQL만 실행하며 Docker 리소스 이름은 `meetpoint-postgres`, `meetpoint-postgres-data`, `meetpoint-network`를 사용한다. Server와 Solver를 호스트 프로세스로 실행할 때는 `localhost`를 사용한다. 추후 세 서비스를 Docker 네트워크에 넣으면 Server 컨테이너에서 PostgreSQL은 `meetpoint-postgres:5432`, Solver는 `meetpoint-solver:4000`으로 접근하고, 브라우저가 사용하는 Client → Server 주소는 공개 가능한 호스트명으로 별도 설정한다.
+
+## 자동 검증
+
+필요 도구는 Node 24.12.0, pnpm 11.21.0, Rust 1.95.0/rustfmt, Docker Engine와 Compose v2입니다. pnpm은 `npm install --global pnpm@11.21.0`, Rust는 rustup으로 준비합니다. 실제 `.env`를 테스트용으로 복사하거나 수정하지 않습니다. 설치는 각 lockfile을 사용합니다.
+
+```bash
+pnpm --dir client install --frozen-lockfile
+pnpm --dir services/server install --frozen-lockfile
+pnpm --dir client exec playwright install chromium
+# Linux 브라우저 시스템 라이브러리 포함 설치:
+# pnpm --dir client exec playwright install --with-deps chromium
+```
+
+기존 검증은 각각 별도 명령으로 실행합니다.
+
+```bash
+cd client
+pnpm test
+pnpm lint
+pnpm typecheck
+pnpm build
+cd ../services/server
+pnpm lint:check
+pnpm test --runInBand
+pnpm build
+cd ../solver
+cargo fmt --check
+cargo check --locked
+cargo test --locked
+```
+
+Server의 `pnpm lint`는 기존대로 `--fix`를 포함하므로 CI/읽기 전용 검증에는 `lint:check`를 사용합니다. Client Node 테스트는 기존 두 파일을 직접 실행하며 `node --test` subprocess에 의존하지 않습니다.
+
+실제 브라우저 검증은 저장소 루트에서 아래 한 명령으로 기동·migration·readiness·테스트·정리를 수행합니다. 개발 서비스를 종료하거나 재사용하지 않습니다.
+
+```bash
+pnpm --dir client test:e2e
+```
+
+브라우저 runner는 고유 `meetpoint-browser-test-<ID>` Compose project, 자유 포트, `meetpoint_browser_test_<ID>` DB, 실제 Server/Solver, 임시 Client production build를 사용합니다. PostgreSQL은 `infra/docker-compose.test.yml`의 tmpfs를 사용하며 개발 volume/network와 분리됩니다. 성공·실패·중단 시 소유 자원만 제거하고 20분 제한을 둡니다. 핵심 흐름/복구 시나리오와 안전한 실패 진단은 [Client README](client/README.md#검증)에 설명되어 있습니다.
+
+Server 격리 통합 검증은 전용 DB와 별도 Solver를 먼저 준비합니다. 아래 명령은 Bash 기준이며 15432/15400 포트가 비어 있어야 합니다. 이미 실행 중인 개발 서비스에 연결하지 마세요. PostgreSQL project를 실행한 동일 작업에서 정리합니다.
+
+```bash
+export MEETPOINT_TEST_DB_PORT=15432
+docker compose -f infra/docker-compose.test.yml -p meetpoint-server-verification up -d --wait
+# 별도 터미널에서 실행하고 완료 후 이 프로세스만 Ctrl+C로 종료:
+# cd services/solver && SOLVER_PORT=15400 cargo run --locked
+cd services/server
+DATABASE_URL=postgresql://meetpoint_test:test-only-password@localhost:15432/postgres \
+SOLVER_BASE_URL=http://localhost:15400 RUN_CALCULATION_E2E=true pnpm test:integration
+cd ../..
+docker compose -f infra/docker-compose.test.yml -p meetpoint-server-verification down --volumes --remove-orphans
+```
+
+PowerShell에서는 같은 변수들을 `$env:MEETPOINT_TEST_DB_PORT = '15432'`, `$env:SOLVER_PORT = '15400'`, `$env:DATABASE_URL = 'postgresql://meetpoint_test:test-only-password@localhost:15432/postgres'`, `$env:SOLVER_BASE_URL = 'http://localhost:15400'`, `$env:RUN_CALCULATION_E2E = 'true'`로 해당 터미널에 설정하고 `pnpm test:integration`을 실행합니다. DB 컨테이너와 별도 Solver를 준비하는 순서는 같습니다.
+
+`test:integration`은 임시 DB 생성·migration·기존 `test:e2e` Jest 실행·DB 제거를 담당합니다. `RUN_CALCULATION_E2E=true`를 명시하지 않은 실행은 실제 계산 테스트가 생략되므로 전체 통합 검증으로 보지 않습니다. readiness/정리 방식은 [Server README](services/server/README.md#검증)에 있습니다.
+
+`.github/workflows/verification.yml`은 모든 pull request와 기본 브랜치 `master` push에서 실행합니다. 읽기 권한만 사용하며 Client 테스트/lint/typecheck/build, Server 검사 lint/단위·HTTP/build/전용 PostgreSQL+실제 Solver 통합, Rust fmt/check/test를 수행한 뒤 브라우저 job을 실행합니다. frozen lockfile 설치, 단일 browser worker, retry 0회, job timeout을 사용합니다. 테스트 DB 자격 증명만 포함하고 실제 secret은 필요하지 않습니다. job마다 환경이 분리되어 Server/Solver 빌드 일부는 독립적으로 반복됩니다.
+
+CI artifact는 자격 증명이 없는 `browser-safe-summary`만 7일 보관합니다. trace/HAR, 다운로드한 복구 파일, 원본 오류/로그, DOM, storageState, 영상·스크린샷은 업로드하지 않습니다. 강제 OS 종료처럼 runner 정리가 불가능했던 경우 실행 ID가 붙은 테스트 project만 확인해 제거합니다.
+
+현재 브라우저 검증은 Chromium 데스크톱·localhost HTTP의 개발 쿠키 정책입니다. HTTPS의 production Secure 쿠키, 실제 배포 CORS/프록시, 모바일·Firefox·WebKit은 별도 검증이 필요합니다. 로컬 통과는 GitHub Actions 실행 성공을 의미하지 않습니다. 커밋/push 후 실제 Actions 결과를 따로 확인해야 합니다.

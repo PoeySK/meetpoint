@@ -85,7 +85,6 @@ describe('Existing participant recovery HTTP contract', () => {
       const { room, hostParticipant, recovery, access } = created.body;
       const persistedRoom = context.database.rooms.get(room.id)!;
       persistedRoom.status = status;
-      // Non-null pointers make unintended clearing/staling visible without fabricating domain records.
       persistedRoom.latestScoreResultId = 'existing-score';
       persistedRoom.currentDecisionId = 'existing-decision';
       const before = structuredClone(persistedRoom);

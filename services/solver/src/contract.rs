@@ -1,10 +1,5 @@
 use serde::{Deserialize, Serialize};
 
-/// JSON input accepted by the solver HTTP API.
-///
-/// The wire contract intentionally keeps user-provided enum values as strings.
-/// They are converted to typed domain values by the application validation
-/// boundary so that the scoring core never has to handle unknown variants.
 #[derive(Debug, Deserialize, Serialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct SolveRequest {

@@ -199,7 +199,7 @@ export function getConditionWarnings(
   return warnings;
 }
 
-// Reject timestamps without an explicit offset so browser timezone cannot affect the result.
+// 브라우저 시간대에 따른 차이를 막기 위해 offset 없는 시각은 제외한다.
 function timestamp(value: string) {
   return /T.*(?:Z|[+-]\d{2}:\d{2})$/i.test(value) ? Date.parse(value) : NaN;
 }

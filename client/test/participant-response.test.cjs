@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- Exercise production TypeScript with the existing Node test runner. */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -123,7 +123,6 @@ test('polling preserves automatic/manual drafts; latest warnings and stale reaso
   assert.equal(reapplied.forms.manual, forms.manual);
 });
 
-// Render the real panel with a small deterministic hook driver. Events exercise its real API boundary.
 function panelHarness({ saved = [], criteria = condition(), readOnly = false } = {}) {
   const states = [], effects = [], timers = [];
   let index = 0, effectIndex = 0, fail = false, pending = null, release = null;

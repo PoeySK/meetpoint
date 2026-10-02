@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-require-imports -- Node CommonJS test runner loads transpiled TypeScript. */
+/* eslint-disable @typescript-eslint/no-require-imports */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -6,7 +6,6 @@ const path = require('node:path');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-// Exercise production TypeScript with Node's test runner, without adding a browser-test framework.
 function load(relativePath, imports, globals = {}, exposed = []) {
   const filename = path.resolve(__dirname, '..', relativePath);
   const source = ts.transpileModule(fs.readFileSync(filename, 'utf8') + (exposed.length ? `\nexport { ${exposed.join(', ')} };` : ''), {
@@ -214,7 +213,7 @@ test('explicit reload and personal recovery keep mounted room/condition/response
   h.restoreManually(); await session.loadRoom(); session = h.render();
   assert.equal(session.refreshError, null); assert.equal(session.participantId, 'original'); assert.equal(session.accessToken, 'fixture-manual');
   assert.equal(session.room.myCondition, h.room.myCondition); assert.equal(session.room.myResponses, h.room.myResponses);
-  h.expire(); await session.refreshRoom(); assert.equal(h.calls.recover, 2); // manual load does not reset automatic policy
+  h.expire(); await session.refreshRoom(); assert.equal(h.calls.recover, 2); // 수동 조회는 자동 복구 횟수를 초기화하지 않는다.
 });
 test('loaded room exposes the existing explicit retry action and keeps the workspace during recovery', () => {
   const workspace = () => null; const recovery = () => null; let retries = 0;

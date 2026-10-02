@@ -10,6 +10,20 @@ cargo run
 
 기본 포트는 `4000`이며 `SOLVER_PORT` 환경 변수로 변경할 수 있습니다.
 
+## 검증
+
+CI와 동일한 Rust 1.95.0 및 rustfmt를 설치하고 lockfile 기반으로 실행합니다.
+
+```bash
+rustup toolchain install 1.95.0 --component rustfmt
+rustup override set 1.95.0
+cargo fmt --check
+cargo check --locked
+cargo test --locked
+```
+
+Client의 `pnpm test:e2e`는 실제 Solver를 자유 포트에서 실행·정리합니다. Server 통합 테스트에 수동으로 연결할 때는 개발 Solver를 재사용하지 않고 `SOLVER_PORT=15400 cargo run --locked`처럼 별도 프로세스를 띄우세요. 전체 기동과 CI 범위는 루트 [README](../../README.md#자동-검증)에 기록되어 있습니다.
+
 상태 확인:
 
 ```text
