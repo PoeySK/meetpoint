@@ -2,6 +2,7 @@ const { Client } = require('pg');
 const { randomBytes } = require('node:crypto');
 const { spawn } = require('node:child_process');
 const path = require('node:path');
+const { waitService } = require('./service-readiness.cjs');
 
 async function main() {
   let source;
@@ -13,7 +14,7 @@ async function main() {
     return;
   }
   const databaseName = `meetpoint_recovery_test_${randomBytes(8).toString('hex')}`;
-  const admin = new Client({ connectionString: source.toString() });
+  const admin = new Client({ connectionString: source.toString(), connectionTimeoutMillis: 1000, query_timeout: 5000 });
   let created = false;
   let dataSource;
   let child;
@@ -27,8 +28,7 @@ async function main() {
     await admin.query('SELECT 1');
     if (process.env.RUN_CALCULATION_E2E === 'true') {
       const solverUrl = process.env.SOLVER_BASE_URL || 'http://localhost:4000';
-      const health = await fetch(`${solverUrl}/health`, { signal: AbortSignal.timeout(5000) });
-      if (!health.ok) throw new Error('SolverNotReady');
+      await waitService(`${solverUrl}/health`, 'solver', { isAlive: () => !interrupted });
       console.log('Actual Solver ready; calculation integration enabled.');
     } else {
       console.log('Calculation integration disabled; use RUN_CALCULATION_E2E=true for the full suite.');

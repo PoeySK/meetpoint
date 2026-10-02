@@ -1,5 +1,13 @@
 # MeetPoint REST API 계약
 
+## 서비스 상태 endpoint
+
+- `GET /live`: DB·Solver와 무관한 프로세스 응답 확인. HTTP 200, `status: ok`, `service: server`.
+- `GET /ready`: 초기화된 DataSource의 `SELECT 1` 성공 시 HTTP 200, `status: ready`, `service: server`, `dependencies.database.status: up`. DB 미설정은 `not_configured`, 미초기화·연결 실패·1초 초과는 `down`이며 HTTP 503과 `status: not_ready`를 반환한다. 데이터는 변경하지 않는다.
+- 기존 `GET /health`: HTTP 200의 진단용 응답을 유지한다. `status: ok/degraded`, `service: server`, timestamp와 DB 상태를 반환하며 기동 대기에 사용하지 않는다.
+- `/health`와 `/ready`는 진행 중 검사를 공유한다. 응답 timeout은 실제 DB 쿼리 취소를 보장하지 않으며 실제 종료 후 다음 검사에서 회복을 확인한다.
+- Solver는 일반 API의 필수 의존성이 아니므로 Server readiness에서 제외한다. 계산 테스트는 Solver `/health`의 HTTP 200, `status: ok`, `service: solver`를 별도 확인한다. Server 준비 상태가 계산 의존성까지 정상임을 뜻하지 않는다.
+
 ## 문서 상태와 공통 원칙
 
 - **확정**: 브라우저는 Next.js 화면에서 NestJS REST API만 호출한다. Next.js API Route와 Server Action은 사용하지 않는다.

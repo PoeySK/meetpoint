@@ -21,7 +21,17 @@ DATABASE_URL=postgresql://meetpoint:meetpoint-local@localhost:5432/meetpoint
 
 ```text
 GET http://localhost:3001/health
+GET http://localhost:3001/live
+GET http://localhost:3001/ready
 ```
+
+`/live`는 DB·Solver와 무관하게 프로세스가 응답하면 HTTP 200과 `status: ok`, `service: server`를 반환합니다. `/ready`는 초기화된 DataSource의 `SELECT 1` 성공 시 200(`status: ready`, `dependencies.database.status: up`), 미설정·미초기화·연결 실패·1초 초과 시 503(`status: not_ready`)입니다. 기존 `/health`는 HTTP 200과 `ok/degraded`, timestamp, DB 상태를 유지하는 진단용 endpoint이며 기동 대기에 사용하지 않습니다.
+
+DB 검사는 동시에 하나만 실행하며 `/health`와 `/ready`가 공유합니다. 1초 응답 제한은 PostgreSQL 작업 취소를 보장하지 않습니다. 제한 이후에도 실제 쿼리가 끝날 때까지 새 검사를 만들지 않고 503을 반환합니다. 쿼리가 종료되면 다음 검사에서 복구를 확인합니다. DB driver의 기존 pool 설정을 유지하므로 끊어진 연결의 종료가 지연되면 readiness 회복도 지연될 수 있습니다. 검사는 데이터나 계산 상태를 변경하지 않고 오류 원문을 응답·로그에 출력하지 않습니다.
+
+Solver는 방 조회·조건·의견 저장의 필수 의존성이 아니므로 Server readiness에서 제외합니다. Server의 `ready`는 계산 의존성까지 정상이라는 의미가 아닙니다. 계산 worker의 기존 재시도·lease 정책을 유지하며 계산 테스트는 Solver `/health`의 HTTP 200과 `status: ok`, `service: solver`를 별도로 확인합니다. Solver는 외부 의존성이 없는 계산 서비스라 이 endpoint가 프로세스 응답과 계산 서비스 기동 확인을 겸합니다.
+
+브라우저 E2E는 Server `/ready`의 HTTP 상태와 DB 상태 본문을 함께 확인합니다. CI와 통합 runner는 Solver 계약을 별도로 검사합니다. 각 HTTP 검사에는 최대 1초, 기동 대기에는 최대 60초 제한을 두며 소유 프로세스 종료 시 조기에 실패합니다. 통합 runner는 별도 HTTP Server를 띄우지 않고 Nest 테스트 앱의 readiness를 HTTP 테스트로 검증합니다. 준비 상태를 고정 sleep으로 우회하지 않으며 소유한 임시 자원의 정리는 유지합니다.
 
 NestJS와 PostgreSQL 연결에는 `@nestjs/typeorm`과 TypeORM을 사용합니다. `synchronize`와 자동 migration 실행은 끄고, Room·Participant·Candidate·ParticipantCondition·ParticipantResponse·ScoreResult·Decision을 명시적 migration으로 관리합니다. ParticipantCondition 저장과 후보별 응답 상태 전환은 현재 API에 연결되어 있으며, 개인 조건은 선택 사항입니다.
 

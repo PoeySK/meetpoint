@@ -134,13 +134,15 @@ pnpm dev
 | 서비스        | 주소                    | 확인 경로          |
 | ------------- | ----------------------- | ------------------ |
 | Client        | `http://localhost:10081` | Next.js 화면       |
-| NestJS Server | `http://localhost:3001` | `GET /health`      |
+| NestJS Server | `http://localhost:3001` | `GET /live`, `GET /ready` |
 | Rust Solver   | `http://localhost:4000` | `GET /health`      |
 | PostgreSQL    | `localhost:5432`        | Docker healthcheck |
 
 현재 Compose 파일은 PostgreSQL만 실행하며 Docker 리소스 이름은 `meetpoint-postgres`, `meetpoint-postgres-data`, `meetpoint-network`를 사용한다. Server와 Solver를 호스트 프로세스로 실행할 때는 `localhost`를 사용한다. 추후 세 서비스를 Docker 네트워크에 넣으면 Server 컨테이너에서 PostgreSQL은 `meetpoint-postgres:5432`, Solver는 `meetpoint-solver:4000`으로 접근하고, 브라우저가 사용하는 Client → Server 주소는 공개 가능한 호스트명으로 별도 설정한다.
 
 ## 자동 검증
+
+Server `/live`는 DB 장애에도 200을 반환한다. `/ready`는 DB `SELECT 1` 성공 시 200, 미설정·미초기화·실패·1초 검사 초과 시 503을 반환한다. 기존 `/health`는 HTTP 200의 진단 응답을 유지한다. Solver 장애는 일반 방 API의 readiness를 실패시키지 않으며 계산 의존성은 Solver `/health`로 별도 확인한다. E2E·CI는 상태 코드와 본문 계약을 함께 확인하고 개별 HTTP 요청은 최대 1초, 기동 대기는 최대 60초로 제한한다. 응답 timeout은 실제 DB 쿼리 취소가 아니며 끝나지 않은 검사를 공유해 누적을 막는다. 자세한 제한은 [Server README](services/server/README.md)에 기록한다.
 
 필요 도구는 Node 24.12.0, pnpm 11.21.0, Rust 1.95.0/rustfmt, Docker Engine와 Compose v2입니다. pnpm은 `npm install --global pnpm@11.21.0`, Rust는 rustup으로 준비합니다. 실제 `.env`를 테스트용으로 복사하거나 수정하지 않습니다. 설치는 각 lockfile을 사용합니다.
 
