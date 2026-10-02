@@ -645,6 +645,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `clientRequestId`가 같은 재시도 요청은 동일 계산을 재사용하도록 설계하지만, 이 키의 보존 기간은 미결정이다.
 - 요청 transaction은 `ScoreResult`, Room 상태, `calculation_jobs` outbox row를 함께 `REQUESTED`로 저장한다. Server worker는 PostgreSQL row lock과 lease로 작업을 claim해 `RUNNING`으로 전환한다.
 - worker가 중단되어 lease가 만료된 `RUNNING` 작업은 다음 worker가 다시 claim한다. Solver의 timeout·연결 실패처럼 재시도 가능한 오류는 설정된 최대 시도 횟수까지 `REQUESTED`로 되돌리고, 응답 schema 오류 또는 재시도 한도 초과는 `FAILED`로 확정한다.
+- claim·완료 저장·Solver 실패 상태 저장의 DB 오류는 Solver 오류로 기록하지 않는다. 해당 transaction을 rollback하고 현재 drain을 끝내며, 다음 polling 또는 `RUNNING` lease 만료 후 재claim으로 복구한다. 완료는 Room·ScoreResult·Job을 함께 저장하고, 현재 claim의 시도 횟수와 잠금 시각이 일치하는 실행만 반영한다.
+- 시도 횟수는 claim마다 증가하므로 DB 저장 장애 후 재claim도 포함된다. 같은 snapshot의 Solver 호출은 반복될 수 있으며 외부 호출의 exactly-once는 보장하지 않는다. 일시적 DB 오류는 경고, 분류되지 않거나 영구적인 저장 오류는 오류 로그로 남기며, DB 오류만으로 job을 `FAILED`로 확정하지 않는다. 지속되는 DB 오류는 원인 조치가 필요하다.
 
 ### 12. 계산 결과 조회
 

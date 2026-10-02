@@ -13,6 +13,16 @@ import { Room } from '../src/rooms/infrastructure/persistence/typeorm/entities/r
 import { ScoreResult } from '../src/rooms/infrastructure/persistence/typeorm/entities/score-result.entity';
 import { CalculationJob } from '../src/rooms/infrastructure/persistence/typeorm/entities/calculation-job.entity';
 import { RoomsModule } from '../src/rooms/rooms.module';
+import { CalculationJobRunner } from '../src/rooms/application/calculation-job.runner';
+import { TypeOrmRoomsPersistenceAdapter } from '../src/rooms/infrastructure/persistence/typeorm/typeorm-rooms-persistence.adapter';
+import {
+  SOLVER,
+  type SolverPort,
+} from '../src/rooms/application/ports/solver.port';
+import {
+  SolverCallError,
+  type SolverResponsePayload,
+} from '../src/rooms/application/ports/solver-contract';
 
 const runCalculationE2e = process.env.RUN_CALCULATION_E2E === 'true';
 
@@ -95,6 +105,89 @@ describeCalculation(
     afterAll(async () => {
       await app.close();
     });
+
+    async function pendingJob() {
+      app.get(CalculationJobRunner).onModuleDestroy();
+      const created = await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send({
+          title: 'Worker persistence fault fixture',
+          timezone: 'Asia/Seoul',
+          host: { displayName: 'Worker host' },
+        })
+        .expect(201);
+      roomId = created.body.room.id as string;
+      for (const displayName of ['Worker member one', 'Worker member two']) {
+        await request(app.getHttpServer())
+          .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+          .send({ displayName })
+          .expect(201);
+      }
+      for (const order of [1, 2]) {
+        await request(app.getHttpServer())
+          .post(`/api/v1/rooms/${roomId}/candidates`)
+          .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+          .send(candidatePayload(order))
+          .expect(201);
+      }
+      const started = await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${roomId}/calculations`)
+        .set('Authorization', `Bearer ${created.body.access.hostToken}`)
+        .send({ clientRequestId: 'worker-fault-request' })
+        .expect(202);
+      return dataSource.getRepository(CalculationJob).findOneByOrFail({
+        scoreResultId: started.body.calculation.id as string,
+      });
+    }
+
+    async function injectFault(
+      table: 'calculation_jobs' | 'rooms' | 'score_results',
+      status: string
+    ) {
+      if (
+        !/^meetpoint_(?:recovery|browser)_test_[a-f0-9]{16}$/.test(
+          new URL(databaseUrl).pathname.slice(1)
+        )
+      ) {
+        throw new Error(
+          'Fault injection requires the isolated test DB runner.'
+        );
+      }
+      await dataSource.query(`CREATE FUNCTION worker_test_fault() RETURNS trigger LANGUAGE plpgsql AS $$
+        BEGIN IF NEW."${table === 'rooms' ? 'id' : 'roomId'}"::text = '${roomId}' AND NEW.status = '${status}' THEN
+          RAISE EXCEPTION USING ERRCODE = '08006', MESSAGE = 'Injected test transaction failure';
+        END IF; RETURN NEW; END $$`);
+      await dataSource.query(
+        `CREATE TRIGGER worker_test_fault AFTER UPDATE ON ${table} FOR EACH ROW EXECUTE FUNCTION worker_test_fault()`
+      );
+    }
+
+    async function clearFault(table: string) {
+      await dataSource.query(
+        `DROP TRIGGER IF EXISTS worker_test_fault ON ${table}`
+      );
+      await dataSource.query('DROP FUNCTION IF EXISTS worker_test_fault()');
+    }
+
+    async function workerState(job: CalculationJob) {
+      return {
+        job: await dataSource
+          .getRepository(CalculationJob)
+          .findOneByOrFail({ id: job.id }),
+        score: await dataSource
+          .getRepository(ScoreResult)
+          .findOneByOrFail({ id: job.scoreResultId }),
+        room: await dataSource
+          .getRepository(Room)
+          .findOneByOrFail({ id: job.roomId }),
+      };
+    }
+
+    async function expireLease(job: CalculationJob) {
+      await dataSource
+        .getRepository(CalculationJob)
+        .update(job.id, { lockedAt: new Date(Date.now() - 60_000) });
+    }
 
     it('runs the HOST calculation flow and rejects MEMBER and invalid state requests', async () => {
       const created = await request(app.getHttpServer())
@@ -374,6 +467,123 @@ describeCalculation(
         roomStatus: 'OPEN',
         nextStep: 'CANDIDATE_OR_RESPONSE_CHANGE_THEN_RECALCULATE',
       });
+    });
+    it.each(['claim', 'complete', 'retry', 'failed'] as const)(
+      'rolls back a PostgreSQL %s fault and recovers the job with the actual Solver',
+      async (phase) => {
+        const job = await pendingJob();
+        const solver = app.get<SolverPort>(SOLVER);
+        let first = true;
+        const worker = new CalculationJobRunner(
+          new TypeOrmRoomsPersistenceAdapter(dataSource),
+          {
+            solve: (snapshot) => {
+              if (first && ['retry', 'failed'].includes(phase)) {
+                first = false;
+                throw new SolverCallError(
+                  'SOLVER_UNAVAILABLE',
+                  'Injected Solver failure',
+                  phase === 'retry'
+                );
+              }
+              return solver.solve(snapshot);
+            },
+          }
+        );
+        const table =
+          phase === 'claim'
+            ? 'calculation_jobs'
+            : phase === 'retry'
+              ? 'score_results'
+              : 'rooms';
+        const status =
+          phase === 'claim'
+            ? 'RUNNING'
+            : phase === 'retry'
+              ? 'REQUESTED'
+              : phase === 'failed'
+                ? 'OPEN'
+                : 'CALCULATED';
+        const before = await workerState(job);
+        try {
+          await injectFault(table, status);
+          expect(await worker.runOne()).toBe(false);
+          const rolledBack = await workerState(job);
+          if (phase === 'claim') expect(rolledBack).toEqual(before);
+          else {
+            expect(rolledBack.job).toMatchObject({
+              status: 'RUNNING',
+              attemptCount: 1,
+              lastError: null,
+              completedAt: null,
+            });
+            expect(rolledBack.score).toMatchObject({
+              status: 'RUNNING',
+              error: null,
+              completedAt: null,
+              candidates: [],
+            });
+            expect(rolledBack.room).toEqual(before.room);
+            expect(await worker.runOne()).toBe(false);
+          }
+        } finally {
+          await clearFault(table);
+        }
+        if (phase !== 'claim') await expireLease(job);
+        expect(await worker.runOne()).toBe(true);
+        const completed = await workerState(job);
+        expect(completed.job.status).toBe('COMPLETED');
+        expect(completed.score).toMatchObject({
+          status: 'COMPLETED',
+          error: null,
+        });
+        expect(completed.score.candidates).toHaveLength(2);
+        expect(completed.room.status).toBe('CALCULATED');
+        expect(await worker.runOne()).toBe(false);
+        expect(await workerState(job)).toEqual(completed);
+      }
+    );
+
+    it('fences an old PostgreSQL claim after another worker completes the same snapshot', async () => {
+      const job = await pendingJob();
+      const solver = app.get<SolverPort>(SOLVER);
+      let release!: () => void;
+      let solving!: () => void;
+      const started = new Promise<void>((resolve) => {
+        solving = resolve;
+      });
+      const blocked = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const oldWorker = new CalculationJobRunner(
+        new TypeOrmRoomsPersistenceAdapter(dataSource),
+        {
+          solve: async (snapshot): Promise<SolverResponsePayload> => {
+            const response = await solver.solve(snapshot);
+            solving();
+            await blocked;
+            return { ...response, recommendationWarnings: ['OLD_CLAIM'] };
+          },
+        }
+      );
+      const pending = oldWorker.runOne();
+      try {
+        await started;
+        await expireLease(job);
+        const replacement = new CalculationJobRunner(
+          new TypeOrmRoomsPersistenceAdapter(dataSource),
+          solver
+        );
+        expect(await replacement.runOne()).toBe(true);
+        const completed = await workerState(job);
+        release();
+        await pending;
+        expect(await workerState(job)).toEqual(completed);
+        expect(completed.job.attemptCount).toBe(2);
+      } finally {
+        release();
+        await pending;
+      }
     });
   }
 );
