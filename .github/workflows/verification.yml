@@ -104,13 +104,8 @@ jobs:
           ../solver/target/debug/solver > /dev/null 2>&1 &
           solver_pid=$!
           trap 'kill "$solver_pid" 2>/dev/null || true' EXIT INT TERM
-          ready=false
-          for attempt in {1..60}; do
-            if curl --fail --silent "$SOLVER_BASE_URL/health" > /dev/null; then ready=true; break; fi
-            kill -0 "$solver_pid"
-            sleep 1
-          done
-          test "$ready" = true
+          node test/wait-service.cjs "$SOLVER_BASE_URL/health" solver "$solver_pid"
+          node test/service-readiness.test.cjs
           pnpm test:integration
 
   browser:

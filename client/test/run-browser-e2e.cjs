@@ -13,6 +13,7 @@ const server = path.join(root, 'services/server');
 const solver = path.join(root, 'services/solver');
 const serverRequire = createRequire(path.join(server, 'package.json'));
 const { Client } = serverRequire('pg');
+const { checkService } = require(path.join(server, 'test/service-readiness.cjs'));
 const id = randomBytes(8).toString('hex');
 const project = `meetpoint-browser-test-${id}`;
 const database = `meetpoint_browser_test_${id}`;
@@ -53,7 +54,7 @@ async function run(label, command, args, cwd, env, visible = false) {
 async function ready(label, check, child, timeout = 60_000) {
   const deadline = Date.now() + timeout;
   while (Date.now() < deadline) {
-    if (child && child.exitCode !== null) throw new Error(`${label} exited before readiness.`);
+    if (child && (child.exitCode !== null || child.signalCode !== null || !child.pid)) throw new Error(`${label} exited before readiness.`);
     try { if (await check()) { console.log(`${label} ready.`); return; } } catch { /* 기동 중 연결 실패는 재시도한다. */ }
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
@@ -146,10 +147,10 @@ async function main() {
     await run('Applying real TypeORM migrations to temporary DB', process.execPath,
       ['-r', 'ts-node/register', '-e', "const d=require('./src/database/data-source').default; (async()=>{await d.initialize();await d.runMigrations();await d.destroy()})().catch(()=>process.exit(1))"], server, { ...env, NODE_ENV: 'test' });
     const solverProcess = launch(path.join(solver, `target/debug/solver${process.platform === 'win32' ? '.exe' : ''}`), [], directory, env);
-    await ready('Solver', async () => (await fetch(`${env.SOLVER_BASE_URL}/health`, { signal: AbortSignal.timeout(1000) })).ok, solverProcess);
+    await ready('Solver', () => checkService(`${env.SOLVER_BASE_URL}/health`, 'solver'), solverProcess);
     // ConfigModule이 개발 .env를 읽지 않도록 임시 디렉터리에서 실행한다.
     const serverProcess = launch(process.execPath, [path.join(server, 'dist/main.js')], directory, env);
-    await ready('Server', async () => (await fetch(`${api}/health`, { signal: AbortSignal.timeout(1000) })).ok, serverProcess);
+    await ready('Server', () => checkService(`${api}/ready`, 'server'), serverProcess);
     const clientProcess = launch(process.execPath, [path.join(client, 'node_modules/next/dist/bin/next'), 'start', '-p', String(clientPort), '-H', 'localhost'], stagedClient, { ...env, NODE_ENV: 'production' });
     await ready('Client', async () => (await fetch(url, { signal: AbortSignal.timeout(1000) })).ok, clientProcess);
     if (!interrupted) await run('Running real Chromium scenarios', process.execPath, [path.join(client, 'node_modules/@playwright/test/cli.js'), 'test'], client, env, true);

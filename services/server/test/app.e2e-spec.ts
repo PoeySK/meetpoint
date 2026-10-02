@@ -34,6 +34,21 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  it('/live remains alive without a configured database', async () => {
+    await request(app.getHttpServer())
+      .get('/live')
+      .expect(200)
+      .expect({ status: 'ok', service: 'server' });
+    await request(app.getHttpServer())
+      .get('/ready')
+      .expect(503)
+      .expect({
+        status: 'not_ready',
+        service: 'server',
+        dependencies: { database: { status: 'not_configured' } },
+      });
+  });
+
   afterEach(async () => {
     await app.close();
   });
