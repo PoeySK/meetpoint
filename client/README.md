@@ -23,6 +23,8 @@ pnpm typecheck
 pnpm build
 ```
 
+`typecheck`는 먼저 `next typegen`으로 `LayoutProps` 등 라우트 타입을 생성합니다. 빌드 결과가 없는 새 checkout에서도 실행할 수 있습니다.
+
 실제 Chromium E2E에는 Docker Compose v2, Rust 1.95.0, Server 의존성도 필요합니다.
 
 ```bash

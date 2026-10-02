@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start -p 10081",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "next typegen && tsc --noEmit",
     "test": "node test/participant-response.test.cjs && node test/room-recovery.test.cjs",
     "test:e2e": "node test/run-browser-e2e.cjs"
   },
