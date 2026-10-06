@@ -20,6 +20,21 @@ export const databaseUrl =
   process.env.DATABASE_URL ??
   'postgresql://meetpoint:meetpoint-local@localhost:5432/meetpoint';
 
+if (process.env.NODE_ENV === 'production') {
+  let valid = false;
+  try {
+    const url = new URL(process.env.DATABASE_URL ?? '');
+    valid =
+      ['postgres:', 'postgresql:'].includes(url.protocol) &&
+      Boolean(
+        url.hostname && url.username && url.password && url.pathname.length > 1
+      );
+  } catch {
+    /* Report only the variable name, never credentials. */
+  }
+  if (!valid) throw new Error('Invalid environment variable: DATABASE_URL');
+}
+
 const dataSource = new DataSource({
   type: 'postgres',
   url: databaseUrl,

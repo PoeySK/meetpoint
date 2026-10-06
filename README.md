@@ -42,7 +42,7 @@ Client·Server·DB 연결
 
 이 과정에서 AI는 요구사항을 구조화하고, 경계와 예외를 발견하고, 검증 시나리오를 확장하는 데 사용됩니다. 결과는 API 계약, 도메인 문서, 실행 코드, 데이터베이스 상태, 자동 테스트로 이어져 다음 작업의 기준이 됩니다.
 
-제품 내부 기능도 같은 구성으로 확장합니다. 자연어 조건은 구조화된 데이터로 정리하고, Rust Solver는 입력 snapshot을 바탕으로 결정적인 점수와 근거를 계산하며, NestJS는 전체 흐름과 데이터 계약을 관리합니다. 현재는 방 생성·입장·후보 등록·참여자 응답·계산·확정 흐름이 연결되어 있으며, 개인 조건과 후보 lifecycle을 다음 작업으로 완성합니다.
+제품 내부 기능도 같은 구성으로 확장합니다. 자연어 조건은 구조화된 데이터로 정리하고, Rust Solver는 입력 snapshot을 바탕으로 결정적인 점수와 근거를 계산하며, NestJS는 전체 흐름과 데이터 계약을 관리합니다. 현재는 방 생성·입장·개인 조건·후보 생성·수정·보관·의견 저장·계산·확정·재검토·leave/kick·개인 접근 복구가 구현되어 있습니다. 계산은 PostgreSQL outbox·lease·제한 재시도로 복구합니다.
 
 ## 프로젝트 구조
 
@@ -86,7 +86,7 @@ NestJS Server
   └─ Rust Solver
 ```
 
-현재 저장소에는 방 생성부터 계산·확정까지의 실행 코드가 있으며, 제품 정의와 실제 구현이 어긋난 개인 조건·후보 lifecycle·운영 내구성을 우선 보강합니다. 구체적인 작업 순서는 [현재 작업 계획](docs/07-implementation-plan.md)에 기록합니다.
+현재 핵심 사용자 흐름과 자동 검증·CI가 구현되어 있습니다. 다음 작업은 배포, 남용 방지, 실제 사용자 검증, 데이터 lifecycle과 운영 관측입니다. 구체적인 작업 순서는 [현재 작업 계획](docs/07-implementation-plan.md)에 기록합니다.
 
 ## 권장 로컬 포트
 
@@ -138,7 +138,7 @@ pnpm dev
 | Rust Solver   | `http://localhost:4000` | `GET /health`      |
 | PostgreSQL    | `localhost:5432`        | Docker healthcheck |
 
-현재 Compose 파일은 PostgreSQL만 실행하며 Docker 리소스 이름은 `meetpoint-postgres`, `meetpoint-postgres-data`, `meetpoint-network`를 사용한다. Server와 Solver를 호스트 프로세스로 실행할 때는 `localhost`를 사용한다. 추후 세 서비스를 Docker 네트워크에 넣으면 Server 컨테이너에서 PostgreSQL은 `meetpoint-postgres:5432`, Solver는 `meetpoint-solver:4000`으로 접근하고, 브라우저가 사용하는 Client → Server 주소는 공개 가능한 호스트명으로 별도 설정한다.
+개발 Compose는 PostgreSQL만 실행합니다. 전체 서비스의 최소 배포 구성은 `infra/docker-compose.deploy.yml`이며 개발 자원과 분리된 project 이름을 사용합니다. 새 환경 설정, 명시적 migration, HTTPS 같은 site 구성, backup/restore 및 rollback은 [배포 운영 절차](docs/09-deployment.md)를 따릅니다. 격리 배포 검증은 `node infra/test-deployment.cjs`로 실행합니다.
 
 ## 자동 검증
 

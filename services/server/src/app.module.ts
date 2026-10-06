@@ -4,12 +4,14 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { RoomsModule } from './rooms/rooms.module';
+import { validateEnvironment } from './config/environment';
 
 @Module({
   imports: [
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: ['.env', '../../.env'],
+      validate: validateEnvironment,
     }),
     ...(process.env.NODE_ENV === 'test'
       ? []
