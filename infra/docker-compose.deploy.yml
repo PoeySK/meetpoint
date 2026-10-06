@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?required}
+      POSTGRES_USER: ${POSTGRES_USER:?required}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  solver:
+    image: meetpoint-solver:${RELEASE_TAG:-local}
+    build: ../services/solver
+    restart: unless-stopped
+    networks: [backend]
+    healthcheck:
+      test: [CMD-SHELL, 'curl --fail --silent --max-time 2 http://localhost:4000/health | grep -q ''"service":"solver"''']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  server:
+    image: meetpoint-server:${RELEASE_TAG:-local}
+    build: ../services/server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      SERVER_PORT: '3001'
+      DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}
+      SOLVER_BASE_URL: http://solver:4000
+      CLIENT_ORIGIN: ${CLIENT_ORIGIN:?required}
+    ports: ['127.0.0.1:${SERVER_BIND_PORT:-13001}:3001']
+    networks: [backend, edge]
+    depends_on:
+      postgres: {condition: service_healthy}
+      solver: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, 'Promise.all([fetch("http://localhost:3001/live"),fetch("http://localhost:3001/ready")]).then(async rs=>{const [l,r]=await Promise.all(rs.map(x=>x.json()));if(!rs.every(x=>x.ok)||l.status!=="ok"||r.status!=="ready"||r.dependencies.database.status!=="up")process.exit(1)}).catch(()=>process.exit(1))']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+  migrate:
+    image: meetpoint-server:${RELEASE_TAG:-local}
+    profiles: [tools]
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}
+    networks: [backend]
+    depends_on:
+      postgres: {condition: service_healthy}
+    command: [node, node_modules/typeorm/cli.js, -d, dist/database/data-source.js, migration:run]
+    restart: 'no'
+  client:
+    image: meetpoint-client:${RELEASE_TAG:-local}
+    build:
+      context: ../client
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:?required}
+    restart: unless-stopped
+    ports: ['127.0.0.1:${CLIENT_BIND_PORT:-10081}:10081']
+    networks: [edge]
+    depends_on:
+      server: {condition: service_healthy}
+networks:
+  backend:
+    internal: true
+  edge:
+volumes:
+  postgres-data:

@@ -36,11 +36,11 @@ NestJS Server :3001
 | Participant 입장·lifecycle | 완료 | 방 코드 입장, MEMBER leave, HOST kick, token 폐기, 활성 목록 반영을 제공한다. |
 | Candidate | 완료(P0-2 범위) | HOST의 생성·수정과 `ARCHIVED` 전환, version 조건부 저장, 활성 목록·과거 이력 분리, Client 관리 UI를 제공한다. |
 | ParticipantCondition·ParticipantResponse | 완료 | 참여자 본인 조건 저장·수정, 조건 기반 응답 검증, 모든 활성 후보 응답 완료 시 `RESPONDED` 전환과 최신 결과 무효화를 제공한다. |
-| 계산 | 부분 완료 | Server가 조건·응답 snapshot을 만들어 조건-aware Solver를 호출하고 결과·coverage·충돌·경고를 저장한다. 계산 실행 복구는 남아 있다. |
+| 계산 | 완료 | 조건-aware snapshot·결과 저장과 PostgreSQL outbox·lease·제한 재시도로 재시작 및 장애를 복구한다. |
 | Decision | 완료 | HOST의 최신 완료 결과 선택, 이슈 확인, 확정·재검토와 이력 보존을 제공한다. |
-| Client 화면 | 부분 완료 | 생성·입장·방 작업공간·조건 입력·후보 생성·수정·보관·응답·계산 결과·확정·참여자 lifecycle을 제공한다. Client 자동 테스트는 남아 있다. |
+| Client 화면 | 구현·자동 검증 완료 | 생성·입장·조건·후보 lifecycle·응답·계산·확정·재검토·leave/kick·개인 접근 복구 및 Node/Chromium 테스트가 있다. 실제 사용자 검증은 남아 있다. |
 | 계약·문서 | 완료(P0-2 범위) | 조건 API, Candidate lifecycle, Room의 `myCondition`, condition-aware Solver snapshot·결과와 현재 구현을 정렬했다. |
-| 검증 | 부분 완료 | 조건·Candidate HTTP 계약, PostgreSQL 통합 흐름, Solver 점수·HTTP 단위 검증을 추가했다. Client 자동 테스트와 CI 고정은 남아 있다. |
+| 검증 | 자동 검증 구성 완료 | Client Node·격리 Chromium E2E, Server 단위·HTTP·격리 PostgreSQL/실제 Solver 통합, Solver 단위·HTTP 테스트와 GitHub Actions가 있다. 원격 CI 실행 성공과 운영 환경 검증은 별도 확인한다. |
 
 ## 우선순위 작업
 
@@ -98,6 +98,8 @@ Client 수정·보관·실패 복구 UI와 관련 HTTP·PostgreSQL 통합 테스
 
 #### 3. API 계약과 실제 구현 정렬
 
+현재 상태: 구현된 핵심 route는 `docs/04-api-contract.md`, HTTP/controller 테스트와 PostgreSQL 통합 테스트로 관리한다. OpenAPI는 도입하지 않았으며 계약 문서를 유지한다. 이번 정렬은 기능 상태와 배포 절차를 갱신하며 새로운 API나 계산 정책 버전을 추가하지 않는다.
+
 - `docs/04-api-contract.md`, DTO/validation, controller, view model, Client 타입의
   차이를 한 항목씩 정리한다.
 - 구현되지 않은 조건·후보 lifecycle을 “설계”와 “구현됨”으로 구분하지 않고 현재
@@ -123,44 +125,34 @@ claim·완료·실패 상태 저장의 DB 오류는 Solver 오류와 분리한�
 완료 조건: Server 재시작과 Solver 장애 뒤에도 계산이 유실되거나 중복 확정되지
 않으며, Client가 기존 polling API로 `REQUESTED`·`RUNNING`·최종 상태를 확인할 수 있다.
 
-#### 5. 인증·남용 방지·데이터 lifecycle
+#### 5. 남용 방지 — 후속 구현
 
-- 익명 room-scoped token의 24시간 만료, 폐기, 재발급/복구 정책을 실제 사용자
-  흐름에 맞게 확정한다.
-- 방 코드 추측, 입장·응답·계산 endpoint 남용에 대한 rate limit과 감사 로그 범위를
-  정한다.
-- 운영 로그에서 token 원문과 민감한 입력이 노출되지 않는지 확인한다.
-- Room 자동 종결, 계산·Decision·Participant 이력 보존 기간, 삭제 요청과 DB
-  cleanup 정책을 정하고 migration/배치 작업으로 구현한다.
-- Room·Solver·PostgreSQL health의 의미와 장애 시 HTTP 응답을 분리한다.
+익명 token 만료·폐기, MEMBER leave/HOST kick, 개인 접근 복구는 구현되어 있다.
+복구 credential의 hash 저장·token 교체·복구 origin 검사·HttpOnly/Secure(운영)/SameSite=Strict 쿠키와 관련 HTTP·DB·Client 테스트가 있다.
+방 코드 추측, 생성·입장·응답·계산·복구 endpoint별 rate limit과 안전한 감사 로그는 후속 작업이다.
+완료 기준: 제한 단위·임계값·오탐 복구 정책을 결정하고 정상 흐름 및 남용 시나리오를 테스트한다. 원문 인증 정보는 기록하지 않는다.
 
-완료 조건: 공격·만료·삭제 시나리오가 정책과 테스트로 설명되고, 복구 가능한
-운영 데이터와 삭제 대상의 경계가 명확하다.
+#### 6. 사용자 검증 — 후속 검증
 
-#### 6. Client 품질과 실제 사용자 검증
+Node 테스트, 격리 Chromium E2E와 CI job은 구현되어 있다. 로컬 자동 검증과 실제 사용자의 이해도 검증을 구분한다.
+완료 기준: 실제 사용자와 모바일에서 생성부터 확정·재검토·접근 복구까지 실행하고, 실패·동시 변경·접근성 문제를 기록·해결한다. Firefox/WebKit과 실제 HTTPS·CORS·쿠키도 확인한다.
 
-- 조건 입력, 후보 lifecycle, 응답 저장, 계산 polling, 확정·재검토, leave/kick의
-  성공·실패·새로고침·token 만료 시나리오를 브라우저 수준에서 검증한다.
-- 현재 수동 확인에 의존하는 Client API 타입과 로딩·빈 상태·오류·접근성 메시지를
-  정리한다.
-- Server API 계약과 Client 타입을 같은 fixture 또는 contract test로 연결한다.
-- 계산 e2e가 환경 변수에 따라 건너뛰지 않도록 테스트용 Solver 전략을 정한다.
+#### 7. 배포 — 최소 구성 추가, 운영 검증 필요
 
-완료 조건: 핵심 흐름을 새 브라우저 세션에서 처음부터 확정까지 재현할 수 있고,
-API 오류·새로고침·동시 변경에서도 화면과 서버 상태가 어긋나지 않는다.
+`infra/docker-compose.deploy.yml`과 각 서비스 Dockerfile, 환경 예시 및 [운영 절차](09-deployment.md)를 제공한다.
+개발 Compose는 PostgreSQL 전용으로 유지한다. 자동 migration/synchronize는 사용하지 않는다.
+완료 기준: 격리 project에서 이미지 build → DB 준비 → 명시적 migration → 서비스 readiness → 생성·입장·조건·응답·계산·확정·복구가 통과한다.
+실제 배포의 완료 기준은 도메인·HTTPS 프록시·secret 주입·백업 위치 결정과 실제 HTTPS 브라우저 검증이다. 이 작업은 실제 배포를 수행하지 않는다.
 
-#### 7. 배포·관측 가능성
+#### 8. 데이터 lifecycle — 후속 정책·구현
 
-- Server와 Solver를 포함한 Compose 실행 구성을 실제 환경 변수·healthcheck·migration
-  순서와 함께 정의한다.
-- CI에서 Client lint/build, Server lint/test/e2e/build, Solver fmt/check/test를
-  실행한다.
-- 구조화 로그, `requestId` 추적, 계산 latency·failure metric, DB migration 상태를
-  운영에서 확인할 수 있게 한다.
-- secret 주입, HTTPS/reverse proxy, DB backup/restore, rollback 절차를 문서화한다.
+Room 자동 종결, Participant/조건/응답/계산 snapshot/Decision/복구 credential 보존 기간, 삭제 요청과 backup 만료 정책을 결정한다.
+완료 기준: 보존과 삭제 대상·예외·복구 가능 기간을 명시하고, 식별 가능한 테스트 데이터로 cleanup과 참조 정합성을 검증한다. 이번에는 방 삭제나 cleanup 배치를 추가하지 않는다.
 
-완료 조건: 새 환경에서 같은 설정으로 서비스를 시작하고 migration·health·로그를
-확인할 수 있으며, 배포 실패 시 이전 버전과 데이터를 안전하게 복구할 수 있다.
+#### 9. 운영 관측 — 후속 구현
+
+Server `/live`·DB 기반 `/ready`, Solver `/health`, 안전한 계산 job 오류 로그는 구현되어 있다. readiness는 migration 완료나 Solver 정상 여부를 증명하지 않는다.
+완료 기준: requestId 추적, 계산 지연·실패·lease 재처리, DB 용량·backup 성공·migration 상태를 확인하는 지표와 경보·대응 절차를 마련한다. 관측 시스템은 이번 범위 밖이다.
 
 ### P2 — 제품 확장
 
@@ -168,7 +160,7 @@ API 오류·새로고침·동시 변경에서도 화면과 서버 상태가 어�
 결정 문서를 만든다.
 
 - 지도·주소 정규화·실제 이동시간 provider 연동과 자기 기입 이동 부담의 우선순위
-- 사용자 계정, 방 목록, 토큰 분실 복구와 권한 모델
+- 사용자 계정, 방 목록, 계정 기반 복구와 권한 모델 확장(현재 익명 개인 접근 복구는 구현됨)
 - 이메일·푸시 알림 및 계산 완료 이벤트
 - WebSocket/SSE 기반 실시간 상태 반영
 - 식사 외 카페·운동·여행·행사 모임 유형과 유형별 Solver 정책
@@ -177,13 +169,10 @@ API 오류·새로고침·동시 변경에서도 화면과 서버 상태가 어�
 
 ## 작업 순서의 기준
 
-1. ParticipantCondition과 Candidate lifecycle을 구현해 제품 정의와 실제 입력 흐름을
-   일치시킨다.
-2. 위 변경을 API 계약·migration·Solver schema·Client 타입·자동 테스트에 동시에
-   반영한다.
-3. 계산 실행 내구성과 token·data lifecycle을 보강한다.
-4. 브라우저 검증, CI, 배포·관측 가능성을 갖춘 뒤 외부 provider와 확장 기능을
-   추가한다.
+1. 최소 배포 구성을 격리 환경에서 검증하고 HTTPS·backup·rollback 결정을 마무리한다.
+2. 남용 방지와 실제 사용자 검증을 진행한다.
+3. 데이터 lifecycle과 운영 관측을 정책·테스트와 함께 구현한다.
+4. 확장 기능은 별도 요구사항과 결정 문서를 만든 뒤 진행한다.
 
 각 작업은 코드 변경만으로 완료하지 않고 migration, API 계약, 자동 테스트,
 Client 동작, 운영상 실패 조건을 함께 확인한다.

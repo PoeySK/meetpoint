@@ -22,17 +22,19 @@
 ## 계산 lifecycle
 
 `POST /api/v1/rooms/{roomId}/calculations`는 `ScoreResult`를 만들고 `202 Accepted`를
-반환한다. NestJS는 현재 Solver 호출을 프로세스 내부 비동기 작업으로 실행하며,
-Client는 계산 결과 API를 polling한다.
+반환한다. 요청 transaction은 Room·ScoreResult와 snapshot을 담은 PostgreSQL
+`calculation_jobs` outbox를 함께 저장한다. Client는 계산 결과 API를 polling한다.
 
-- 계산 시작은 HOST만 가능하다.
-- Room이 `CALCULATING`인 동안 두 번째 계산 요청은 거부한다.
-- 성공하면 `COMPLETED`를 저장하고 Room을 `CALCULATED`로 바꾼다.
-- timeout, 연결 실패, Solver 출력 검증 실패는 `FAILED`를 저장하고 Room을 `OPEN`으로
-  되돌린다.
-- Queue나 Redis는 아직 사용하지 않는다. NestJS가 재시작되면 실행 중인 계산이
-  `RUNNING` 상태로 남을 수 있으며, 재시작 복구·재시도는 현재 작업 계획의
-  계산 내구성 작업에서 해결한다.
+- HOST만 시작하며 `CALCULATING` 중 중복 시작은 거부한다.
+- Worker는 row lock과 lease로 claim하고 `REQUESTED` → `RUNNING`으로 진행한다.
+- 성공은 Room·ScoreResult·Job을 같은 transaction에서 저장한다.
+- timeout·연결 실패 등 재시도 가능한 오류는 제한 횟수까지 재요청한다. 영구 오류 또는 한도 초과만 `FAILED`로 확정하고 Room을 `OPEN`으로 되돌린다.
+- 시작/polling에서 만료 lease를 재claim한다. claim 시각·시도 횟수로 오래된 worker의 저장을 차단한다.
+- DB 저장 오류는 rollback 후 drain을 종료하고 다음 polling/lease 만료로 복구한다.
+- 종료 시 새 claim과 polling을 중지한다. 진행 중 작업의 종료 대기는 없고 저장되지 않은 작업은 lease로 복구한다.
+- 같은 snapshot의 Solver 재호출은 가능하며 외부 호출의 exactly-once는 보장하지 않는다. Redis는 사용하지 않는다.
+
+자세한 실패 경계와 테스트 근거는 [현재 작업 계획](07-implementation-plan.md)의 계산 내구성 항목을 따른다.
 
 ## 결과 metadata
 
