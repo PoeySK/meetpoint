@@ -24,6 +24,7 @@
 **/.env.*
 !services/server/.env.example
 !client/.env.example
+!infra/.env.example
 
 # Logs
 **/*.log
