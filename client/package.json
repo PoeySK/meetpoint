@@ -8,7 +8,7 @@
     "start": "next start -p 10081",
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
-    "test": "node test/participant-response.test.cjs && node test/room-recovery.test.cjs",
+    "test": "node test/participant-response.test.cjs && node test/room-recovery.test.cjs && node test/calculation-result.test.cjs",
     "test:e2e": "node test/run-browser-e2e.cjs"
   },
   "dependencies": {

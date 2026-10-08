@@ -138,6 +138,7 @@ export function CalculationResultPanel({
   }
 
   function handleSelectCandidate(candidateId: string) {
+    if (candidateId === selectedCandidateId) return;
     setSelectedCandidateId(candidateId);
     resetDecisionDraft();
   }

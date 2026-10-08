@@ -3,6 +3,7 @@ import type {
   MatchLevel,
   RecommendationStatus,
   ScoringProfile,
+  ScoreResultCandidate,
 } from "@/entities/calculation";
 import type { RoomDetailsResponse } from "@/entities/room";
 
@@ -71,6 +72,37 @@ export function isCalculationRunning(
   status: CalculationPayload["status"] | undefined,
 ) {
   return status === "REQUESTED" || status === "RUNNING";
+}
+
+const componentLabels = {
+  time: "시간",
+  travelBurden: "이동 부담",
+  budget: "예산",
+  preference: "선호",
+} as const;
+
+function participantName(room: RoomDetailsResponse, participantId: string) {
+  return room.participants.find((item) => item.id === participantId)?.displayName
+    ?? "이름을 확인할 수 없는 참가자";
+}
+
+// API의 중복 코드를 묶기만 하며 점수·충돌 판단은 새로 계산하지 않는다.
+export function groupCandidateIssues(candidate: ScoreResultCandidate) {
+  const groups = new Map<string, Set<string>>();
+  function add(code: string, participantId: string) {
+    if (!groups.has(code)) groups.set(code, new Set());
+    groups.get(code)!.add(participantId);
+  }
+  for (const conflict of candidate.conflicts) add(conflict.code, conflict.participantId);
+  for (const participant of candidate.participantBreakdown) {
+    for (const code of [...participant.hardConflicts, ...participant.blockingIssues]) {
+      add(code, participant.participantId);
+    }
+  }
+  for (const code of candidate.blockingIssues) {
+    if (!groups.has(code)) groups.set(code, new Set());
+  }
+  return Array.from(groups, ([code, participantIds]) => ({ code, participantIds: [...participantIds] }));
 }
 
 export function CalculationStatus({
@@ -172,17 +204,18 @@ export function CompletedResult({
             (item) => item.id === candidate.candidateId,
           );
           const isSelected = selectedCandidateId === candidate.candidateId;
+          const issues = groupCandidateIssues(candidate);
           const selectionClassName = isSelected
             ? "mp-button mt-4 w-full border border-emerald-700 bg-emerald-700 px-3 py-2.5 text-sm text-white hover:bg-emerald-800"
             : "mp-button mp-button-secondary mt-4 w-full px-3 py-2.5 text-sm hover:border-emerald-500 hover:text-emerald-700";
 
           return (
             <article
-              className="mp-card rounded-xl p-4 shadow-none"
+              className="mp-card min-w-0 rounded-xl p-4 shadow-none [overflow-wrap:anywhere]"
               key={candidate.candidateId}
             >
               <div className="flex items-start justify-between gap-4">
-                <div>
+                <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
                     {candidate.rank}순위
                   </p>
@@ -190,7 +223,7 @@ export function CompletedResult({
                     {roomCandidate?.place.name ?? "후보 정보를 불러오지 못했습니다"}
                   </h3>
                 </div>
-                <div className="text-right">
+                <div className="shrink-0 text-right">
                   <p className="text-xl font-bold text-slate-950">
                     {candidate.overallScore.toFixed(1)}점
                   </p>
@@ -199,6 +232,19 @@ export function CompletedResult({
                   </p>
                 </div>
               </div>
+
+              {roomCandidate && (
+                <div className="mt-2 space-y-1 text-sm leading-6 text-slate-600">
+                  <p>
+                    {new Date(roomCandidate.time.startsAt).toLocaleString("ko-KR", {
+                      dateStyle: "medium", timeStyle: "short", timeZone: roomCandidate.time.timezone,
+                    })} ~ {new Date(roomCandidate.time.endsAt).toLocaleString("ko-KR", {
+                      dateStyle: "medium", timeStyle: "short", timeZone: roomCandidate.time.timezone,
+                    })} ({roomCandidate.time.timezone})
+                  </p>
+                  <p>1인 예상 비용: {roomCandidate.estimatedCostPerPersonKrw.toLocaleString("ko-KR")}원</p>
+                </div>
+              )}
 
               <div className="mt-4 flex flex-wrap gap-2 text-xs font-medium">
                 <span
@@ -210,7 +256,7 @@ export function CompletedResult({
                 >
                   {candidate.eligible ? "추천 가능한 후보" : "확인할 점 있음"}
                 </span>
-                {candidate.explanationFlags.map((flag) => (
+                {Array.from(new Set(candidate.explanationFlags)).filter((flag) => !issues.some((issue) => issue.code === flag)).map((flag) => (
                   <span
                     className="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600"
                     key={flag}
@@ -225,17 +271,18 @@ export function CompletedResult({
                 {candidate.coverage.expectedResponses}명
               </p>
 
-              {candidate.blockingIssues.length > 0 && (
-                <p className="mt-4 text-sm text-rose-700">
-                  확정 전에 확인해 주세요: {candidate.blockingIssues.map(getCalculationCodeLabel).join(", ")}
-                </p>
-              )}
-              {candidate.conflicts.length > 0 && (
-                <p className="mt-2 text-sm text-rose-700">
-                  충돌: {candidate.conflicts
-                    .map((conflict) => getCalculationCodeLabel(conflict.code))
-                    .join(", ")}
-                </p>
+              {issues.length > 0 && (
+                <div className="mt-4 space-y-2 text-sm leading-6 text-rose-700">
+                  <p>평균 점수가 높아도 필수 조건 충돌이나 미응답이 있을 수 있습니다. 확정 전에 확인해 주세요.</p>
+                  <ul className="space-y-1">
+                    {issues.map(({ code, participantIds }) => (
+                      <li key={code}>
+                        {code === "MISSING_RESPONSE" ? "미응답" : "충돌"}: {getCalculationCodeLabel(code)}
+                        {participantIds.length > 0 && ` — ${participantIds.map((id) => participantName(room, id)).join(", ")}`}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
               )}
 
               {candidate.reasons.length > 0 && (
@@ -248,19 +295,34 @@ export function CompletedResult({
 
               <div className="mt-4 space-y-2 border-t border-slate-100 pt-4">
                 {candidate.participantBreakdown.map((participant) => (
-                  <div
-                    className="flex items-center justify-between gap-3 text-sm"
+                  <details
+                    className="rounded-lg bg-slate-50 text-sm"
                     key={participant.participantId}
                   >
-                    <span className="text-slate-600">
-                      {room.participants.find(
-                        (item) => item.id === participant.participantId,
-                      )?.displayName ?? participant.participantId}
-                    </span>
-                    <span className="font-semibold text-slate-950">
-                      {participant.score.toFixed(1)}점
-                    </span>
-                  </div>
+                    <summary className="cursor-pointer rounded-lg p-3 text-slate-700 focus-visible:outline-2 focus-visible:outline-emerald-600">
+                      <span>{participantName(room, participant.participantId)}</span>{" "}
+                      <strong className="text-slate-950">{participant.score.toFixed(1)}점</strong>{" "}
+                      <span className="text-xs">상세 근거</span>
+                    </summary>
+                    <div className="space-y-3 px-3 pb-3 leading-6">
+                      <dl className="grid grid-cols-2 gap-2">
+                        {(Object.keys(componentLabels) as Array<keyof typeof componentLabels>).map((key) => (
+                          <div key={key}>
+                            <dt className="text-slate-500">{componentLabels[key]}</dt>
+                            <dd className="font-semibold text-slate-950">{participant.components[key].toFixed(1)} / {calculation.metadata.weights[key]}점</dd>
+                          </div>
+                        ))}
+                      </dl>
+                      {participant.hardConflicts.length + participant.blockingIssues.length > 0 && (
+                        <p className="text-rose-700">확인할 점: {Array.from(new Set([...participant.hardConflicts, ...participant.blockingIssues])).map(getCalculationCodeLabel).join(", ")}</p>
+                      )}
+                      <ul className="space-y-1 text-slate-600">
+                        {Array.from(new Set(participant.reasons)).map((reason) => (
+                          <li key={reason}>{getCalculationReasonLabel(reason)}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </details>
                 ))}
               </div>
 
