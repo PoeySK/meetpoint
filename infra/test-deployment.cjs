@@ -149,6 +149,14 @@ async function main() {
       `test "$(psql -U meetpoint_test -d ${restoreDb} -At -c 'SELECT count(*) FROM rooms')" = 1`);
     await dc('exec', '-T', 'postgres', 'rm', '/tmp/deployment-test.dump');
     console.log('PASS: PostgreSQL custom dump and restore into a separate owned DB');
+    for (let attempt = 0; attempt < 9; attempt++) await request('/api/v1/rooms', 400, null, {});
+    const rateLimited = await request('/api/v1/rooms', 429, null, {
+      title: 'Blocked deployment room', timezone: 'Asia/Seoul', host: { displayName: 'Blocked host' },
+    });
+    assert.equal(rateLimited.body.error.code, 'RATE_LIMITED');
+    assert.ok(rateLimited.body.error.details.retryAfterSeconds > 0);
+    await request(`/api/v1/rooms/${room.id}`, 200, recovered.access.participantToken);
+    console.log('PASS: production rate limit and unaffected Room polling');
     console.log('PASS: deployment health, Client HTTP, create/join/conditions/responses/calculation/decision/recovery and production cookie attributes');
     console.log('HTTPS browser cookie transport still requires the chosen proxy/domain.');
   } finally {

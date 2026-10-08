@@ -29,6 +29,7 @@ type CalculationResultPanelProps = {
 };
 
 function describeCalculationError(error: unknown) {
+  if (error instanceof RoomApiError && error.status === 429) return error.message;
   if (error instanceof RoomApiError) {
     if (error.code === 'HOST_ONLY') {
       return '방장만 추천 결과를 만들 수 있습니다.';

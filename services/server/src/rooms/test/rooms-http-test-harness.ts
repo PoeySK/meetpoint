@@ -49,6 +49,8 @@ import {
 } from '../application/ports/room-access.port';
 import { ROOMS_PERSISTENCE } from '../application/ports/rooms-persistence.port';
 import { SOLVER } from '../application/ports/solver.port';
+import { RoomRateLimiter } from '../presentation/http/rate-limit/room-rate-limiter';
+import { RoomRateLimitGuard } from '../presentation/http/rate-limit/room-rate-limit.guard';
 
 type CreateRoomPayload = {
   title?: unknown;
@@ -701,6 +703,8 @@ export async function createRoomsTestContext(): Promise<RoomsTestContext> {
       ParticipantLifecycleController,
     ],
     providers: [
+      RoomRateLimiter,
+      RoomRateLimitGuard,
       RecoverRoomAccessUseCase,
       RecoveryCredentialAdapter,
       { provide: RECOVERY_CREDENTIAL, useExisting: RecoveryCredentialAdapter },

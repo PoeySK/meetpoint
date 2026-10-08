@@ -135,6 +135,7 @@ function validateCandidateForm(
 }
 
 function describeCandidateError(error: unknown) {
+  if (error instanceof RoomApiError && error.status === 429) return error.message;
   if (error instanceof RoomApiError) {
     if (error.code === 'CANDIDATE_LIMIT_EXCEEDED') {
       return '후보는 최대 5개까지 등록할 수 있습니다. 다른 후보를 제외한 뒤 추가해 주세요.';

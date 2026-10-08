@@ -88,6 +88,39 @@
 
 ## 공통 오류 응답
 
+### 변경 요청 rate limit
+
+단일 Server 프로세스의 메모리 고정 구간 제한이다. 각 bucket의 첫 요청에서 구간을 시작하며 성공·인증 실패·권한/validation 실패도 요청 횟수에 포함한다. IP는 신뢰 설정을 적용한 연결 주소로 판별하고 정책별로 공유한다. 본문의 participantId, 표시 이름, token/복구 코드 원문이나 요청 roomId를 인증 전 bucket 키로 사용하지 않는다.
+
+- `POST /api/v1/rooms`: IP당 10분에 10회.
+- `POST /api/v1/rooms/{roomCode}/participants`: 모든 방 코드 합산 IP당 10분에 30회.
+- `POST /api/v1/rooms/{roomId}/recovery`, `POST .../recovery/register`: 두 endpoint·모든 방을 합산해 IP당 10분에 30회. register는 Bearer로 검증한 참가자·방당 추가 10분에 6회. 복구로 token을 바꿔도 동일 참가자의 등록 quota는 유지된다.
+- `PUT .../participants/{participantId}/conditions`: IP당 분당 180회(의견 저장과 공유), 검증된 참가자·방당 분당 10회.
+- `PUT .../participants/{participantId}/responses/{candidateId}`: 위 IP quota를 공유하고, 모든 후보를 합산해 검증된 참가자·방당 분당 30회.
+- `POST .../calculations`: IP당 분당 30회, HOST 인증 후 방당 분당 6회. 동일 clientRequestId의 재요청도 횟수에 포함한다. polling은 포함하지 않는다.
+- GET 조회·5초 polling·health 및 OPTIONS preflight는 제외한다. 후보 관리·확정/재검토·leave/kick도 이번 제한 대상에 추가하지 않는다.
+
+3~6명이 최대 5개 후보에 연속 응답하는 정상 흐름을 허용하는 초기값이다. 같은 NAT를 공유하는 사용자는 IP quota도 공유한다. 임계값 변경은 실제 사용자 검증 후 코드의 `ROOM_LIMITS`와 계약·테스트를 함께 갱신한다.
+
+순서는 HTTP JSON parsing → IP quota → (인증이 필요한 endpoint의) Bearer 인증 → HOST/본인 권한 → 참가자·방 quota → 기존 controller/use-case의 origin·입력·상태·transaction 검증이다. register의 origin·room UUID 검사는 기존 오류 계약을 유지하기 위해 Bearer 인증 전에 수행한다. 복구는 IP quota 뒤 기존 origin/복구 credential 검증을 수행한다. JSON parsing 실패는 guard 이전에 발생한다. 인증/권한 오류는 그 단계에서 기존 코드로 응답하고 인증된 bucket을 생성하지 않는다. 이미 IP 제한에 걸렸으면 인증/validation 오류보다 429가 먼저 반환된다. 제한된 요청은 controller/use-case를 실행하지 않으며 DB 변경·ScoreResult/job 생성·credential 교체를 하지 않는다.
+
+초과 요청은 HTTP **429**, `Retry-After: <남은 정수 초>`와 기존 오류 envelope를 반환한다. 실패 요청이 만료 시각을 연장하지는 않는다. 다중 quota에서는 먼저 초과한 quota의 남은 시간을 제공하며 다른 quota가 여전히 제한 중이면 이후 재시도도 429일 수 있다.
+
+```json
+{
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "요청이 너무 많습니다. 잠시 기다린 뒤 다시 시도해 주세요.",
+    "details": { "retryAfterSeconds": 60 },
+    "requestId": "req_example"
+  }
+}
+```
+
+429는 `Cache-Control: no-store`이며 CORS에서 `Retry-After`를 공개한다. Client는 정수 초/HTTP-date 헤더를 읽어 한국어 대기 안내를 표시하고, 초안·저장된 인증 상태를 유지하며 자동 재전송/접근 복구를 하지 않는다.
+
+메모리는 프로세스별 HMAC key만 보관한다. 60초 주기 및 요청 시 만료 항목을 정리하고 전체 최대 10,000항목을 유지한다. 활성 항목을 임의로 축출하지 않는다. 만료 정리 후에도 가득 차면 새 항목이 필요한 요청을 가장 빠른 만료까지 429로 거부한다. bucket key·IP·인증 원문은 출력하지 않는다. 프로세스 재시작 시 초기화되며 다중 worker/instance는 각각 별도 quota를 갖는다. 고정 구간 경계에는 짧은 시간에 최대 두 구간 분량의 요청이 가능하다. 분산 차단·계정 차단·CAPTCHA·네트워크 DDoS 방어는 제공하지 않는다. 프록시 설정과 배포 한계는 `docs/09-deployment.md`를 따른다.
+
 모든 실패 응답은 다음 형태를 따른다.
 
 ```json
@@ -116,6 +149,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | 404 | `ROOM_NOT_FOUND_OR_INVALID_CODE`, `RESOURCE_NOT_FOUND`, `SCORE_RESULT_NOT_FOUND`, `DECISION_NOT_FOUND` | 방 또는 하위 객체가 없음 |
 | 409 | `ROOM_STATE_CONFLICT`, `CALCULATION_IN_PROGRESS`, `STALE_RESULT`, `DUPLICATE_RESPONSE`, `CANDIDATE_VERSION_CONFLICT` | 현재 상태 또는 오래된 Candidate 버전과 충돌 |
 | 422 | `BUSINESS_RULE_VIOLATION`, `NO_ACTIVE_CANDIDATES`, `CANDIDATE_LIMIT_EXCEEDED`, `CONDITION_INCOMPLETE`, `PARTICIPANT_COUNT_OUT_OF_RANGE`, `RESPONSE_FIELD_MISSING` | JSON은 맞지만 MeetPoint 규칙 위반. `CONDITION_INCOMPLETE`은 조건을 보냈을 때의 형식·범위 오류이며 미입력을 뜻하지 않는다. 후보와 조건의 시간 충돌은 응답 제출을 거부하지 않고 계산 결과에 표시한다. |
+| 429 | `RATE_LIMITED` | 요청 quota 초과 또는 제한 저장소 포화. `Retry-After`와 `details.retryAfterSeconds`로 남은 시간 안내 |
 | 502 | `SOLVER_ERROR` | Solver가 계산 실패를 반환함 |
 | 503 | `SOLVER_UNAVAILABLE` | Solver에 연결할 수 없음 또는 타임아웃 |
 | 500 | `INTERNAL_ERROR` | 예상하지 못한 서버 오류 |

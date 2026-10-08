@@ -16,6 +16,7 @@ type UseParticipantLifecycleOptions = {
 };
 
 function describeLifecycleError(error: unknown) {
+  if (error instanceof RoomApiError && error.status === 429) return error.message;
   if (error instanceof RoomApiError) {
     if (error.code === "HOST_ONLY") {
       return "방장만 다른 사람을 내보낼 수 있습니다.";

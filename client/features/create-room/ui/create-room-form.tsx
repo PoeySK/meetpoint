@@ -90,7 +90,9 @@ export function CreateRoomForm() {
       rememberRoomAddress(response.room.roomCode, response.room.id);
       router.push(`/rooms/${encodeURIComponent(response.room.id)}`);
     } catch (error) {
-      if (error instanceof RoomApiError && error.status === 400) {
+      if (error instanceof RoomApiError && error.status === 429) {
+        setFormError(error.message);
+      } else if (error instanceof RoomApiError && error.status === 400) {
         setFormError("입력 내용을 확인해 주세요.");
       } else {
         setFormError("방을 만들지 못했습니다. 잠시 후 다시 시도해 주세요.");

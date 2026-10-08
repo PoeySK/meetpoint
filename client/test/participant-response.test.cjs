@@ -278,3 +278,24 @@ test('authentication failure retains response draft and requires recovery before
   h.fail(false); h.cards()[0].props.onSave(); await settle(); assert.equal(h.calls.length, 2);
   assert.equal(model.getResponseState(h.cards()[0].props.form), 'saved');
 });
+
+test('429 keeps response draft and token, shows retry guidance and waits for an explicit retry', async () => {
+  const h = panelHarness();
+  h.fill().props.onClick();
+  h.cards()[0].props.onUpdate({ travelBurden: 'NORMAL', note: 'Rate limited draft' });
+  const token = h.props.token;
+  const message = '요청이 너무 많습니다. 60초 뒤에 다시 시도해 주세요.';
+  h.fail(new RoomApiError(message, 429, 'RATE_LIMITED'));
+  h.cards()[0].props.onSave();
+  await settle();
+  const form = h.cards()[0].props.form;
+  assert.equal(form.note, 'Rate limited draft');
+  assert.equal(form.travelBurden, 'NORMAL');
+  assert.equal(form.savedResponseId, null);
+  assert.equal(form.message, message);
+  assert.equal(h.props.token, token);
+  h.render(); h.flush(); await settle();
+  assert.equal(h.calls.length, 1);
+  h.fail(false); h.cards()[0].props.onSave(); await settle();
+  assert.equal(model.getResponseState(h.cards()[0].props.form), 'saved');
+});

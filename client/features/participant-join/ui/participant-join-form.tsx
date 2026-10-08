@@ -39,6 +39,7 @@ function validateForm(roomCode: string, displayName: string) {
 }
 
 function describeJoinError(error: unknown) {
+  if (error instanceof RoomApiError && error.status === 429) return error.message;
   if (error instanceof RoomApiError) {
     if (error.code === 'ROOM_NOT_FOUND_OR_INVALID_CODE') {
       return '방 코드를 확인해 주세요. 존재하지 않거나 입장할 수 없는 방입니다.';

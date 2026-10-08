@@ -9,6 +9,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import type { Response } from 'express';
+import { RateLimited } from '../rate-limit/room-rate-limit.guard';
 import { RecoverRoomAccessUseCase } from '../../../application/commands/recover-room-access.use-case';
 import {
   assertRecoveryOrigin,
@@ -41,6 +42,7 @@ export class RoomsController {
   ) {}
 
   @Post()
+  @RateLimited('create')
   async createRoom(
     @Body() body: CreateRoomDto,
     @Res({ passthrough: true }) response: Response
@@ -56,6 +58,7 @@ export class RoomsController {
   }
 
   @Post(':roomCode/participants')
+  @RateLimited('join')
   async joinParticipant(
     @Param('roomCode') roomCode: string,
     @Body() body: JoinParticipantDto,
@@ -72,6 +75,7 @@ export class RoomsController {
   }
 
   @Post(':roomId/recovery')
+  @RateLimited('recover')
   async recover(
     @Param('roomId') roomId: string,
     @Body() body: { recoveryCode?: unknown },
@@ -97,6 +101,7 @@ export class RoomsController {
   }
 
   @Post(':roomId/recovery/register')
+  @RateLimited('register')
   async registerRecovery(
     @Param('roomId') roomId: string,
     @Body() body: { replace?: unknown },

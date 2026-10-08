@@ -19,6 +19,7 @@ type UseDecisionConfirmationOptions = {
 };
 
 function describeDecisionError(error: unknown) {
+  if (error instanceof RoomApiError && error.status === 429) return error.message;
   if (error instanceof RoomApiError) {
     if (error.code === "HOST_ONLY") {
       return "방장만 후보를 선택해 일정을 확정하거나 확정 내용을 다시 검토할 수 있습니다.";

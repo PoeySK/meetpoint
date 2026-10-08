@@ -7,6 +7,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import type { UpsertParticipantConditionDto } from '../dto/upsert-participant-condition.dto';
+import { RateLimited } from '../rate-limit/room-rate-limit.guard';
 import { UpsertParticipantConditionUseCase } from '../../../application/commands/upsert-participant-condition.use-case';
 import { extractBearerToken } from '../auth/bearer-token';
 import { RoomsErrorFilter } from '../filters/rooms-error.filter';
@@ -20,6 +21,7 @@ export class ParticipantConditionController {
   ) {}
 
   @Put(':roomId/participants/:participantId/conditions')
+  @RateLimited('condition')
   upsertParticipantCondition(
     @Param('roomId') roomId: string,
     @Param('participantId') participantId: string,

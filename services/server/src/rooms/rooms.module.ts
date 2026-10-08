@@ -46,6 +46,8 @@ import {
 } from './application/ports/room-access.port';
 import { ROOMS_PERSISTENCE } from './application/ports/rooms-persistence.port';
 import { SOLVER } from './application/ports/solver.port';
+import { RoomRateLimiter } from './presentation/http/rate-limit/room-rate-limiter';
+import { RoomRateLimitGuard } from './presentation/http/rate-limit/room-rate-limit.guard';
 
 @Module({
   imports: [
@@ -70,6 +72,8 @@ import { SOLVER } from './application/ports/solver.port';
     ParticipantLifecycleController,
   ],
   providers: [
+    RoomRateLimiter,
+    RoomRateLimitGuard,
     RecoverRoomAccessUseCase,
     RecoveryCredentialAdapter,
     { provide: RECOVERY_CREDENTIAL, useExisting: RecoveryCredentialAdapter },
