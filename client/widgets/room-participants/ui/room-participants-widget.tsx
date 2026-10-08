@@ -122,11 +122,11 @@ export function RoomParticipantsWidget({
 
           return (
             <li
-              className='flex items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-slate-50/35 px-3 py-2.5'
+              className='flex min-w-0 items-center justify-between gap-3 rounded-xl border border-slate-200/90 bg-slate-50/35 px-3 py-2.5'
               key={participant.id}
             >
               <div className='min-w-0'>
-                <p className='truncate font-semibold text-slate-950'>
+                <p className='font-semibold text-slate-950 [overflow-wrap:anywhere]'>
                   {participant.displayName}
                   {isCurrentParticipant && (
                     <span className='ml-2 text-xs font-semibold text-emerald-700'>

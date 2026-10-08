@@ -194,11 +194,11 @@ async function quickSave(page: Page) {
   await expect(quick.getByText('후보 2개의 의견을 모두 저장했습니다.', { exact: true })).toBeVisible();
   await expect.poll(async () => (await room(page)).myResponses.length).toBe(2);
 }
-async function setup(world: World) {
+async function setup(world: World, hostName = 'E2E host') {
   const host = await world.page();
   await host.goto('/');
   await host.getByLabel('모임 제목', { exact: true }).fill(`browser-e2e-${Date.now()}`);
-  await host.getByLabel('방장 이름', { exact: true }).fill('E2E host');
+  await host.getByLabel('방장 이름', { exact: true }).fill(hostName);
   await host.getByRole('button', { name: '방 만들기', exact: true }).click();
   await expect(host).toHaveURL(/\/rooms\/[0-9a-f-]+$/);
   await expect(host.getByRole('heading', { name: '함께하는 사람', exact: true })).toBeVisible();
@@ -217,9 +217,9 @@ async function setup(world: World) {
   await expect.poll(async () => (await room(host)).participants.length).toBe(3);
   const participants = (await room(host)).participants;
   expect(participants.map((item) => [item.displayName, item.role]).sort()).toEqual([
-    ['E2E host', 'HOST'], ['E2E member one', 'MEMBER'], ['E2E member two', 'MEMBER'],
-  ]);
-  await expect(host.getByRole('region', { name: '함께하는 사람' })).toContainText('E2E host님으로 참여 중입니다. (방장)');
+    [hostName, 'HOST'], ['E2E member one', 'MEMBER'], ['E2E member two', 'MEMBER'],
+  ].sort());
+  await expect(host.getByRole('region', { name: '함께하는 사람' })).toContainText(`${hostName}님으로 참여 중입니다. (방장)`);
   await addCandidate(host, 'E2E inside', false);
   await addCandidate(host, 'E2E outside', true);
   for (const page of [host, ...members]) {
@@ -311,6 +311,73 @@ test('생성·참여 → 조건·자동 초안·수동 수정·저장 → 실제
   const nextCalculation = await calculate(host);
   expect(nextCalculation).not.toBe(firstCalculation);
   await confirm(host);
+});
+
+test('모바일 결과 근거·키보드 펼침·후보 선택·polling 초안 유지·문제 확인 후 HOST 확정', async ({ world }) => {
+  const hostName = '긴이름을사용하는참가자의추천근거확인';
+  const { host, members } = await setup(world, hostName);
+  // 기존 API로 높은 평균과 예산 충돌을 함께 만드는 소유 fixture.
+  const initial = await room(host);
+  const candidate = initial.candidates.find((item) => item.place.name === 'E2E inside')!;
+  const patchStatus = await host.evaluate(async ({ api, roomId, candidateId, version }) => {
+    const response = await fetch(`${api}/api/v1/rooms/${roomId}/candidates/${candidateId}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json', 'If-Match-Version': String(version), Authorization: `Bearer ${sessionStorage.getItem(`meetpoint:room-token:${roomId}`)}` },
+      body: JSON.stringify({ estimatedCostPerPersonKrw: 21000 }),
+    });
+    return response.status;
+  }, { api: process.env.MEETPOINT_E2E_API_URL!, roomId: initial.room.id, candidateId: candidate.id, version: candidate.version });
+  expect(patchStatus).toBe(200);
+  for (const page of [host, ...members]) await quickSave(page);
+  await host.setViewportSize({ width: 320, height: 740 });
+  const steps = host.getByRole('navigation', { name: '방 진행 단계' });
+  await steps.getByRole('button', { name: /결과 확인/ }).click();
+  await calculate(host);
+  const inside = result(host, 'E2E inside');
+  await expect(inside).toContainText('99.0점');
+  await expect(inside).toContainText('21,000원');
+  await expect(inside).toContainText('Asia/Seoul');
+  await expect(inside).toContainText('평균 점수가 높아도');
+  const conflict = inside.getByRole('listitem').filter({ hasText: '충돌: 예산을 넘어요' });
+  await expect(conflict).toHaveCount(1);
+  for (const name of [hostName, 'E2E member one', 'E2E member two']) await expect(conflict).toContainText(name);
+  const disclosure = inside.locator('details').filter({ has: host.locator('summary').filter({ hasText: hostName }) });
+  const summary = disclosure.locator('summary');
+  await summary.focus();
+  await host.keyboard.press('Space');
+  await expect(disclosure).toHaveAttribute('open', '');
+  await expect(disclosure).toContainText('19.0 / 20점');
+  await expect(disclosure).toContainText('예산:');
+  await result(host, 'E2E outside').getByRole('button', { name: '이 후보 선택', exact: true }).click();
+  await expect(disclosure).toHaveAttribute('open', '');
+  await inside.getByRole('button', { name: '이 후보 선택', exact: true }).click();
+  const confirmButton = host.getByRole('button', { name: '이 후보로 일정 확정', exact: true });
+  await expect(confirmButton).toBeDisabled();
+  const acknowledge = host.getByRole('checkbox', { name: '선택한 후보의 확인할 점과 추천 근거를 확인했습니다.', exact: true });
+  await acknowledge.check();
+  await expect(confirmButton).toBeDisabled();
+  await host.getByLabel(/^확정 메모/).fill('높은 평균과 각 참가자의 예산 충돌을 확인했습니다.');
+  // 같은 후보 재선택, polling, 모바일 단계 왕복은 현재 초안·펼침을 유지한다.
+  await inside.getByRole('button', { name: '선택한 후보', exact: true }).click();
+  const poll = host.waitForResponse((response) => response.request().method() === 'GET' && /\/rooms\/[0-9a-f-]+$/.test(new URL(response.url()).pathname) && response.status() === 200);
+  await poll;
+  await steps.getByRole('button', { name: /내 의견/ }).click();
+  await expect(inside).toBeHidden();
+  await steps.getByRole('button', { name: /결과 확인/ }).click();
+  await expect(disclosure).toHaveAttribute('open', '');
+  await expect(acknowledge).toBeChecked();
+  await expect(host.getByLabel(/^확정 메모/)).toHaveValue('높은 평균과 각 참가자의 예산 충돌을 확인했습니다.');
+  expect(await host.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const member = members[0];
+  await member.setViewportSize({ width: 320, height: 740 });
+  await member.getByRole('navigation', { name: '방 진행 단계' }).getByRole('button', { name: /결과 확인/ }).click();
+  await expect(result(member, 'E2E inside')).toBeVisible();
+  await result(member, 'E2E inside').locator('summary').first().click();
+  await expect(result(member, 'E2E inside').getByText('19.0 / 20점', { exact: true }).first()).toBeVisible();
+  for (const name of ['추천 결과 만들기', '이 후보 선택', '이 후보로 일정 확정']) await expect(member.getByRole('button', { name, exact: true })).toHaveCount(0);
+  await action(host, confirmButton, 'POST', /\/decision$/, 201);
+  await expect(host.getByRole('heading', { name: '방장이 일정을 확정했습니다', exact: true })).toBeVisible();
+  await expect(member.getByRole('heading', { name: '방장이 일정을 확정했습니다', exact: true })).toBeVisible();
+  expect((await room(host)).room.status).toBe('CONFIRMED');
 });
 
 async function digest(db: Database, roomId: string) {
