@@ -39,6 +39,25 @@ Server production은 `DATABASE_URL`, `SOLVER_BASE_URL`, 단일 HTTPS `CLIENT_ORI
 
 ## HTTPS와 복구 쿠키
 
+### rate limit과 신뢰 프록시
+
+Server는 기본적으로 forwarding header를 신뢰하지 않는다. `TRUSTED_PROXY_IPS`는 비워 두거나 **직접 TCP 연결하는 proxy의 실제 IPv4/IPv6 주소만** 쉼표로 명시한다. `true`, wildcard, 전체 subnet/CIDR, hop 수, hostname은 허용하지 않으며 잘못된 값은 시작 실패한다. 신뢰 목록에 있는 바로 첫 hop만 허용하고 더 먼 chain은 신뢰하지 않는다. IP 표현은 IPv4-mapped IPv6 및 IPv6 축약을 정규화한다.
+
+Docker의 published loopback port로 호스트 proxy가 연결하면 Server가 보는 TCP peer는 loopback이 아니라 Docker bridge gateway일 수 있다. 해당 배포 network의 실제 연결 주소를 확인해 정확한 주소를 설정한다. network 재생성으로 주소가 바뀌면 설정과 위조 테스트를 다시 확인한다. 임의의 private subnet 전체를 신뢰하지 않는다. 빈 설정은 안전한 기본값이지만 proxy 뒤에서는 모든 사용자가 proxy IP quota를 공유하므로 실제 외부 공개 전 반드시 올바른 설정을 확인한다.
+
+프록시는 외부에서 받은 X-Forwarded-For를 그대로 전달하지 않고 실제 직접 연결한 client 주소로 **덮어쓴다**. 예를 들어 기존 Nginx API proxy의 location 안에서는 다음 설정을 적용한다(업체/TLS 설정 선택과 무관한 forwarding 예시).
+
+```nginx
+proxy_pass http://127.0.0.1:13001;
+proxy_set_header Host $host;
+proxy_set_header X-Forwarded-For $remote_addr;
+proxy_set_header X-Forwarded-Proto $scheme;
+```
+
+Server published port는 계속 loopback에만 열어 proxy를 우회한 외부 접근을 막는다. 추가 CDN/proxy가 앞에 생기면 이 신뢰 모델을 먼저 재설계한다. 사용자 입력 header나 hop 개수만으로 실제 IP를 판정하지 않는다. 429의 Retry-After·Cache-Control·오류 본문을 proxy가 유지하도록 하고 cache하지 않는다. CORS는 Retry-After를 expose하므로 공개 API origin이 다른 Client도 대기 시간을 읽는다.
+
+정책은 [API 계약](04-api-contract.md)을 따른다. 메모리 제한은 **한 Node 프로세스** 기준이다. 재시작·새 release 기동 시 quota가 초기화되고 cluster/여러 replica는 횟수를 공유하지 않는다. 단일 호스트라도 worker가 여러 개면 이 한계가 적용된다. 최대 10,000개의 HMAC bucket과 만료 정리로 메모리를 제한하며 포화 시 새 identity를 429로 거부한다. IP/token/복구 코드/입력 원문을 로그나 key 출력에 기록하지 않는다. 정상 5초 polling은 제외하며 일반 조회 보호나 네트워크 DDoS 방어를 대신하지 않는다.
+
 예: 웹 `https://meet.example.com`, API `https://api.meet.example.com`. 두 주소는 HTTPS와 동일한 registrable domain을 사용해 같은 site여야 한다. 다른 site에서는 `SameSite=Strict` 쿠키가 전달되지 않는다. API CORS `CLIENT_ORIGIN`은 정확한 웹 origin이며 wildcard는 사용하지 않는다. Client는 credentials를 포함하고 복구 API는 Origin을 검증한다.
 
 호스트 reverse proxy는 웹 요청을 `127.0.0.1:10081`, API 요청을 `127.0.0.1:13001`로 전달한다(설정한 bind port에 맞춘다). API `/api/v1` 경로와 Origin, Cookie/Set-Cookie를 보존하고 인증 응답을 cache하지 않는다. TLS는 프록시에서 종료하되 외부 HTTP는 HTTPS로 redirect한다. 쿠키는 API 호스트의 HttpOnly, Secure, SameSite=Strict, room별 recovery path로 발급된다. `NODE_ENV=production`은 내부 HTTP 프록시 구간과 관계없이 Secure를 설정한다. 프록시를 다른 컨테이너로 실행한다면 loopback 대신 edge network 연결 설계가 필요하다. 이 문서는 호스트 프록시를 전제로 한다.
@@ -84,7 +103,14 @@ HTTPS 테스트 도메인/인증서를 가진 소유 프록시가 준비되면 �
 
 성공·실패 후 대상 project와 volume label을 확인하고 해당 **임시 project에만** `dc down --volumes --remove-orphans`를 실행한다. 운영 project에는 volume 삭제 명령을 사용하지 않는다. 고유 테스트 image와 임시 env/backup도 자신의 산출물만 제거한다. build cache나 기존 image를 전역 prune하지 않는다.
 
-남은 작업과 완료 기준은 [현재 작업 계획](07-implementation-plan.md)에 기록한다. rate limit, 삭제 배치, 관측 시스템, 외부 provider는 이 구성에 추가하지 않는다.
+남은 작업과 완료 기준은 [현재 작업 계획](07-implementation-plan.md)에 기록한다. rate limit은 Server 프로세스 안에서 실행하며 별도 인프라가 없다. 삭제 배치, 관측 시스템, 외부 provider는 이 구성에 추가하지 않는다.
+
+## Rate limit 검증 기록 (2026-10-08)
+
+- Server: `pnpm lint:check`, `pnpm test --runInBand` 14 suites/167개, 운영 코드 typecheck, `pnpm build` 통과. 격리 PostgreSQL·실제 Solver의 `pnpm test:integration` 4 suites/19개에서 429 요청의 DB 변경 및 계산 job 미생성을 확인했다.
+- Client: `pnpm test` 32개, `pnpm lint`, `pnpm typecheck`, `pnpm build` 통과. `pnpm test:e2e` 격리 Chromium 3개에서 실제 제한, 대기 안내, polling 후 초안 보존, 자동 복구 미실행을 확인했다.
+- Compose `config --quiet`, 세 image build와 `node infra/test-deployment.cjs` 통과. 명시적 migration, readiness, 핵심 흐름, dump/restore에 더해 production 429와 조회 유지도 확인했다. 모든 실행은 소유 임시 자원을 사용하고 정리했다.
+- Server 전체 `tsc --noEmit`은 기존 테스트 타입 오류로 실패했다. 운영 코드 typecheck와 Jest는 통과했다. 실제 HTTPS·호스트 프록시의 IP 전달 및 원격 CI는 실행하지 않았으며 실제 배포도 수행하지 않았다.
 
 ## 이 변경의 검증 기록 (2026-10-06)
 

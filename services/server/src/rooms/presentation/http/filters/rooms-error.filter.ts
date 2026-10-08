@@ -9,6 +9,7 @@ import type { Response } from 'express';
 import { randomUUID } from 'node:crypto';
 
 const ERROR_MESSAGES = {
+  RATE_LIMITED: '요청이 너무 많습니다. 잠시 기다린 뒤 다시 시도해 주세요.',
   RECOVERY_UNAVAILABLE:
     '복구 정보가 없거나 만료·폐기되어 기존 참여자로 복구할 수 없습니다.',
   INVALID_JSON: '요청 본문이 올바른 JSON 형식이 아닙니다.',
@@ -92,6 +93,11 @@ export class RoomsErrorFilter implements ExceptionFilter {
         requestId: `req_${randomUUID()}`,
       },
     };
+
+    if (status === 429 && code === 'RATE_LIMITED') {
+      response.setHeader('Retry-After', String(details.retryAfterSeconds));
+      response.setHeader('Cache-Control', 'no-store');
+    }
 
     response.status(status).json(body);
   }

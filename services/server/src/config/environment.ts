@@ -1,8 +1,15 @@
+import { isIP } from 'node:net';
+
 export function validateEnvironment(env: Record<string, string | undefined>) {
   const fail = (name: string): never => {
     throw new Error(`Invalid environment variable: ${name}`);
   };
   const production = env.NODE_ENV === 'production';
+  if (env.TRUSTED_PROXY_IPS) {
+    for (const ip of env.TRUSTED_PROXY_IPS.split(',')) {
+      if (!isIP(ip.trim())) fail('TRUSTED_PROXY_IPS');
+    }
+  }
   for (const [name, protocols] of [
     ['DATABASE_URL', ['postgres:', 'postgresql:']],
     ['SOLVER_BASE_URL', ['http:', 'https:']],

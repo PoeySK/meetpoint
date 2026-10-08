@@ -13,6 +13,7 @@ export class RoomApiError extends Error {
     public readonly status: number,
     public readonly code?: string,
     public readonly requestId?: string,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = "RoomApiError";
@@ -70,6 +71,20 @@ export async function request<T>(path: string, options: RequestInit = {}) {
 
   if (!response.ok) {
     const error = getRoomError(payload);
+
+    if (response.status === 429) {
+      const header = response.headers.get("Retry-After");
+      const seconds = header && /^\d+$/.test(header.trim())
+        ? Number(header.trim())
+        : header ? Math.ceil((Date.parse(header) - Date.now()) / 1000) : NaN;
+      const retryAfterSeconds = Number.isSafeInteger(seconds) && seconds > 0 ? seconds : undefined;
+      throw new RoomApiError(
+        retryAfterSeconds
+          ? `요청이 너무 많습니다. ${retryAfterSeconds}초 뒤에 다시 시도해 주세요.`
+          : "요청이 너무 많습니다. 잠시 기다린 뒤 다시 시도해 주세요.",
+        429, "RATE_LIMITED", error?.requestId, retryAfterSeconds,
+      );
+    }
 
     throw new RoomApiError(
       error?.message ?? "요청을 처리하지 못했습니다.",

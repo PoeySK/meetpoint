@@ -129,6 +129,7 @@ function validateDraft(
 }
 
 function describeConditionError(error: unknown) {
+  if (error instanceof RoomApiError && error.status === 429) return error.message;
   const accessMessage = getRoomAccessErrorMessage(error);
   if (accessMessage) return accessMessage;
   if (error instanceof RoomApiError) {

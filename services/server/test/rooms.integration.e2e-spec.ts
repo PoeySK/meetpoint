@@ -28,6 +28,10 @@ import {
 import { RoomStatus } from '../src/rooms/domain/room/room-status';
 import { RoomsModule } from '../src/rooms/rooms.module';
 import { CalculationJobRunner } from '../src/rooms/application/calculation-job.runner';
+import {
+  ROOM_LIMITS,
+  RoomRateLimiter,
+} from '../src/rooms/presentation/http/rate-limit/room-rate-limiter';
 
 const databaseUrl =
   process.env.DATABASE_URL ??
@@ -691,5 +695,114 @@ describe('Room Candidate and ParticipantResponse integration', () => {
       .getRepository(Participant)
       .findOneBy({ id: joined.body.participant.id });
     expect(persisted?.status).toBe(ParticipantStatus.LEFT);
+  });
+
+  it('returns 429 before PostgreSQL conditions, responses, credentials, ScoreResult or job mutations', async () => {
+    const created = await request(app.getHttpServer())
+      .post('/api/v1/rooms')
+      .send({
+        title: 'Rate limit integration fixture',
+        timezone: 'Asia/Seoul',
+        host: { displayName: 'Rate host' },
+      })
+      .expect(201);
+    roomId = created.body.room.id;
+    const token = created.body.access.hostToken as string;
+    const participantId = created.body.hostParticipant.id as string;
+    for (const displayName of ['Rate member one', 'Rate member two']) {
+      await request(app.getHttpServer())
+        .post(`/api/v1/rooms/${created.body.room.roomCode}/participants`)
+        .send({ displayName })
+        .expect(201);
+    }
+    const firstCandidate = await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/candidates`)
+      .auth(token, { type: 'bearer' })
+      .send(candidatePayload())
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/rooms/${roomId}/candidates`)
+      .auth(token, { type: 'bearer' })
+      .send({
+        ...candidatePayload(),
+        displayOrder: 2,
+        place: {
+          name: 'Rate second place',
+          address: 'Seoul second',
+          area: 'Jung-gu',
+        },
+      })
+      .expect(201);
+    const limiter = app.get(RoomRateLimiter);
+    for (const policy of [
+      ROOM_LIMITS.condition,
+      ROOM_LIMITS.response,
+      ROOM_LIMITS.register,
+    ]) {
+      for (let i = 0; i < policy.maximum; i++)
+        limiter.consume(policy, [roomId!, participantId]);
+    }
+    for (let i = 0; i < ROOM_LIMITS.calculation.maximum; i++)
+      limiter.consume(ROOM_LIMITS.calculation, [roomId!]);
+    const participantBefore = await dataSource
+      .getRepository(Participant)
+      .findOneByOrFail({ id: participantId });
+    const roomBefore = await dataSource
+      .getRepository(Room)
+      .findOneByOrFail({ id: roomId! });
+    const requests = [
+      () =>
+        request(app.getHttpServer())
+          .put(
+            `/api/v1/rooms/${roomId}/participants/${participantId}/conditions`
+          )
+          .auth(token, { type: 'bearer' })
+          .send(validConditionPayload()),
+      () =>
+        request(app.getHttpServer())
+          .put(
+            `/api/v1/rooms/${roomId}/participants/${participantId}/responses/${firstCandidate.body.candidate.id}`
+          )
+          .auth(token, { type: 'bearer' })
+          .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' }),
+      () =>
+        request(app.getHttpServer())
+          .post(`/api/v1/rooms/${roomId}/recovery/register`)
+          .auth(token, { type: 'bearer' })
+          .send({ replace: true }),
+      () =>
+        request(app.getHttpServer())
+          .post(`/api/v1/rooms/${roomId}/calculations`)
+          .auth(token, { type: 'bearer' })
+          .send({ clientRequestId: 'blocked-real-job' }),
+    ];
+    for (const pending of requests) {
+      const response = await pending().expect(429);
+      expect(response.body.error.code).toBe('RATE_LIMITED');
+      expect(response.body.error.requestId).toMatch(/^req_/);
+      expect(Number(response.headers['retry-after'])).toBeGreaterThan(0);
+    }
+    for (const entity of [
+      ParticipantCondition,
+      ParticipantResponse,
+      ScoreResult,
+      CalculationJob,
+    ]) {
+      expect(
+        await dataSource.getRepository(entity).countBy({ roomId: roomId! })
+      ).toBe(0);
+    }
+    expect(
+      await dataSource
+        .getRepository(Participant)
+        .findOneByOrFail({ id: participantId })
+    ).toEqual(participantBefore);
+    expect(
+      await dataSource.getRepository(Room).findOneByOrFail({ id: roomId! })
+    ).toEqual(roomBefore);
+    await request(app.getHttpServer())
+      .get(`/api/v1/rooms/${roomId}`)
+      .auth(token, { type: 'bearer' })
+      .expect(200);
   });
 });

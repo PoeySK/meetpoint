@@ -21,6 +21,9 @@ export type RoomLoadError = {
 };
 
 function describeRoomError(error: unknown): RoomLoadError {
+  if (error instanceof RoomApiError && error.status === 429) {
+    return { title: '잠시 기다린 뒤 다시 시도해 주세요.', message: error.message };
+  }
   if (error instanceof RoomApiError) {
     if (error.code === 'RECOVERY_UNAVAILABLE') {
       return {

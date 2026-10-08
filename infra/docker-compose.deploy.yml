@@ -34,6 +34,7 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:?required}:${POSTGRES_PASSWORD:?required}@postgres:5432/${POSTGRES_DB:?required}
       SOLVER_BASE_URL: http://solver:4000
       CLIENT_ORIGIN: ${CLIENT_ORIGIN:?required}
+      TRUSTED_PROXY_IPS: ${TRUSTED_PROXY_IPS:-}
     ports: ['127.0.0.1:${SERVER_BIND_PORT:-13001}:3001']
     networks: [backend, edge]
     depends_on:

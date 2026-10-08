@@ -10,6 +10,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import type { StartCalculationDto } from '../dto/start-calculation.dto';
+import { RateLimited } from '../rate-limit/room-rate-limit.guard';
 import { StartCalculationUseCase } from '../../../application/commands/start-calculation.use-case';
 import { GetCalculationQuery } from '../../../application/queries/get-calculation.query';
 import { GetLatestScoreResultQuery } from '../../../application/queries/get-latest-score-result.query';
@@ -31,6 +32,7 @@ export class CalculationController {
   ) {}
 
   @Post(':roomId/calculations')
+  @RateLimited('calculation')
   @HttpCode(HttpStatus.ACCEPTED)
   startCalculation(
     @Param('roomId') roomId: string,

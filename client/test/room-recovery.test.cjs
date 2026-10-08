@@ -111,6 +111,7 @@ test('failure UI distinguishes personal recovery from creating a new MEMBER', ()
   const { renderToStaticMarkup } = require('react-dom/server');
   const { RoomRecoveryPanel } = load('features/room-recovery/ui/room-recovery-panel.tsx', {
     '@/entities/room': {}, '@/shared/lib/room-session': {},
+    '@/shared/api/http-client': { RoomApiError },
   });
   const html = renderToStaticMarkup(React.createElement(RoomRecoveryPanel, { roomId: 'one', onRecovered() {} }));
   assert.equal(html.includes('개인 복구 코드'), true);
@@ -156,7 +157,44 @@ test('all six feature error messages separate expiry/invalid access from permiss
     for (const error of [new Error('Fixture network'), new RoomApiError('Fixture forbidden', 403, 'HOST_ONLY')]) {
       assert.doesNotMatch(describe(error), /개인 복구 코드|토큰이 만료/, file);
     }
+    const limited = new RoomApiError('요청이 너무 많습니다. 60초 뒤에 다시 시도해 주세요.', 429, 'RATE_LIMITED');
+    assert.equal(describe(limited), limited.message, file);
+    assert.equal(accessErrors.getRoomAccessErrorMessage(limited), null);
   }
+});
+
+test('common API parses Retry-After seconds/date and missing headers without retrying', async () => {
+  const fixedDate = class extends Date { static now() { return 1000000; } };
+  for (const [header, seconds] of [['60', 60], [new Date(1030000).toUTCString(), 30], [null, undefined], ['invalid', undefined], ['0', undefined]]) {
+    let calls = 0;
+    const api = load('shared/api/http-client.ts', {}, {
+      Date: fixedDate, process: { env: {} }, fetch: async () => {
+        calls++;
+        return { ok: false, status: 429, headers: { get: () => header }, json: async () => ({ error: {
+          code: 'RATE_LIMITED', message: 'Server message', details: {}, requestId: 'req_fixture',
+        } }) };
+      },
+    });
+    await assert.rejects(api.request('/fixture'), error => {
+      assert.equal(error.status, 429); assert.equal(error.code, 'RATE_LIMITED');
+      assert.equal(error.requestId, 'req_fixture'); assert.equal(error.retryAfterSeconds, seconds);
+      assert.match(error.message, /다시 시도/); return true;
+    });
+    assert.equal(calls, 1);
+  }
+});
+
+test('429 never triggers access recovery or changes stored credentials', async () => {
+  let recoveryCalls = 0;
+  let storageWrites = 0;
+  const limited = new RoomApiError('요청이 너무 많습니다. 60초 뒤에 다시 시도해 주세요.', 429, 'RATE_LIMITED');
+  const { createRoomAccessRecovery } = load('widgets/room/model/room-access-recovery.ts', {
+    '@/entities/room': { getRoom: async () => { throw limited; }, recoverRoomAccess: async () => { recoveryCalls++; } },
+    '@/shared/api/http-client': { RoomApiError },
+    '@/shared/lib/room-session': { getRoomTokenStorageKey: () => 'token' },
+  }, { window: { sessionStorage: { setItem: () => { storageWrites++; } } } });
+  await assert.rejects(createRoomAccessRecovery('one').load('stored-token'), error => error === limited);
+  assert.equal(recoveryCalls, 0); assert.equal(storageWrites, 0);
 });
 test('MAYBE result explanation displays 보류 while other recommendation meanings remain unchanged', () => {
   const { getCalculationCodeLabel } = load('features/calculation/ui/calculation-result-view.tsx', {});

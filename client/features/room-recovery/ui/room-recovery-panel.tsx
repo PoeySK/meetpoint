@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { RoomApiError } from "@/shared/api/http-client";
 import { recoverRoomAccess, registerRoomRecovery } from "@/entities/room";
 import { getRoomRecoveryStorageKey, getRoomTokenStorageKey } from "@/shared/lib/room-session";
 
@@ -20,8 +21,8 @@ export function RoomRecoveryPanel({ roomId, token, onRecovered }: {
       window.sessionStorage.setItem(getRoomTokenStorageKey(roomId), result.access.participantToken);
       setCode("");
       onRecovered();
-    } catch {
-      setNotice("복구하지 못했습니다. 코드의 만료·폐기 여부와 인터넷 연결을 확인해 주세요. 기존 조건과 응답은 삭제되지 않습니다.");
+    } catch (error) {
+      setNotice(error instanceof RoomApiError && error.status === 429 ? error.message : "복구하지 못했습니다. 코드의 만료·폐기 여부와 인터넷 연결을 확인해 주세요. 기존 조건과 응답은 삭제되지 않습니다.");
     } finally { setBusy(false); }
   }
 
@@ -46,7 +47,7 @@ export function RoomRecoveryPanel({ roomId, token, onRecovered }: {
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
       setNotice("개인 복구 파일을 안전한 곳에 보관하세요. 파일을 가진 사람은 본인의 방 권한을 사용할 수 있습니다.");
-    } catch { setNotice("복구 파일을 보관하지 못했습니다. 브라우저 설정과 연결을 확인해 주세요."); }
+    } catch (error) { setNotice(error instanceof RoomApiError && error.status === 429 ? error.message : "복구 파일을 보관하지 못했습니다. 브라우저 설정과 연결을 확인해 주세요."); }
     finally { setBusy(false); }
   }
 

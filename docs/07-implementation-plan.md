@@ -125,12 +125,13 @@ claim·완료·실패 상태 저장의 DB 오류는 Solver 오류와 분리한�
 완료 조건: Server 재시작과 Solver 장애 뒤에도 계산이 유실되거나 중복 확정되지
 않으며, Client가 기존 polling API로 `REQUESTED`·`RUNNING`·최종 상태를 확인할 수 있다.
 
-#### 5. 남용 방지 — 후속 구현
+#### 5. 남용 방지 — 단일 Server rate limit 구현, 운영 조정 필요
 
 익명 token 만료·폐기, MEMBER leave/HOST kick, 개인 접근 복구는 구현되어 있다.
 복구 credential의 hash 저장·token 교체·복구 origin 검사·HttpOnly/Secure(운영)/SameSite=Strict 쿠키와 관련 HTTP·DB·Client 테스트가 있다.
-방 코드 추측, 생성·입장·응답·계산·복구 endpoint별 rate limit과 안전한 감사 로그는 후속 작업이다.
-완료 기준: 제한 단위·임계값·오탐 복구 정책을 결정하고 정상 흐름 및 남용 시나리오를 테스트한다. 원문 인증 정보는 기록하지 않는다.
+방 생성·코드 입장·개인 복구/등록에 IP 제한, 조건·의견 저장에 IP 및 검증된 참가자·방 제한, 계산에 IP 및 HOST 방 제한을 적용한다. GET/polling은 제외한다. HTTP 429·공통 오류·Retry-After, 명시적 direct proxy 신뢰, 메모리 만료 정리·10,000항목 상한, Client의 대기 안내·초안/인증 보존을 구현했다. 상세 기준은 [API 계약](04-api-contract.md)의 변경 요청 rate limit을 따른다.
+완료 기준: 가짜 시간의 임계값·해제·정리·IP/참가자/방 분리, 입력/token 회전 우회와 프록시 위조 거부, DB 변경/job 미생성, 정상 polling 및 Client 초안 보존을 자동 테스트로 검증한다.
+남은 사항: 실제 프록시 연결 주소 설정과 NAT/실제 사용자 흐름에서 임계값 조정, 향후 다중 인스턴스 전환 시 공유 제한 설계. 안전한 감사 로그·관측 시스템은 별도 후속 작업이며 원문 인증 정보를 기록하지 않는다.
 
 #### 6. 사용자 검증 — 후속 검증
 

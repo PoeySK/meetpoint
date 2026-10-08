@@ -15,6 +15,7 @@ type World = {
   db: Database;
   page(): Promise<Page>;
   track(roomId: string): void;
+  allowResourceErrors(statuses: number[]): void;
 };
 
 const test = base.extend<{ world: World }>({
@@ -29,18 +30,21 @@ const test = base.extend<{ world: World }>({
     const rooms: string[] = [];
     let pageErrors = 0;
     let consoleErrors = 0;
+    const allowedResourceErrors = new Set([401, 403, 429]);
     try {
       await provide({
         db,
         track: (roomId) => rooms.push(roomId),
+        allowResourceErrors: statuses => statuses.forEach(status => allowedResourceErrors.add(status)),
         page: async () => {
           const context = await browser.newContext({ baseURL: process.env.MEETPOINT_E2E_URL, timezoneId: 'Asia/Seoul' });
           contexts.push(context);
           context.on('page', (page) => {
             page.on('pageerror', () => { pageErrors += 1; });
             page.on('console', (message) => {
-              // 인증 거부 테스트의 리소스 오류만 제외하고 원문은 저장하지 않는다.
-              if (message.type() === 'error' && !/^Failed to load resource: the server responded with a status of (401|403)/.test(message.text())) consoleErrors += 1;
+              // 인증·제한 거부 테스트의 리소스 오류만 제외하고 원문은 저장하지 않는다.
+              const resourceError = /^Failed to load resource: the server responded with a status of (\d+)/.exec(message.text());
+              if (message.type() === 'error' && (!resourceError || !allowedResourceErrors.has(Number(resourceError[1])))) consoleErrors += 1;
             });
           });
           return context.newPage();
@@ -54,6 +58,77 @@ const test = base.extend<{ world: World }>({
       await db.end();
     }
   },
+});
+
+test('429 안내·조건과 의견 초안 유지·인증 복구 미실행·계산 job 차단', async ({ world }) => {
+  world.allowResourceErrors([400, 422]);
+  const { host, roomId } = await setup(world);
+  let recoveryRequests = 0;
+  let mutationRequests = 0;
+  host.on('request', (request) => {
+    if (request.method() === 'POST' && /\/recovery(?:\/register)?$/.test(new URL(request.url()).pathname)) recoveryRequests++;
+    if (request.method() === 'PUT') mutationRequests++;
+  });
+  const current = await room(host);
+  async function exhaustQuota(endpoint: string, count: number) {
+    const statuses = await host.evaluate(async ({ api, roomId, endpoint, count }) => {
+      const statuses: number[] = [];
+      for (let i = 0; i < count; i++) {
+        const response = await fetch(`${api}/api/v1/rooms/${roomId}/${endpoint}`, {
+          method: 'PUT', credentials: 'include',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem(`meetpoint:room-token:${roomId}`)}` },
+          body: '{}',
+        });
+        statuses.push(response.status);
+      }
+      return statuses;
+    }, { api: process.env.MEETPOINT_E2E_API_URL!, roomId, endpoint, count });
+    expect(statuses.every(status => status === 400 || status === 422)).toBe(true);
+  }
+  await exhaustQuota(`participants/${current.currentParticipant.id}/conditions`, 9);
+  const condition = section(host, '원하는 조건을 알려주세요');
+  await condition.getByLabel('1인 최대 예산 (원)', { exact: true }).fill('23456');
+  await action(host, condition.getByRole('button', { name: '선택 조건 수정 저장', exact: true }), 'PUT', /\/conditions$/, 429);
+  await expect(condition).toContainText(/\d+초 뒤에 다시 시도해 주세요/);
+  await expect(condition.getByLabel('1인 최대 예산 (원)', { exact: true })).toHaveValue('23456');
+  expect((await room(host)).myCondition!.maxBudgetKrw).toBe(20000);
+  await exhaustQuota(`participants/${current.currentParticipant.id}/responses/${current.candidates[0].id}`, 30);
+  const card = opinion(host, 'E2E inside');
+  await card.getByRole('button', { name: '가능', exact: true }).click();
+  await card.getByRole('button', { name: '편함', exact: true }).click();
+  await card.getByLabel(/^메모/).fill('429 뒤에도 보존할 초안');
+  const save = card.getByRole('button', { name: /^(의견 저장|변경 저장)$/ });
+  await action(host, save, 'PUT', /\/responses\//, 429);
+  await expect(card).toContainText(/\d+초 뒤에 다시 시도해 주세요/);
+  await expect(card.getByLabel(/^메모/)).toHaveValue('429 뒤에도 보존할 초안');
+  expect((await room(host)).myResponses.length).toBe(0);
+  expect(mutationRequests).toBe(41);
+  expect(recoveryRequests).toBe(0);
+  // Wait for normal polling; no automatic mutation retry and both drafts remain.
+  await host.waitForResponse(response => response.request().method() === 'GET' && new URL(response.url()).pathname === `/api/v1/rooms/${roomId}` && response.status() === 200);
+  await expect(card.getByLabel(/^메모/)).toHaveValue('429 뒤에도 보존할 초안');
+  await expect(condition.getByLabel('1인 최대 예산 (원)', { exact: true })).toHaveValue('23456');
+  expect(mutationRequests).toBe(41);
+
+  // Real Server quota: valid HOST authentication, invalid body consumes requests without jobs.
+  const statuses = await host.evaluate(async ({ api, roomId }) => {
+    const statuses: number[] = [];
+    for (let i = 0; i < 6; i++) {
+      const response = await fetch(`${api}/api/v1/rooms/${roomId}/calculations`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem(`meetpoint:room-token:${roomId}`)}` },
+        body: JSON.stringify({ clientRequestId: '' }),
+      });
+      statuses.push(response.status);
+    }
+    return statuses;
+  }, { api: process.env.MEETPOINT_E2E_API_URL!, roomId });
+  expect(statuses).toEqual([400, 400, 400, 400, 400, 400]);
+  await action(host, host.getByRole('button', { name: '추천 결과 만들기', exact: true }), 'POST', /\/calculations$/, 429);
+  await expect(section(host, '모임 추천 결과 확인')).toContainText(/\d+초 뒤에 다시 시도해 주세요/);
+  expect((await room(host)).room.latestScoreResultId).toBeNull();
+  expect((await world.db.query('SELECT count(*)::int AS count FROM calculation_jobs WHERE "roomId" = $1', [roomId])).rows[0].count).toBe(0);
+  expect(recoveryRequests).toBe(0);
 });
 
 function section(page: Page, heading: string) {

@@ -7,6 +7,7 @@ import {
   UseFilters,
 } from '@nestjs/common';
 import type { UpsertParticipantResponseDto } from '../dto/upsert-participant-response.dto';
+import { RateLimited } from '../rate-limit/room-rate-limit.guard';
 import { UpsertParticipantResponseUseCase } from '../../../application/commands/upsert-participant-response.use-case';
 import { extractBearerToken } from '../auth/bearer-token';
 import { RoomsErrorFilter } from '../filters/rooms-error.filter';
@@ -20,6 +21,7 @@ export class ParticipantResponseController {
   ) {}
 
   @Put(':roomId/participants/:participantId/responses/:candidateId')
+  @RateLimited('response')
   upsertParticipantResponse(
     @Param('roomId') roomId: string,
     @Param('participantId') participantId: string,
