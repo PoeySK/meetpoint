@@ -12,6 +12,7 @@ export enum TravelBurden {
 
 export enum ParticipantResponseStatus {
   SUBMITTED = 'SUBMITTED',
+  RECONFIRM_REQUIRED = 'RECONFIRM_REQUIRED',
 }
 
 export interface ParticipantResponseRecord {

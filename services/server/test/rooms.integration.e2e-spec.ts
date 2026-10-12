@@ -11,6 +11,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { DataSource } from 'typeorm';
+import { ReconfirmEditedCandidateResponses20261012000000 } from '../src/database/migrations/20261012000000-reconfirm-edited-candidate-responses';
 import { Participant } from '../src/rooms/infrastructure/persistence/typeorm/entities/participant.entity';
 import { Candidate } from '../src/rooms/infrastructure/persistence/typeorm/entities/candidate.entity';
 import { Decision } from '../src/rooms/infrastructure/persistence/typeorm/entities/decision.entity';
@@ -23,6 +24,7 @@ import { ParticipantStatus } from '../src/rooms/domain/participant/participant';
 import { CandidateStatus } from '../src/rooms/domain/candidate/candidate';
 import {
   AvailabilityStatus,
+  ParticipantResponseStatus,
   TravelBurden,
 } from '../src/rooms/domain/participant-response/participant-response';
 import { RoomStatus } from '../src/rooms/domain/room/room-status';
@@ -104,9 +106,395 @@ describe('Room Candidate and ParticipantResponse integration', () => {
     }
   });
 
+  beforeEach(() => {
+    // 각 DB 시나리오의 quota를 격리한다. 제한 자체는 별도 HTTP/DB 테스트에서 검증한다.
+    app.get(RoomRateLimiter).onModuleDestroy();
+  });
+
   afterAll(async () => {
     await app.close();
   });
+
+  async function reconfirmationFixture() {
+    const created = (
+      await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send({
+          title: 'Reconfirmation integration',
+          timezone: 'Asia/Seoul',
+          host: { displayName: 'Host' },
+        })
+        .expect(201)
+    ).body;
+    roomId = created.room.id;
+    const prefix = `/api/v1/rooms/${roomId}`;
+    const actors = [
+      {
+        id: created.hostParticipant.id as string,
+        token: created.access.hostToken as string,
+      },
+    ];
+    for (const displayName of ['Member one', 'Member two']) {
+      const member = (
+        await request(app.getHttpServer())
+          .post(`/api/v1/rooms/${created.room.roomCode}/participants`)
+          .send({ displayName })
+          .expect(201)
+      ).body;
+      actors.push({
+        id: member.participant.id as string,
+        token: member.access.participantToken as string,
+      });
+    }
+    const candidates: Candidate[] = [];
+    for (const displayOrder of [1, 2]) {
+      const candidate = await request(app.getHttpServer())
+        .post(`${prefix}/candidates`)
+        .auth(actors[0].token, { type: 'bearer' })
+        .send({
+          ...candidatePayload(),
+          displayOrder,
+          place: {
+            name: `Cafe ${displayOrder}`,
+            address: `Seoul ${displayOrder}`,
+            area: 'Seoul',
+          },
+        })
+        .expect(201);
+      candidates.push(candidate.body.candidate as Candidate);
+    }
+    const responsePath = (actorId: string, candidateId: string) =>
+      `${prefix}/participants/${actorId}/responses/${candidateId}`;
+    const input = {
+      candidateVersion: 1,
+      availabilityStatus: 'AVAILABLE',
+      travelBurden: 'EASY',
+      note: 'Previous opinion',
+    };
+    for (const actor of actors)
+      for (const candidate of candidates) {
+        await request(app.getHttpServer())
+          .put(responsePath(actor.id, candidate.id))
+          .auth(actor.token, { type: 'bearer' })
+          .send(input)
+          .expect(200);
+      }
+    return { prefix, actors, candidates, responsePath, input };
+  }
+
+  it('serializes candidate edits and old response saves; excludes only changed opinions from the persisted job snapshot', async () => {
+    const { prefix, actors, candidates, responsePath, input } =
+      await reconfirmationFixture();
+    const candidate = candidates[0];
+    const [edited, savedOld] = await Promise.all([
+      request(app.getHttpServer())
+        .patch(`${prefix}/candidates/${candidate.id}`)
+        .auth(actors[0].token, { type: 'bearer' })
+        .set('If-Match-Version', '1')
+        .send({ estimatedCostPerPersonKrw: 21000 }),
+      request(app.getHttpServer())
+        .put(responsePath(actors[1].id, candidate.id))
+        .auth(actors[1].token, { type: 'bearer' })
+        .send(input),
+    ]);
+    expect(edited.status).toBe(200);
+    expect([200, 409]).toContain(savedOld.status);
+    const stored = await dataSource
+      .getRepository(ParticipantResponse)
+      .findBy({ roomId });
+    expect(
+      stored
+        .filter((r) => r.candidateId === candidate.id)
+        .every(
+          (r) =>
+            r.status === ParticipantResponseStatus.RECONFIRM_REQUIRED &&
+            r.note === 'Previous opinion'
+        )
+    ).toBe(true);
+    expect(
+      stored
+        .filter((r) => r.candidateId === candidates[1].id)
+        .every((r) => r.status === ParticipantResponseStatus.SUBMITTED)
+    ).toBe(true);
+    expect(
+      (await dataSource.getRepository(Participant).findBy({ roomId })).every(
+        (p) => p.status === ParticipantStatus.JOINED
+      )
+    ).toBe(true);
+    await request(app.getHttpServer())
+      .put(responsePath(actors[1].id, candidate.id))
+      .auth(actors[1].token, { type: 'bearer' })
+      .send(input)
+      .expect(409);
+    await request(app.getHttpServer())
+      .put(responsePath(actors[1].id, candidate.id))
+      .auth(actors[1].token, { type: 'bearer' })
+      .send({ ...input, candidateVersion: 2 })
+      .expect(200);
+    expect(
+      (
+        await dataSource
+          .getRepository(Participant)
+          .findOneByOrFail({ id: actors[1].id })
+      ).status
+    ).toBe('RESPONDED');
+    const started = await request(app.getHttpServer())
+      .post(`${prefix}/calculations`)
+      .auth(actors[0].token, { type: 'bearer' })
+      .send({ clientRequestId: randomUUID() })
+      .expect(202);
+    const score = await dataSource
+      .getRepository(ScoreResult)
+      .findOneByOrFail({ id: started.body.calculation.id });
+    expect(score.coverage).toMatchObject({
+      submittedResponses: 4,
+      expectedResponses: 6,
+    });
+    const job = await dataSource
+      .getRepository(CalculationJob)
+      .findOneByOrFail({ scoreResultId: score.id });
+    expect(
+      job.snapshot.participants
+        .find((p) => p.participantId === actors[0].id)!
+        .responses.map((r) => r.candidateId)
+    ).toEqual([candidates[1].id]);
+    expect(
+      job.snapshot.participants.find((p) => p.participantId === actors[1].id)!
+        .responses
+    ).toHaveLength(2);
+    const migrationRunner = dataSource.createQueryRunner();
+    try {
+      await expect(
+        new ReconfirmEditedCandidateResponses20261012000000().up(
+          migrationRunner
+        )
+      ).rejects.toThrow('Drain calculation jobs');
+    } finally {
+      await migrationRunner.release();
+    }
+    // 완료 응답에 coverage가 잘못 완전하게 기록되어도 저장된 재확인 상태가 확정을 막는다.
+    await dataSource.getRepository(ScoreResult).update(score.id, {
+      status: 'COMPLETED' as ScoreResult['status'],
+      coverage: {
+        respondedParticipants: 3,
+        totalParticipants: 3,
+        submittedResponses: 6,
+        expectedResponses: 6,
+      },
+      candidates: [
+        {
+          candidateId: candidate.id,
+          rank: 1,
+          overallScore: 100,
+          eligible: true,
+          matchLevel: 'FULL',
+          hardConflictCount: 0,
+          coverage: { submittedResponses: 3, expectedResponses: 3 },
+          participantBreakdown: [],
+          reasons: [],
+          conflicts: [],
+          blockingIssues: [],
+          explanationFlags: [],
+        },
+      ],
+    });
+    await dataSource
+      .getRepository(Room)
+      .update(roomId!, { status: RoomStatus.CALCULATED });
+    await request(app.getHttpServer())
+      .post(`${prefix}/decision`)
+      .auth(actors[0].token, { type: 'bearer' })
+      .send({
+        candidateId: candidate.id,
+        scoreResultId: score.id,
+        acknowledgeIssues: false,
+      })
+      .expect(422);
+    expect(await dataSource.getRepository(Decision).countBy({ roomId })).toBe(
+      0
+    );
+  });
+
+  it('rolls back the whole candidate edit when PostgreSQL rejects response invalidation', async () => {
+    const { prefix, actors, candidates } = await reconfirmationFixture();
+    const score = await dataSource
+      .getRepository(ScoreResult)
+      .save(completedScoreResult(randomUUID(), roomId!));
+    await dataSource.getRepository(Room).update(roomId!, {
+      latestScoreResultId: score.id,
+      status: RoomStatus.CALCULATED,
+    });
+    const before = {
+      room: await dataSource
+        .getRepository(Room)
+        .findOneByOrFail({ id: roomId! }),
+      candidate: await dataSource
+        .getRepository(Candidate)
+        .findOneByOrFail({ id: candidates[0].id }),
+      responses: await dataSource
+        .getRepository(ParticipantResponse)
+        .find({ where: { roomId }, order: { id: 'ASC' } }),
+      score: await dataSource
+        .getRepository(ScoreResult)
+        .findOneByOrFail({ id: score.id }),
+    };
+    const name = `reconfirm_failure_${randomUUID().replaceAll('-', '')}`;
+    await dataSource.query(
+      `CREATE FUNCTION "${name}"() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.status = 'RECONFIRM_REQUIRED' THEN RAISE EXCEPTION 'Owned reconfirmation rollback fixture'; END IF; RETURN NEW; END; $$`
+    );
+    try {
+      await dataSource.query(
+        `CREATE TRIGGER "${name}" BEFORE UPDATE ON participant_responses FOR EACH ROW EXECUTE FUNCTION "${name}"()`
+      );
+      await request(app.getHttpServer())
+        .patch(`${prefix}/candidates/${candidates[0].id}`)
+        .auth(actors[0].token, { type: 'bearer' })
+        .set('If-Match-Version', '1')
+        .send({ estimatedCostPerPersonKrw: 21000 })
+        .expect(500);
+      const after = {
+        room: await dataSource
+          .getRepository(Room)
+          .findOneByOrFail({ id: roomId! }),
+        candidate: await dataSource
+          .getRepository(Candidate)
+          .findOneByOrFail({ id: candidates[0].id }),
+        responses: await dataSource
+          .getRepository(ParticipantResponse)
+          .find({ where: { roomId }, order: { id: 'ASC' } }),
+        score: await dataSource
+          .getRepository(ScoreResult)
+          .findOneByOrFail({ id: score.id }),
+      };
+      expect(isDeepStrictEqual(after, before)).toBe(true);
+      expect(
+        (await dataSource.getRepository(Participant).findBy({ roomId })).every(
+          (p) => p.status === ParticipantStatus.RESPONDED
+        )
+      ).toBe(true);
+    } finally {
+      await dataSource.query(
+        `DROP TRIGGER IF EXISTS "${name}" ON participant_responses`
+      );
+      await dataSource.query(`DROP FUNCTION IF EXISTS "${name}"()`);
+    }
+  });
+
+  it.each([RoomStatus.CALCULATED, RoomStatus.CONFIRMED, RoomStatus.CLOSED])(
+    'migrates legacy %s responses conservatively while preserving values and decision history',
+    async (status) => {
+      const { actors, candidates } = await reconfirmationFixture();
+      await dataSource
+        .getRepository(Candidate)
+        .update(candidates[0].id, { version: 2 });
+      const score = await dataSource
+        .getRepository(ScoreResult)
+        .save(completedScoreResult(randomUUID(), roomId!));
+      const historicalDecision = await dataSource.getRepository(Decision).save({
+        id: randomUUID(),
+        roomId: roomId!,
+        candidateId: candidates[0].id,
+        scoreResultId: score.id,
+        decidedByParticipantId: actors[0].id,
+        status: DecisionStatus.REOPENED,
+        acknowledgeIssues: false,
+        decisionNote: 'Retained decision',
+        confirmedAt: new Date(),
+        replacedDecisionId: null,
+        reopenedAt: new Date(),
+        reopenReason: 'Review',
+      });
+      await dataSource.getRepository(Room).update(roomId!, {
+        latestScoreResultId: score.id,
+        currentDecisionId: historicalDecision.id,
+        status,
+      });
+      const decisionBefore = await dataSource
+        .getRepository(Decision)
+        .findOneByOrFail({ id: historicalDecision.id });
+      const runner = dataSource.createQueryRunner();
+      try {
+        await runner.connect();
+        await runner.startTransaction();
+        await new ReconfirmEditedCandidateResponses20261012000000().up(runner);
+        await runner.commitTransaction();
+      } finally {
+        if (runner.isTransactionActive) await runner.rollbackTransaction();
+        await runner.release();
+      }
+      const responses = await dataSource
+        .getRepository(ParticipantResponse)
+        .findBy({ roomId });
+      if (status !== RoomStatus.CALCULATED) {
+        expect(
+          responses.every(
+            (r) =>
+              r.status === ParticipantResponseStatus.SUBMITTED &&
+              r.note === 'Previous opinion'
+          )
+        ).toBe(true);
+        expect(
+          (
+            await dataSource
+              .getRepository(Room)
+              .findOneByOrFail({ id: roomId! })
+          ).status
+        ).toBe(status);
+        expect(
+          (
+            await dataSource
+              .getRepository(ScoreResult)
+              .findOneByOrFail({ id: score.id })
+          ).status
+        ).toBe('COMPLETED');
+        expect(
+          isDeepStrictEqual(
+            await dataSource
+              .getRepository(Decision)
+              .findOneByOrFail({ id: historicalDecision.id }),
+            decisionBefore
+          )
+        ).toBe(true);
+        return;
+      }
+      expect(
+        responses
+          .filter((r) => r.candidateId === candidates[0].id)
+          .every(
+            (r) =>
+              r.status === ParticipantResponseStatus.RECONFIRM_REQUIRED &&
+              r.note === 'Previous opinion'
+          )
+      ).toBe(true);
+      expect(
+        responses
+          .filter((r) => r.candidateId === candidates[1].id)
+          .every((r) => r.status === ParticipantResponseStatus.SUBMITTED)
+      ).toBe(true);
+      expect(
+        (await dataSource.getRepository(Room).findOneByOrFail({ id: roomId! }))
+          .status
+      ).toBe('OPEN');
+      const afterScore = await dataSource
+        .getRepository(ScoreResult)
+        .findOneByOrFail({ id: score.id });
+      expect(isDeepStrictEqual(afterScore.candidates, score.candidates)).toBe(
+        true
+      );
+      expect(afterScore.status).toBe('STALE');
+      expect(
+        isDeepStrictEqual(
+          await dataSource
+            .getRepository(Decision)
+            .findOneByOrFail({ id: historicalDecision.id }),
+          decisionBefore
+        )
+      ).toBe(true);
+      await expect(
+        new ReconfirmEditedCandidateResponses20261012000000().down()
+      ).rejects.toThrow('forward fix');
+    }
+  );
 
   it('recovers expired HOST/MEMBER credentials while preserving conditions, responses, results and Decision history', async () => {
     const created = await request(app.getHttpServer())
@@ -139,6 +527,7 @@ describe('Room Candidate and ParticipantResponse integration', () => {
       .put(responsePath)
       .set('Authorization', `Bearer ${member.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: 'AVAILABLE',
         travelBurden: 'EASY',
         note: 'Preserved in PostgreSQL',
@@ -250,7 +639,11 @@ describe('Room Candidate and ParticipantResponse integration', () => {
         'Authorization',
         `Bearer ${memberRecovery.body.access.participantToken}`
       )
-      .send({ availabilityStatus: 'MAYBE', travelBurden: 'HARD' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'MAYBE',
+        travelBurden: 'HARD',
+      })
       .expect(409);
     await request(app.getHttpServer())
       .get(`/api/v1/rooms/${roomId}/decision`)
@@ -435,6 +828,7 @@ describe('Room Candidate and ParticipantResponse integration', () => {
       )
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.AVAILABLE,
         travelBurden: TravelBurden.EASY,
         note: 'First response',
@@ -447,6 +841,7 @@ describe('Room Candidate and ParticipantResponse integration', () => {
       )
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.MAYBE,
         travelBurden: TravelBurden.HARD,
         note: 'Updated response',
@@ -764,7 +1159,11 @@ describe('Room Candidate and ParticipantResponse integration', () => {
             `/api/v1/rooms/${roomId}/participants/${participantId}/responses/${firstCandidate.body.candidate.id}`
           )
           .auth(token, { type: 'bearer' })
-          .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' }),
+          .send({
+            candidateVersion: 1,
+            availabilityStatus: 'AVAILABLE',
+            travelBurden: 'EASY',
+          }),
       () =>
         request(app.getHttpServer())
           .post(`/api/v1/rooms/${roomId}/recovery/register`)

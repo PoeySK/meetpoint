@@ -413,6 +413,7 @@ describe('Participant lifecycle HTTP contract', () => {
       )
       .set('Authorization', authorization)
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.AVAILABLE,
         travelBurden: TravelBurden.EASY,
       });

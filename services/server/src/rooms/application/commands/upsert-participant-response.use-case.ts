@@ -61,6 +61,9 @@ export class UpsertParticipantResponseUseCase {
       if (candidate.status === CandidateStatus.ARCHIVED) {
         throw new ConflictException('ROOM_STATE_CONFLICT');
       }
+      if (candidate.version !== normalizedInput.candidateVersion) {
+        throw new ConflictException('CANDIDATE_VERSION_CONFLICT');
+      }
 
       const participant = await participants.findById(participantId);
       if (!participant || participant.roomId !== room.id) {
@@ -105,6 +108,7 @@ export class UpsertParticipantResponseUseCase {
       response.travelBurden = normalizedInput.travelBurden;
       response.note = normalizedInput.note;
       response.status = ParticipantResponseStatus.SUBMITTED;
+      response.submittedAt = now;
       response.updatedAt = now;
       const savedResponse = await responses.save(response);
       const activeCandidates = await candidates.findByRoomId(room.id, {

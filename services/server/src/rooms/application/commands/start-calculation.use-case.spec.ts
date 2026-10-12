@@ -724,79 +724,86 @@ describe('StartCalculationUseCase flow', () => {
     expect(completed.status).toBe(ScoreResultStatus.COMPLETED);
   });
 
-  it('keeps a missing response absent from the calculation snapshot', async () => {
-    const seed = createSeed();
-    seed.store.responses.delete('participant-member-1-candidate-2');
-    let solverInput!: SolverSnapshot;
-    globalThis.fetch = jest.fn((_input, init) => {
-      solverInput = parseSolverSnapshot(init);
-      return {
-        ok: true,
-        status: 200,
-        json: () => Promise.resolve(solverResponseFromSnapshot(solverInput)),
-      } as Response;
-    });
-    const service = createCalculationService(
-      createCalculationDataSource(seed.store)
-    );
+  it.each(['missing', 'reconfirmation'])(
+    'keeps a %s response absent from the calculation snapshot',
+    async (state) => {
+      const seed = createSeed();
+      if (state === 'missing')
+        seed.store.responses.delete('participant-member-1-candidate-2');
+      else
+        seed.store.responses.get('participant-member-1-candidate-2')!.status =
+          ParticipantResponseStatus.RECONFIRM_REQUIRED;
+      let solverInput!: SolverSnapshot;
+      globalThis.fetch = jest.fn((_input, init) => {
+        solverInput = parseSolverSnapshot(init);
+        return {
+          ok: true,
+          status: 200,
+          json: () => Promise.resolve(solverResponseFromSnapshot(solverInput)),
+        } as Response;
+      });
+      const service = createCalculationService(
+        createCalculationDataSource(seed.store)
+      );
 
-    const started = await service.startCalculation(
-      seed.roomId,
-      seed.hostToken,
-      {
-        clientRequestId: 'client-missing-response',
-      }
-    );
-    const completed = await waitForStatus(
-      seed.store,
-      started.calculation.id,
-      ScoreResultStatus.COMPLETED
-    );
+      const started = await service.startCalculation(
+        seed.roomId,
+        seed.hostToken,
+        {
+          clientRequestId: 'client-missing-response',
+        }
+      );
+      const completed = await waitForStatus(
+        seed.store,
+        started.calculation.id,
+        ScoreResultStatus.COMPLETED
+      );
 
-    const memberSnapshot = solverInput.participants.find(
-      (participant) => participant.participantId === 'participant-member-1'
-    );
-    const missingCandidateResult = completed.candidates.find(
-      (candidate) => candidate.candidateId === 'candidate-2'
-    );
-    if (!missingCandidateResult) {
-      throw new Error('Missing candidate result');
-    }
-    const missingParticipantResult =
-      missingCandidateResult.participantBreakdown.find(
+      const memberSnapshot = solverInput.participants.find(
         (participant) => participant.participantId === 'participant-member-1'
       );
-    if (!missingParticipantResult) {
-      throw new Error('Missing participant result');
-    }
+      const missingCandidateResult = completed.candidates.find(
+        (candidate) => candidate.candidateId === 'candidate-2'
+      );
+      if (!missingCandidateResult) {
+        throw new Error('Missing candidate result');
+      }
+      const missingParticipantResult =
+        missingCandidateResult.participantBreakdown.find(
+          (participant) => participant.participantId === 'participant-member-1'
+        );
+      if (!missingParticipantResult) {
+        throw new Error('Missing participant result');
+      }
 
-    expect(memberSnapshot.responses).toEqual([
-      expect.objectContaining({ candidateId: 'candidate-1' }),
-    ]);
-    expect(memberSnapshot.responses).not.toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          candidateId: 'candidate-2',
-          availabilityStatus: AvailabilityStatus.AVAILABLE,
-        }),
-      ])
-    );
-    expect(completed.coverage).toMatchObject({
-      submittedResponses: 5,
-      expectedResponses: 6,
-    });
-    expect(missingCandidateResult).toMatchObject({
-      matchLevel: 'INCOMPLETE',
-      eligible: false,
-      coverage: { submittedResponses: 2, expectedResponses: 3 },
-      blockingIssues: ['MISSING_RESPONSE'],
-    });
-    expect(missingParticipantResult).toMatchObject({
-      score: 0,
-      components: { time: 0, travelBurden: 0, budget: 0, preference: 0 },
-      blockingIssues: ['MISSING_RESPONSE'],
-    });
-  });
+      expect(memberSnapshot.responses).toEqual([
+        expect.objectContaining({ candidateId: 'candidate-1' }),
+      ]);
+      expect(memberSnapshot.responses).not.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            candidateId: 'candidate-2',
+            availabilityStatus: AvailabilityStatus.AVAILABLE,
+          }),
+        ])
+      );
+      expect(completed.coverage).toMatchObject({
+        submittedResponses: 5,
+        expectedResponses: 6,
+      });
+      expect(missingCandidateResult).toMatchObject({
+        matchLevel: 'INCOMPLETE',
+        eligible: false,
+        coverage: { submittedResponses: 2, expectedResponses: 3 },
+        blockingIssues: ['MISSING_RESPONSE'],
+      });
+      expect(missingParticipantResult).toMatchObject({
+        score: 0,
+        components: { time: 0, travelBurden: 0, budget: 0, preference: 0 },
+        blockingIssues: ['MISSING_RESPONSE'],
+      });
+    }
+  );
 
   it('marks the previous completed result stale when an OPEN room is edited after reopen', async () => {
     const seed = createSeed();
@@ -832,6 +839,7 @@ describe('StartCalculationUseCase flow', () => {
       'candidate-1',
       seed.hostToken,
       {
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.MAYBE,
         travelBurden: TravelBurden.NORMAL,
         note: null,

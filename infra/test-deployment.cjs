@@ -117,7 +117,7 @@ async function main() {
       }, 'PUT');
       for (const activeCandidate of [candidate, secondCandidate]) {
         await request(`/api/v1/rooms/${room.id}/participants/${participant.id}/responses/${activeCandidate.id}`, 200, token,
-          { availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' }, 'PUT');
+          { candidateVersion: activeCandidate.version, availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' }, 'PUT');
       }
     }
     const calculation = (await request(`/api/v1/rooms/${room.id}/calculations`, 202, hostToken, { clientRequestId: id })).body.calculation;

@@ -134,6 +134,7 @@ describe('Rooms HTTP contract', () => {
         `Bearer ${firstParticipant.body.access.participantToken}`
       )
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.AVAILABLE,
         travelBurden: TravelBurden.EASY,
         note: 'First note',
@@ -148,6 +149,7 @@ describe('Rooms HTTP contract', () => {
         `Bearer ${secondParticipant.body.access.participantToken}`
       )
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.UNAVAILABLE,
         travelBurden: TravelBurden.HARD,
         note: 'Second note',
@@ -221,6 +223,7 @@ describe('Rooms HTTP contract', () => {
       )
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.MAYBE,
         travelBurden: TravelBurden.NORMAL,
       })

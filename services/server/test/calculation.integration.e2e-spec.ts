@@ -276,7 +276,11 @@ describeCalculation(
               `/api/v1/rooms/${roomId}/participants/${participant.id}/responses/${candidateId}`
             )
             .set('Authorization', `Bearer ${participant.token}`)
-            .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
+            .send({
+              candidateVersion: 1,
+              availabilityStatus: 'AVAILABLE',
+              travelBurden: 'EASY',
+            })
             .expect(200);
         }
       }

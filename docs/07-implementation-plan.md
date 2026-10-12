@@ -190,3 +190,15 @@ Client 동작, 운영상 실패 조건을 함께 확인한다.
 - `mvp-1`, `MVP_NO_CONDITIONS` 같은 호환 식별자를 제거하려면 Solver, Server,
   Client, 저장 결과, API 문서, 테스트를 함께 version migration해야 한다. 그 전까지
   사용자 화면에는 내부 식별자를 노출하지 않는다.
+
+### 후보 변경 후 의견 재확인
+
+구현: 시작·종료의 실제 시각, trim한 장소명·주소, 예상 비용(증가·감소 모두), 정규화한 태그 집합이 달라지면 해당 후보의 `SUBMITTED` 응답만 `RECONFIRM_REQUIRED`로 전환한다. 표시 순서·지역 표시(`place.area`)·같은 순간의 시간대 표기·공백·태그 대소문자/순서/중복 차이는 재확인을 요구하지 않는다. 장소 식별자가 없어 이름·주소의 오탈자와 실제 장소 변경을 구분할 수 없으므로 둘 다 보수적으로 재확인을 요구한다. 기존 상태 필드에 `RECONFIRM_REQUIRED`를 추가하며 별도 테이블·컬럼은 추가하지 않는다. 이전 값은 초안으로 보존하고 상태·coverage·Solver snapshot·확정에서는 유효 제출로 세지 않는다. 저장 요청은 현재 `candidateVersion`을 필수로 보내며 Room 잠금 안에서 검증한다. Client는 충돌 시 초안을 유지하고 명시적 재시도만 허용한다.
+
+완료 기준: 후보별 무효화 분리, 표시 변경 예외, 참가자 상태·coverage·snapshot 제외, 확정 차단과 재저장 복구, 경쟁 저장 거부, rollback 및 과거 계산·결정 payload 보존을 단위·실제 DB·브라우저 흐름으로 검증한다.
+
+검증 결과: Client Node 37개, Server 단위·HTTP 179개, 실제 PostgreSQL·Solver 통합 24개, 격리 Chromium 4개가 통과했다. Client/Server lint·typecheck·build와 Solver fmt·check·test도 통과했다.
+
+기존 데이터 전환: `20261012000000-reconfirm-edited-candidate-responses` migration을 명시적으로 실행한다. 설정된 대상 DB를 확인한 뒤 `services/server`에서 `pnpm migration:run`을 사용하거나 기존 배포 문서의 명시적 migration 컨테이너 단계를 따른다. 먼저 쓰기를 중단하고 REQUESTED/RUNNING 계산 job을 모두 처리한 뒤 worker를 중단한다. 미처리 job이 있으면 migration은 거부한다. DRAFT/OPEN/CALCULATED 방의 활성 참가자·활성 후보 중 version > 1인 후보의 제출 의견을 보수적으로 재확인 대상으로 바꾼다. 과거 변경 필드 이력이 없어 표시 변경도 포함된다. 관련 RESPONDED는 JOINED, 최신 완료 결과는 STALE, CALCULATED 방은 OPEN으로 바꾼다. CONFIRMED/CLOSED 방과 의견 값·계산/결정 payload는 보존한다.
+
+배포 시 DB 백업 후 Client/Server를 함께 갱신한다. 자동 migration은 사용하지 않는다. 기존 데이터 전환은 유효한 동의를 추정해 되돌릴 수 없으므로 down은 거부한다. 문제 발생 시 쓰기를 막고 호환되는 수정 버전으로 전진 복구한다. 이전 Server는 재확인 상태를 안전하게 처리하지 못하므로 그대로 rollback하지 않는다. 개발 DB에는 이번 작업에서 migration을 적용하지 않는다.

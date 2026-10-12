@@ -548,6 +548,26 @@ describe('DecisionService vertical slice', () => {
     );
   });
 
+  it('rejects reconfirmation even if a result reports full coverage', async () => {
+    const seed = createSeed();
+    seed.store.responses.get('participant-member-2-candidate-2')!.status =
+      ParticipantResponseStatus.RECONFIRM_REQUIRED;
+    const before = JSON.stringify([...seed.store.responses.values()]);
+    const service = createDecisionService(seed.store);
+    await expectCode(
+      () =>
+        service.createDecision(seed.roomId, seed.hostToken, {
+          candidateId: seed.candidateIds[0],
+          scoreResultId: seed.scoreResultId,
+          acknowledgeIssues: false,
+        }),
+      UnprocessableEntityException,
+      'BUSINESS_RULE_VIOLATION'
+    );
+    expect(JSON.stringify([...seed.store.responses.values()])).toBe(before);
+    expect(seed.store.decisions.size).toBe(0);
+  });
+
   it('rejects incomplete coverage and missing active responses without filling them', async () => {
     const seed = createSeed();
     seed.store.responses.delete('participant-member-2-candidate-2');

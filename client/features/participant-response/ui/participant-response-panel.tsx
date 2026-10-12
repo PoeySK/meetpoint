@@ -42,6 +42,9 @@ function describeResponseError(error: unknown) {
   const accessMessage = getRoomAccessErrorMessage(error);
   if (accessMessage) return accessMessage;
   if (error instanceof RoomApiError) {
+    if (error.code === 'CANDIDATE_VERSION_CONFLICT') {
+      return '후보가 변경되어 의견 재확인이 필요합니다. 입력은 유지됩니다. 최신 후보를 불러와 확인한 뒤 다시 저장해 주세요.';
+    }
     if (error.code === 'ROOM_STATE_CONFLICT') {
       return '현재 방 상태에서는 의견을 수정할 수 없습니다.';
     }
@@ -187,6 +190,7 @@ export function ParticipantResponsePanel({
         candidateId,
         token,
         {
+          candidateVersion: activeCandidates.find((candidate) => candidate.id === candidateId)!.version,
           availabilityStatus: form.availabilityStatus!,
           travelBurden: form.travelBurden!,
           note: form.note.trim() || null,
@@ -204,6 +208,9 @@ export function ParticipantResponsePanel({
         message: describeResponseError(error),
         messageKind: 'error',
       });
+      if (error instanceof RoomApiError && error.code === 'CANDIDATE_VERSION_CONFLICT') {
+        await onRoomRefresh().catch(() => undefined);
+      }
     }
   }
 
@@ -271,6 +278,7 @@ export function ParticipantResponsePanel({
     const results = await Promise.allSettled(
       formsToSave.map(({ candidate, form }) =>
         upsertParticipantResponse(roomId, participantId, candidate.id, token, {
+          candidateVersion: candidate.version,
           availabilityStatus: form.availabilityStatus!,
           travelBurden: form.travelBurden!,
           note: form.note.trim() || null,
@@ -308,7 +316,7 @@ export function ParticipantResponsePanel({
           : `후보 ${successCount}개는 저장했고 ${failureCount}개는 저장하지 못했습니다. 실패한 후보의 입력은 유지됩니다.`,
       kind: failureCount === 0 ? 'success' : 'error',
     });
-    if (successCount > 0) {
+    if (successCount > 0 || results.some((result) => result.status === 'rejected' && result.reason instanceof RoomApiError && result.reason.code === 'CANDIDATE_VERSION_CONFLICT')) {
       await onRoomRefresh();
     }
   }

@@ -226,7 +226,11 @@ describe('rate limit HTTP contract and mutation boundaries', () => {
           `${prefix}/participants/${created.hostParticipant.id}/responses/${candidate.id}`
         )
         .auth(token, { type: 'bearer' })
-        .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
+        .send({
+          candidateVersion: 1,
+          availabilityStatus: 'AVAILABLE',
+          travelBurden: 'EASY',
+        })
         .expect(200);
     const before = JSON.stringify([...context.database.responses.values()]);
     await request(api)
@@ -234,7 +238,11 @@ describe('rate limit HTTP contract and mutation boundaries', () => {
         `${prefix}/participants/${created.hostParticipant.id}/responses/another`
       )
       .auth(token, { type: 'bearer' })
-      .send({ availabilityStatus: 'UNAVAILABLE', travelBurden: 'HARD' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'UNAVAILABLE',
+        travelBurden: 'HARD',
+      })
       .expect(429);
     expect(JSON.stringify([...context.database.responses.values()])).toBe(
       before

@@ -160,6 +160,40 @@ function panelHarness({ saved = [], criteria = condition(), readOnly = false } =
 }
 const settle = () => new Promise((resolve) => setImmediate(resolve));
 
+test('reconfirmation retains previous values as an unsubmitted draft and polling preserves manual edits', () => {
+  const saved = { ...response(), status: 'RECONFIRM_REQUIRED' };
+  const initial = model.createResponseForm(saved);
+  assert.equal(model.getResponseState(initial), 'reconfirm');
+  assert.equal(initial.availabilityStatus, 'UNAVAILABLE');
+  assert.equal(initial.travelBurden, 'HARD');
+  assert.equal(initial.note, 'Stored note');
+  const edited = model.editResponseForm(model.createResponseForm(response()), { note: 'Manual reconfirmation draft' });
+  const forms = model.synchronizeResponseForms({ one: edited }, [candidate()], [saved]);
+  assert.equal(forms.one.note, 'Manual reconfirmation draft');
+  assert.equal(forms.one.reconfirmRequired, true);
+  assert.equal(model.getResponseState(forms.one), 'reconfirm');
+  const unchanged = model.synchronizeResponseForms(forms, [candidate()], [saved]);
+  assert.equal(unchanged.one, forms.one);
+});
+
+test('stale candidate save preserves draft, refreshes without automatic resubmission and requires explicit retry', async () => {
+  const h = panelHarness({ saved: [{ ...response(), status: 'RECONFIRM_REQUIRED' }] });
+  let refreshes = 0; h.props.onRoomRefresh = async () => { refreshes++; };
+  h.cards()[0].props.onUpdate({ note: 'Kept version conflict draft' });
+  h.fail(new RoomApiError('Fixture conflict', 409, 'CANDIDATE_VERSION_CONFLICT'));
+  h.cards()[0].props.onSave(); await settle();
+  assert.equal(h.calls[0].input.candidateVersion, 1);
+  assert.equal(refreshes, 1);
+  assert.equal(h.calls.length, 1);
+  assert.match(h.cards()[0].props.form.message, /후보가 변경되어 의견 재확인/);
+  assert.equal(h.cards()[0].props.form.note, 'Kept version conflict draft');
+  h.props.candidates = h.props.candidates.map(c => ({ ...c, version: 2 }));
+  h.fail(false); h.cards()[0].props.onSave(); await settle();
+  assert.equal(h.calls.length, 2);
+  assert.equal(h.calls[1].input.candidateVersion, 2);
+  assert.equal(model.getResponseState(h.cards()[0].props.form), 'saved');
+});
+
 test('default and fill do not call API; manual edits are drafts until explicit save', async () => {
   const h = panelHarness(); h.render(); h.flush();
   assert.equal(h.calls.length, 0);

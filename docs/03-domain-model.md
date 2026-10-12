@@ -248,6 +248,9 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - 수정·보관은 `version`을 조건으로 저장하여 오래된 Client가 최신 변경을 덮어쓰지 못하게 한다. 성공한 변경은 `version`을 1 증가시킨다.
 - 보관된 후보와 연결된 ParticipantResponse는 이력으로 보존하지만 활성 후보·새 계산·coverage에서는 제외한다.
 
+- 시작·종료의 실제 시각, trim한 장소명·주소, 예상 비용(증가·감소 모두), 정규화한 태그 집합이 달라지면 해당 후보의 `SUBMITTED` 응답만 `RECONFIRM_REQUIRED`로 전환한다. 표시 순서·지역 표시(`place.area`)·같은 순간의 시간대 표기·공백·태그 대소문자/순서/중복 차이는 재확인을 요구하지 않는다. 장소 식별자가 없어 이름·주소의 오탈자와 실제 장소 변경을 구분할 수 없으므로 둘 다 보수적으로 재확인을 요구한다.
+- 후보 변경, 응답 무효화, 참가자 상태 조정, 최신 결과 무효화는 같은 Room 잠금 트랜잭션에서 처리한다. `version`은 기존 동시 수정 방지 역할을 유지한다.
+
 ## ParticipantResponse
 
 ### 목적
@@ -278,7 +281,8 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 
 ### 상태값
 
-- `SUBMITTED`: 계산에 사용할 수 있는 최신 응답
+- `SUBMITTED`: 현재 후보에 대해 명시적으로 저장한 유효 응답
+- `RECONFIRM_REQUIRED`: 중요한 후보 변경 전 의견. 값과 마지막 `submittedAt`은 초안으로 보존하되 `RESPONDED`, coverage, Solver snapshot, 확정의 유효 응답에서 제외한다.
 - 응답 레코드가 존재하지 않는 상태는 객체 상태가 아니라 후보별 `MISSING` 파생 상태다.
 
 ### 관계
@@ -288,7 +292,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 ### 생성 및 변경 시점
 
 - 참여자가 후보별 응답을 제출할 때 생성한다.
-- 참여자가 내용을 수정할 때 같은 논리 응답을 갱신한다.
+- 참여자가 내용을 수정하거나 재확인할 때 같은 논리 응답을 갱신하고 `SUBMITTED`, `submittedAt`을 현재 저장 시각으로 갱신한다. 요청의 필수 `candidateVersion`이 잠금 안에서 현재 후보 version과 같아야 한다.
 - 후보가 `ARCHIVED`되면 해당 응답은 새 계산에서 제외한다.
 - 응답의 생성·변경은 최신 `ScoreResult`를 `STALE`로 만든다.
 

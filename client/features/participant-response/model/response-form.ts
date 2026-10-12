@@ -10,6 +10,7 @@ import { MEETPOINT_TIMEZONE } from '@/shared/config/meetpoint';
 export type ResponseMessageKind = 'success' | 'error' | 'info';
 
 export type ResponseForm = {
+  reconfirmRequired: boolean;
   availabilityStatus: AvailabilityStatus | null;
   travelBurden: TravelBurden | null;
   note: string;
@@ -60,6 +61,7 @@ export function createResponseForm(
   const note = response?.note ?? '';
 
   return {
+    reconfirmRequired: response?.status === 'RECONFIRM_REQUIRED',
     availabilityStatus,
     travelBurden,
     note,
@@ -102,6 +104,7 @@ export function isFormDirty(form: ResponseForm) {
 }
 
 export function getResponseState(form: ResponseForm) {
+  if (form.reconfirmRequired) return 'reconfirm' as const;
   if (isFormDirty(form)) {
     return 'dirty' as const;
   }
@@ -297,7 +300,7 @@ export function fillFormsFromCondition(
   );
   const next = { ...current };
   let applied = 0;
-  const savedIds = new Set(responses.map((response) => response.candidateId));
+  const savedIds = new Set(responses.filter((response) => response.status === 'SUBMITTED').map((response) => response.candidateId));
   if (!disabled && condition) {
     for (const candidate of active) {
       const form = current[candidate.id] ?? createResponseForm();
@@ -342,20 +345,27 @@ export function synchronizeResponseForms(
   let next = current;
   for (const candidate of candidates) {
     const existing = current[candidate.id];
+    const response = responsesById.get(candidate.id);
     if (
       existing &&
       (existing.isSubmitting ||
         existing.manuallyEdited ||
         isFormDirty(existing))
-    )
+    ) {
+      // 후보 변경 안내만 갱신하고 작성 중인 값·메모·오류는 유지한다.
+      if (response?.status === 'RECONFIRM_REQUIRED' && !existing.reconfirmRequired) {
+        next = { ...next, [candidate.id]: { ...existing, reconfirmRequired: true } };
+      }
       continue;
-    const hydrated = createResponseForm(responsesById.get(candidate.id));
+    }
+    const hydrated = createResponseForm(response);
     if (
       !existing ||
       existing.savedResponseId !== hydrated.savedResponseId ||
       existing.savedAvailabilityStatus !== hydrated.savedAvailabilityStatus ||
       existing.savedTravelBurden !== hydrated.savedTravelBurden ||
-      existing.savedNote !== hydrated.savedNote
+      existing.savedNote !== hydrated.savedNote ||
+      existing.reconfirmRequired !== hydrated.reconfirmRequired
     ) {
       next = { ...next, [candidate.id]: hydrated };
     }
@@ -394,6 +404,7 @@ export function messageClassName(kind: ResponseMessageKind) {
 }
 
 export function responseStateLabel(state: ReturnType<typeof getResponseState>) {
+  if (state === 'reconfirm') return '의견 재확인 필요';
   if (state === 'saved') {
     return '의견 저장됨';
   }
@@ -410,7 +421,7 @@ export function responseStateClassName(
   if (state === 'saved') {
     return 'bg-emerald-50 text-emerald-700';
   }
-  if (state === 'dirty') {
+  if (state === 'dirty' || state === 'reconfirm') {
     return 'bg-amber-50 text-amber-700';
   }
 
