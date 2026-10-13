@@ -7,6 +7,7 @@ import type {
   TravelBurden,
   ParticipantResponseRecord,
 } from '../../domain/participant-response/participant-response';
+import { ParticipantResponseStatus } from '../../domain/participant-response/participant-response';
 import type {
   ScoreResultCandidate,
   ScoreResultCoverage,
@@ -74,6 +75,7 @@ export function isCandidateResponseForSnapshot(
   candidateIds: ReadonlySet<string>
 ): boolean {
   return (
+    response.status === ParticipantResponseStatus.SUBMITTED &&
     response.participantId === participantId &&
     candidateIds.has(response.candidateId)
   );

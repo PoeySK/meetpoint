@@ -82,7 +82,7 @@ export function RoomWorkspaceWidget({
 
   const candidateIds = new Set(room.candidates.map((candidate) => candidate.id));
   const responseCount = room.myResponses.filter((response) =>
-    candidateIds.has(response.candidateId),
+    candidateIds.has(response.candidateId) && response.status === "SUBMITTED",
   ).length;
   const responseComplete =
     room.candidates.length > 0 && responseCount === room.candidates.length;

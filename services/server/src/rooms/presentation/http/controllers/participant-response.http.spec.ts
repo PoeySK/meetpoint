@@ -58,6 +58,7 @@ describe('Participant response HTTP contract', () => {
       )
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.AVAILABLE,
         travelBurden: TravelBurden.EASY,
         note: 'Near the station',
@@ -85,6 +86,7 @@ describe('Participant response HTTP contract', () => {
       )
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.MAYBE,
         travelBurden: TravelBurden.HARD,
         note: 'Updated note',
@@ -123,6 +125,7 @@ describe('Participant response HTTP contract', () => {
       .expect(200);
     const path = `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`;
     const validResponse = {
+      candidateVersion: 1,
       availabilityStatus: AvailabilityStatus.AVAILABLE,
       travelBurden: TravelBurden.NORMAL,
     };
@@ -149,7 +152,11 @@ describe('Participant response HTTP contract', () => {
     const invalid = await request(app.getHttpServer())
       .put(path)
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
-      .send({ availabilityStatus: 'UNKNOWN', travelBurden: 'EASY' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'UNKNOWN',
+        travelBurden: 'EASY',
+      })
       .expect(400);
     expectRoomError(invalid, 'VALIDATION_ERROR');
 
@@ -216,6 +223,7 @@ describe('Participant response HTTP contract', () => {
       )
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: AvailabilityStatus.UNAVAILABLE,
         travelBurden: TravelBurden.HARD,
       })

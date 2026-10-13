@@ -93,6 +93,12 @@ export function CandidateResponseCard({
         <p className='text-sm text-slate-600'>
           {formatCandidateTime(candidate)}
         </p>
+        {form.reconfirmRequired && (
+          <p role='status' className='text-sm leading-6 text-amber-800'>
+            후보가 변경되어 의견 재확인이 필요합니다. 이전 의견은 초안으로 남아 있습니다.
+            현재 시간·장소·비용·특징을 확인하고 다시 저장해 주세요.
+          </p>
+        )}
         <p className='text-sm text-slate-600'>
           {candidate.place.address} · {candidate.place.area}
         </p>
@@ -236,7 +242,7 @@ export function CandidateResponseCard({
             ? '저장 중...'
             : isBulkSubmitting
               ? '전체 저장 중...'
-              : responseState === 'dirty'
+              : responseState === 'dirty' || responseState === 'reconfirm'
                 ? '변경 저장'
                 : '의견 저장'}
         </button>

@@ -1,4 +1,5 @@
 import 'reflect-metadata';
+import { ReconfirmEditedCandidateResponses20261012000000 } from './migrations/20261012000000-reconfirm-edited-candidate-responses';
 import { AddParticipantRecovery20261001000000 } from './migrations/20261001000000-add-participant-recovery';
 import { DataSource } from 'typeorm';
 import { Participant } from '../rooms/infrastructure/persistence/typeorm/entities/participant.entity';
@@ -56,6 +57,7 @@ const dataSource = new DataSource({
     CreateDecisions20260817000000,
     CreateParticipantConditions20260818000000,
     CreateCalculationJobs20260921000000,
+    ReconfirmEditedCandidateResponses20261012000000,
   ],
   synchronize: false,
   migrationsRun: false,

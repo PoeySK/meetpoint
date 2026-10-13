@@ -256,12 +256,14 @@ export function validateCandidateVersion(value: unknown): number {
 }
 
 export function validateParticipantResponseInput(input: unknown): {
+  candidateVersion: number;
   availabilityStatus: AvailabilityStatus;
   travelBurden: TravelBurden;
   note: string | null;
 } {
   const candidate = input as
     | {
+        candidateVersion?: unknown;
         availabilityStatus?: unknown;
         travelBurden?: unknown;
         note?: unknown;
@@ -272,6 +274,9 @@ export function validateParticipantResponseInput(input: unknown): {
   const travelBurden = candidate?.travelBurden;
 
   if (
+    typeof candidate?.candidateVersion !== 'number' ||
+    !Number.isSafeInteger(candidate.candidateVersion) ||
+    candidate.candidateVersion < 1 ||
     !Object.values(AvailabilityStatus).includes(
       availabilityStatus as AvailabilityStatus
     ) ||
@@ -288,6 +293,7 @@ export function validateParticipantResponseInput(input: unknown): {
   }
 
   return {
+    candidateVersion: candidate.candidateVersion,
     availabilityStatus: availabilityStatus as AvailabilityStatus,
     travelBurden: travelBurden as TravelBurden,
     note: typeof candidate?.note === 'string' ? candidate.note.trim() : null,

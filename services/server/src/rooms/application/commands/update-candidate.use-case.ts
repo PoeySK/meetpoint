@@ -6,6 +6,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { CandidateStatus } from '../../domain/candidate/candidate';
+import { requiresResponseReconfirmation } from '../../domain/candidate/candidate-response-change';
+import { ParticipantResponseStatus } from '../../domain/participant-response/participant-response';
 import { ParticipantRole } from '../../domain/participant/participant';
 import { ROOM_ACCESS, type RoomAccessPort } from '../ports/room-access.port';
 import {
@@ -93,6 +95,23 @@ export class UpdateCandidateUseCase {
       );
       if (!savedCandidate) {
         throw new ConflictException('CANDIDATE_VERSION_CONFLICT');
+      }
+
+      if (requiresResponseReconfirmation(candidate, savedCandidate)) {
+        for (const response of await repositories.responses.findByRoomId(
+          room.id
+        )) {
+          if (
+            response.candidateId === candidate.id &&
+            response.status === ParticipantResponseStatus.SUBMITTED
+          ) {
+            await repositories.responses.save({
+              ...response,
+              status: ParticipantResponseStatus.RECONFIRM_REQUIRED,
+              updatedAt: now,
+            });
+          }
+        }
       }
 
       const activeCandidatesAfterUpdate = activeCandidates.map((item) =>

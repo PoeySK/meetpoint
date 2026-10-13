@@ -12,6 +12,7 @@ import {
 import { CandidateStatus } from '../../../domain/candidate/candidate';
 import { ParticipantStatus } from '../../../domain/participant/participant';
 import { RoomStatus } from '../../../domain/room/room-status';
+import { ParticipantResponseStatus } from '../../../domain/participant-response/participant-response';
 
 describe('Candidate HTTP contract', () => {
   let app: RoomsTestContext['app'];
@@ -23,6 +24,174 @@ describe('Candidate HTTP contract', () => {
 
   afterEach(async () => {
     await closeRoomsTestContext({ app, database });
+  });
+
+  it('reconfirms only the changed candidate, preserves values and rejects old or missing response versions', async () => {
+    const created = (
+      await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201)
+    ).body;
+    const prefix = `/api/v1/rooms/${created.room.id}`;
+    const token = created.access.hostToken;
+    const first = (
+      await request(app.getHttpServer())
+        .post(`${prefix}/candidates`)
+        .auth(token, { type: 'bearer' })
+        .send(validCandidatePayload())
+        .expect(201)
+    ).body.candidate;
+    const second = (
+      await request(app.getHttpServer())
+        .post(`${prefix}/candidates`)
+        .auth(token, { type: 'bearer' })
+        .send({
+          ...validCandidatePayload(),
+          displayOrder: 2,
+          place: { name: 'Other', address: 'Other 2', area: 'Other' },
+        })
+        .expect(201)
+    ).body.candidate;
+    const responsePath = (id: string) =>
+      `${prefix}/participants/${created.hostParticipant.id}/responses/${id}`;
+    const input = {
+      candidateVersion: 1,
+      availabilityStatus: 'AVAILABLE',
+      travelBurden: 'EASY',
+      note: 'Preserved',
+    };
+    const firstResponse = (
+      await request(app.getHttpServer())
+        .put(responsePath(first.id))
+        .auth(token, { type: 'bearer' })
+        .send(input)
+        .expect(200)
+    ).body.response;
+    await request(app.getHttpServer())
+      .put(responsePath(second.id))
+      .auth(token, { type: 'bearer' })
+      .send(input)
+      .expect(200);
+    const patch = (body: object, version: number) =>
+      request(app.getHttpServer())
+        .patch(`${prefix}/candidates/${first.id}`)
+        .auth(token, { type: 'bearer' })
+        .set('If-Match-Version', String(version))
+        .send(body);
+    await patch(
+      {
+        displayOrder: 3,
+        place: { ...first.place, area: 'Display only' },
+        tags: [...first.tags].reverse(),
+      },
+      1
+    ).expect(200);
+    expect(
+      [...database.responses.values()].every(
+        (response) => response.status === ParticipantResponseStatus.SUBMITTED
+      )
+    ).toBe(true);
+    await patch({ estimatedCostPerPersonKrw: 22000 }, 2).expect(200);
+    const room = (
+      await request(app.getHttpServer())
+        .get(prefix)
+        .auth(token, { type: 'bearer' })
+        .expect(200)
+    ).body;
+    expect(room.currentParticipant.status).toBe('JOINED');
+    expect(
+      room.myResponses.find(
+        (response: { candidateId: string }) => response.candidateId === first.id
+      )
+    ).toMatchObject({
+      ...firstResponse,
+      status: 'RECONFIRM_REQUIRED',
+      updatedAt: expect.any(String),
+    });
+    expect(
+      room.myResponses.find(
+        (response: { candidateId: string }) =>
+          response.candidateId === second.id
+      ).status
+    ).toBe('SUBMITTED');
+    await request(app.getHttpServer())
+      .put(responsePath(first.id))
+      .auth(token, { type: 'bearer' })
+      .send({ ...input, candidateVersion: 2 })
+      .expect(409);
+    await request(app.getHttpServer())
+      .put(responsePath(first.id))
+      .auth(token, { type: 'bearer' })
+      .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
+      .expect(400);
+    const saved = await request(app.getHttpServer())
+      .put(responsePath(first.id))
+      .auth(token, { type: 'bearer' })
+      .send({ ...input, candidateVersion: 3 })
+      .expect(200);
+    expect(saved.body.response.id).toBe(firstResponse.id);
+    expect(saved.body.response.status).toBe('SUBMITTED');
+    expect(saved.body.participantStatus).toBe('RESPONDED');
+  });
+
+  it('rolls back the candidate, response, participant and latest result if response invalidation fails', async () => {
+    const created = (
+      await request(app.getHttpServer())
+        .post('/api/v1/rooms')
+        .send(validPayload())
+        .expect(201)
+    ).body;
+    const prefix = `/api/v1/rooms/${created.room.id}`;
+    const token = created.access.hostToken;
+    const candidate = (
+      await request(app.getHttpServer())
+        .post(`${prefix}/candidates`)
+        .auth(token, { type: 'bearer' })
+        .send(validCandidatePayload())
+        .expect(201)
+    ).body.candidate;
+    await request(app.getHttpServer())
+      .put(
+        `${prefix}/participants/${created.hostParticipant.id}/responses/${candidate.id}`
+      )
+      .auth(token, { type: 'bearer' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'AVAILABLE',
+        travelBurden: 'EASY',
+      })
+      .expect(200);
+    const result = completedScoreResult(
+      'score-reconfirmation',
+      created.room.id
+    );
+    database.scoreResults.set(result.id, result);
+    database.rooms.get(created.room.id)!.latestScoreResultId = result.id;
+    database.rooms.get(created.room.id)!.status = RoomStatus.CALCULATED;
+    const before = JSON.stringify([
+      ...database.candidates.values(),
+      ...database.responses.values(),
+      ...database.participants.values(),
+      ...database.rooms.values(),
+      ...database.scoreResults.values(),
+    ]);
+    database.failResponseSave = true;
+    await request(app.getHttpServer())
+      .patch(`${prefix}/candidates/${candidate.id}`)
+      .auth(token, { type: 'bearer' })
+      .set('If-Match-Version', '1')
+      .send({ estimatedCostPerPersonKrw: 22000 })
+      .expect(500);
+    expect(
+      JSON.stringify([
+        ...database.candidates.values(),
+        ...database.responses.values(),
+        ...database.participants.values(),
+        ...database.rooms.values(),
+        ...database.scoreResults.values(),
+      ])
+    ).toBe(before);
   });
 
   it('allows the HOST to create a Candidate and returns it from Room details', async () => {
@@ -541,7 +710,11 @@ describe('Candidate HTTP contract', () => {
         `/api/v1/rooms/${created.body.room.id}/participants/${joined.body.participant.id}/responses/${candidate.body.candidate.id}`
       )
       .set('Authorization', `Bearer ${joined.body.access.participantToken}`)
-      .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'AVAILABLE',
+        travelBurden: 'EASY',
+      })
       .expect(200);
     expect(database.participants.get(joined.body.participant.id)?.status).toBe(
       ParticipantStatus.RESPONDED

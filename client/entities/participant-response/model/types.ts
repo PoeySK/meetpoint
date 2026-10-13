@@ -2,6 +2,7 @@ export type AvailabilityStatus = "AVAILABLE" | "MAYBE" | "UNAVAILABLE";
 export type TravelBurden = "EASY" | "NORMAL" | "HARD";
 
 export type UpsertParticipantResponseInput = {
+  candidateVersion: number;
   availabilityStatus: AvailabilityStatus;
   travelBurden: TravelBurden;
   note?: string | null;
@@ -14,7 +15,7 @@ export type ParticipantResponsePayload = {
   availabilityStatus: AvailabilityStatus;
   travelBurden: TravelBurden;
   note: string | null;
-  status: "SUBMITTED";
+  status: "SUBMITTED" | "RECONFIRM_REQUIRED";
   submittedAt: string;
   updatedAt: string;
 };

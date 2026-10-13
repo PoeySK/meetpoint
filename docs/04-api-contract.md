@@ -489,6 +489,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `409 CANDIDATE_VERSION_CONFLICT`: 요청 헤더의 버전이 현재 Candidate 버전과 다름
 - 성공하면 Candidate `version`이 1 증가하고, 기존 완료 결과는 `STALE`이 된다.
 
+시작·종료의 실제 시각, trim한 장소명·주소, 예상 비용(증가·감소 모두), 정규화한 태그 집합이 달라지면 해당 후보의 `SUBMITTED` 응답만 `RECONFIRM_REQUIRED`로 전환한다. 표시 순서·지역 표시(`place.area`)·같은 순간의 시간대 표기·공백·태그 대소문자/순서/중복 차이는 재확인을 요구하지 않는다. 장소 식별자가 없어 이름·주소의 오탈자와 실제 장소 변경을 구분할 수 없으므로 둘 다 보수적으로 재확인을 요구한다. 기존 의견 값과 과거 ScoreResult·Decision payload는 보존한다.
+
 ### 8. 후보 삭제(보관)
 
 `DELETE /api/v1/rooms/{roomId}/candidates/{candidateId}`
@@ -606,6 +608,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 
 ```json
 {
+  "candidateVersion": 1,
   "availabilityStatus": "AVAILABLE",
   "travelBurden": "EASY",
   "note": "지하철로 이동 가능"
@@ -625,7 +628,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
     "travelBurden": "EASY",
     "note": "지하철로 이동 가능",
     "status": "SUBMITTED",
-    "submittedAt": "2026-08-13T04:18:00Z",
+    "submittedAt": "2026-08-13T04:45:00Z",
     "updatedAt": "2026-08-13T04:45:00Z"
   },
   "participantStatus": "JOINED",
@@ -633,14 +636,17 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 }
 ```
 
-이 예시는 아직 일부 후보에만 응답한 경우라 `participantStatus`가 `JOINED`다. 해당 참여자가 모든 활성 후보에 응답을 저장하면 같은 API는 `RESPONDED`를 반환한다.
+이 예시는 아직 일부 후보에만 응답한 경우라 `participantStatus`가 `JOINED`다. 해당 참여자가 모든 활성 후보에 유효한 `SUBMITTED` 응답을 저장하면 같은 API는 `RESPONDED`를 반환한다.
 
 #### 주요 실패 상태와 유효성 검사
 
 - `401 MISSING_TOKEN`, `INVALID_TOKEN` 또는 `TOKEN_EXPIRED`; 본인 참여자 ID가 아니면 `403 FORBIDDEN`
 - `404 RESOURCE_NOT_FOUND`: 방·참여자·후보 중 하나가 다른 방이거나 없음
+- `409 CANDIDATE_VERSION_CONFLICT`: 필수 `candidateVersion`이 현재 후보 version과 다름. 데이터 변경 없이 거부하며 최신 후보 조회 후 사용자가 명시적으로 재시도한다. 표시 변경도 version은 증가하므로 오래된 저장 요청은 보수적으로 거부한다.
 - `409 ROOM_STATE_CONFLICT`: 후보가 보관되었거나 확정 방에서 재검토 없이 변경
 - `400 VALIDATION_ERROR`: 상태가 세 값 중 하나가 아니거나 `travelBurden`이 `EASY`, `NORMAL`, `HARD` 중 하나가 아님
+- `candidateVersion`은 1 이상의 safe integer이며 누락·잘못된 값은 `400 VALIDATION_ERROR`다. 이전 Client와 호환되지 않으므로 Client/Server를 함께 갱신한다.
+- 중요한 후보 변경 후 조회 `myResponses`는 이전 값을 `RECONFIRM_REQUIRED` 상태로 반환한다. 명시적 재저장만 `SUBMITTED`로 전환하고 `submittedAt`을 현재 저장 시각으로 갱신하며 자동 재제출하지 않는다.
 - `travelBurden`은 모든 활성 후보에 필수다.
 - `note`는 선택 입력이며 0~300자다. Solver는 이 값을 점수·순위·충돌 판정에 사용하지 않는다.
 - 응답 제출에는 개인 조건이 필요하지 않다. 조건을 입력한 참여자가 시간·예산·태그 기준과 다른 후보에 `AVAILABLE` 또는 `MAYBE`를 선택해도 응답을 저장한다. 해당 차이는 계산 결과의 충돌·근거로 표시한다.
@@ -683,7 +689,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 - `422 PARTICIPANT_COUNT_OUT_OF_RANGE`: 활성 참가자가 3~6명이 아님
 - `422 NO_ACTIVE_CANDIDATES`: 활성 후보가 2개 미만이거나 5개 초과
 - 개인 조건은 선택 사항이다. 미입력 참여자의 `condition`은 `null`로 Solver에 전달하며 응답과 후보 정보로 계산한다. 결과의 `explanationFlags`에 `CONDITION_NOT_PROVIDED`를 표시한다.
-- 후보별 응답 누락은 계산을 거부하지 않고 결과의 `coverage`와 `MISSING_RESPONSE`로 표시한다.
+- `RECONFIRM_REQUIRED`는 snapshot에서 제외하고 미응답처럼 처리한다. 후보별 응답 누락은 계산을 거부하지 않고 결과의 `coverage`와 `MISSING_RESPONSE`로 표시한다.
 - `clientRequestId`가 같은 재시도 요청은 동일 계산을 재사용하도록 설계하지만, 이 키의 보존 기간은 미결정이다.
 - 요청 transaction은 `ScoreResult`, Room 상태, `calculation_jobs` outbox row를 함께 `REQUESTED`로 저장한다. Server worker는 PostgreSQL row lock과 lease로 작업을 claim해 `RUNNING`으로 전환한다.
 - worker가 중단되어 lease가 만료된 `RUNNING` 작업은 다음 worker가 다시 claim한다. Solver의 timeout·연결 실패처럼 재시도 가능한 오류는 설정된 최대 시도 횟수까지 `REQUESTED`로 되돌리고, 응답 schema 오류 또는 재시도 한도 초과는 `FAILED`로 확정한다.

@@ -301,13 +301,45 @@ test('생성·참여 → 조건·자동 초안·수동 수정·저장 → 실제
   for (const member of members) await expect(member.getByRole('heading', { name: '방장이 일정을 확정했습니다', exact: true })).toBeVisible();
   await host.getByLabel('다시 검토하는 이유', { exact: true }).fill('E2E 장소를 다시 확인');
   await action(host, host.getByRole('button', { name: '확정 내용 다시 검토하기', exact: true }), 'POST', /\/decision\/reopen$/, 200);
+  const retainedHistory = await world.db.query('SELECT candidates, ranking, metadata FROM score_results WHERE id = $1', [firstCalculation]);
+  const oldCandidate = (await room(host)).candidates.find(candidate => candidate.place.name === 'E2E inside')!;
+  await opinion(members[0], 'E2E inside').getByLabel(/^메모/).fill('후보 변경 중에도 유지할 초안');
   await host.getByText('후보 관리', { exact: true }).click();
   const management = section(host, '모임 후보 관리');
   await management.getByRole('article').filter({ has: host.getByRole('heading', { name: 'E2E inside', exact: true }) }).getByRole('button', { name: '수정', exact: true }).click();
   await management.getByLabel('주소', { exact: true }).fill('서울 중구 테스트길 2');
   await action(host, management.getByRole('button', { name: '수정 내용 저장', exact: true }), 'PATCH', /\/candidates\//, 200);
   await expect(section(host, '모임 추천 결과 확인')).toContainText('이 결과는 최신 내용이 아닙니다.');
-  for (const page of [host, ...members]) expect((await room(page)).myResponses.length).toBe(2);
+  for (const page of [host, ...members]) {
+    await expect(opinion(page, 'E2E inside')).toContainText('후보가 변경되어 의견 재확인이 필요합니다');
+    await expect(opinion(page, 'E2E inside').getByText('의견 저장됨', { exact: true })).toHaveCount(0);
+    await expect(opinion(page, 'E2E outside').getByText('의견 저장됨', { exact: true })).toBeVisible();
+    const current = await room(page);
+    expect(current.myResponses.find(response => response.candidateId === oldCandidate.id)!.status).toBe('RECONFIRM_REQUIRED');
+    expect(current.currentParticipant.status).toBe('JOINED');
+  }
+  await expect(opinion(members[0], 'E2E inside').getByLabel(/^메모/)).toHaveValue('후보 변경 중에도 유지할 초안');
+  world.allowResourceErrors([409]);
+  const staleSaveStatus = await members[0].evaluate(async ({ api, candidateId, version }) => {
+    const roomId = window.location.pathname.split('/').pop()!;
+    const participantId = sessionStorage.getItem(`meetpoint:room-participant:${roomId}`);
+    const response = await fetch(`${api}/api/v1/rooms/${roomId}/participants/${participantId}/responses/${candidateId}`, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${sessionStorage.getItem(`meetpoint:room-token:${roomId}`)}` },
+      body: JSON.stringify({ candidateVersion: version, availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' }),
+    });
+    return response.status;
+  }, { api: process.env.MEETPOINT_E2E_API_URL!, candidateId: oldCandidate.id, version: oldCandidate.version });
+  expect(staleSaveStatus).toBe(409);
+  await action(host, host.getByRole('button', { name: '추천 결과 만들기', exact: true }), 'POST', /\/calculations$/, 202);
+  await expect(result(host, 'E2E inside')).toContainText(/이 후보에 응답한 사람: 0명\s*\/\s*3명/);
+  await expect(host.getByRole('button', { name: '이 후보로 일정 확정', exact: true })).toBeDisabled();
+  for (const page of [host, ...members]) {
+    await action(page, opinion(page, 'E2E inside').getByRole('button', { name: '변경 저장', exact: true }), 'PUT', /\/responses\//, 200);
+    await expect(opinion(page, 'E2E inside').getByText('의견 저장됨', { exact: true })).toBeVisible();
+    expect((await room(page)).currentParticipant.status).toBe('RESPONDED');
+  }
+  const historyAfter = await world.db.query('SELECT candidates, ranking, metadata FROM score_results WHERE id = $1', [firstCalculation]);
+  expect(historyAfter.rows).toEqual(retainedHistory.rows);
   const nextCalculation = await calculate(host);
   expect(nextCalculation).not.toBe(firstCalculation);
   await confirm(host);
@@ -327,7 +359,11 @@ test('모바일 결과 근거·키보드 펼침·후보 선택·polling 초안 �
     return response.status;
   }, { api: process.env.MEETPOINT_E2E_API_URL!, roomId: initial.room.id, candidateId: candidate.id, version: candidate.version });
   expect(patchStatus).toBe(200);
-  for (const page of [host, ...members]) await quickSave(page);
+  await host.reload();
+  for (const page of [host, ...members]) {
+    await expect(opinion(page, 'E2E inside')).toContainText('21,000원');
+    await quickSave(page);
+  }
   await host.setViewportSize({ width: 320, height: 740 });
   const steps = host.getByRole('navigation', { name: '방 진행 단계' });
   await steps.getByRole('button', { name: /결과 확인/ }).click();

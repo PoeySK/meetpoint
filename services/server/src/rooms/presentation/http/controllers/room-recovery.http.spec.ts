@@ -151,6 +151,7 @@ describe('Existing participant recovery HTTP contract', () => {
       .put(responsePath)
       .set('Authorization', `Bearer ${member.body.access.participantToken}`)
       .send({
+        candidateVersion: 1,
         availabilityStatus: 'AVAILABLE',
         travelBurden: 'EASY',
         note: 'Preserved',
@@ -184,7 +185,11 @@ describe('Existing participant recovery HTTP contract', () => {
     await request(context.app.getHttpServer())
       .put(responsePath)
       .set('Authorization', `Bearer ${result.body.access.participantToken}`)
-      .send({ availabilityStatus: 'MAYBE', travelBurden: 'HARD' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'MAYBE',
+        travelBurden: 'HARD',
+      })
       .expect(409);
     await request(context.app.getHttpServer())
       .post(`/api/v1/rooms/${roomId}/candidates`)

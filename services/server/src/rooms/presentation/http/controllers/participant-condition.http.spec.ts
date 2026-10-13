@@ -143,7 +143,11 @@ describe('Participant condition HTTP contract', () => {
         `/api/v1/rooms/${created.body.room.id}/participants/${member.body.participant.id}/responses/${candidate.body.candidate.id}`
       )
       .set('Authorization', `Bearer ${member.body.access.participantToken}`)
-      .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'AVAILABLE',
+        travelBurden: 'EASY',
+      })
       .expect(200);
 
     expect(response.body.participantStatus).toBe(ParticipantStatus.RESPONDED);
@@ -183,7 +187,11 @@ describe('Participant condition HTTP contract', () => {
         `/api/v1/rooms/${created.body.room.id}/participants/${member.body.participant.id}/responses/${candidate.body.candidate.id}`
       )
       .set('Authorization', `Bearer ${member.body.access.participantToken}`)
-      .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'AVAILABLE',
+        travelBurden: 'EASY',
+      })
       .expect(200);
 
     expect(resubmitted.body.participantStatus).toBe(
@@ -210,7 +218,11 @@ describe('Participant condition HTTP contract', () => {
         `/api/v1/rooms/${created.body.room.id}/participants/${member.body.participant.id}/responses/${candidate.body.candidate.id}`
       )
       .set('Authorization', `Bearer ${member.body.access.participantToken}`)
-      .send({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' })
+      .send({
+        candidateVersion: 1,
+        availabilityStatus: 'AVAILABLE',
+        travelBurden: 'EASY',
+      })
       .expect(200);
 
     expect(outsideWindow.body.response.availabilityStatus).toBe('AVAILABLE');
