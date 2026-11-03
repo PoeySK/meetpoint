@@ -14,6 +14,13 @@ vm.runInNewContext(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
 }).outputText, { module: compiled, exports: compiled.exports, require }, { filename });
 const { CompletedResult, CalculationStatus, groupCandidateIssues } = compiled.exports;
 
+const decisionModule = { exports: {} };
+const decisionFilename = path.resolve(__dirname, '../features/decision-confirmation/ui/decision-confirmation-panel.tsx');
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(decisionFilename, 'utf8'), {
+  compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+}).outputText, { module: decisionModule, exports: decisionModule.exports, require }, { filename: decisionFilename });
+const { DecisionConfirmationPanel } = decisionModule.exports;
+
 function fixture() {
   const participant = (id) => ({
     participantId: id, score: 99, components: { time: 30, travelBurden: 35, budget: 19, preference: 15 },
@@ -83,4 +90,35 @@ test('same place candidates show distinct time, timezone and cost; MEMBER cannot
   props.calculation.status = 'STALE';
   assert.equal(CompletedResult(props), null);
   assert.match(renderToStaticMarkup(CalculationStatus(props)), /최신 내용이 아닙니다/);
+});
+
+test('confirmed summary shows the decision candidate schedule, address and cost to HOST and MEMBER across midnight', () => {
+  const decision = {
+    status: 'CONFIRMED', overallScore: 91.7, decisionNote: '확정 메모 유지',
+    candidate: {
+      place: { name: '확정 장소', address: '서울 중구 확정길 28' },
+      time: { startsAt: '2026-11-03T14:30:00Z', endsAt: '2026-11-03T16:30:00Z', timezone: 'Asia/Seoul' },
+      estimatedCostPerPersonKrw: 28000,
+    },
+  };
+  for (const isHost of [true, false]) {
+    const html = renderToStaticMarkup(DecisionConfirmationPanel({ decision, isHost, roomStatus: 'CONFIRMED' }));
+    for (const text of ['방장이 일정을 확정했습니다', '확정 장소', '서울 중구 확정길 28', '시작: 2026. 11. 3. 오후 11:30', '종료: 2026. 11. 4. 오전 1:30', 'Asia/Seoul', '1인 예상 비용', '28,000원', '91.7점', '확정 메모 유지']) assert.ok(html.includes(text), text);
+    assert.ok(html.includes('dateTime="2026-11-03T14:30:00Z"'));
+    assert.equal(html.includes('확정 내용 다시 검토하기'), isHost);
+  }
+});
+
+test('reopened summary uses the candidate timezone and preserves zero cost and review reason', () => {
+  const decision = {
+    status: 'REOPENED', overallScore: 85, decisionNote: null, reopenReason: '시간 재검토',
+    candidate: {
+      place: { name: '다시 검토할 장소', address: '검토할 주소' },
+      time: { startsAt: '2026-11-03T04:30:00Z', endsAt: '2026-11-03T06:30:00Z', timezone: 'America/New_York' },
+      estimatedCostPerPersonKrw: 0,
+    },
+  };
+  const html = renderToStaticMarkup(DecisionConfirmationPanel({ decision, isHost: false, roomStatus: 'OPEN' }));
+  for (const text of ['확정 내용을 다시 검토하는 중입니다', '검토할 주소', '시작: 2026. 11. 2. 오후 11:30', '종료: 2026. 11. 3. 오전 1:30', 'America/New_York', '0원', '시간 재검토', '기록 없음']) assert.ok(html.includes(text), text);
+  assert.ok(!html.includes('이 후보로 일정 확정'));
 });
