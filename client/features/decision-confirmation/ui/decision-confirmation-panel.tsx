@@ -70,11 +70,38 @@ export function DecisionConfirmationPanel({
               {decision.status === "CONFIRMED" ? "일정 확정" : "재검토 중"}
             </span>
           </div>
-          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <div className="mt-4 grid gap-3 [overflow-wrap:anywhere] sm:grid-cols-3">
             <div className="rounded-xl bg-white/80 p-3">
               <p className="text-xs text-slate-500">선택한 후보</p>
               <p className="mt-1 font-semibold text-slate-950">
                 {decision.candidate.place.name}
+              </p>
+              <p className="mt-1 text-sm leading-5 text-slate-600">
+                {decision.candidate.place.address}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white/80 p-3 sm:col-span-2">
+              <p className="text-xs text-slate-500">모임 일시</p>
+              <p className="mt-1 text-sm leading-6 text-slate-950">
+                <time className="block" dateTime={decision.candidate.time.startsAt}>
+                  시작: {new Date(decision.candidate.time.startsAt).toLocaleString("ko-KR", {
+                    dateStyle: "medium", timeStyle: "short", timeZone: decision.candidate.time.timezone,
+                  })}
+                </time>
+                <time className="block" dateTime={decision.candidate.time.endsAt}>
+                  종료: {new Date(decision.candidate.time.endsAt).toLocaleString("ko-KR", {
+                    dateStyle: "medium", timeStyle: "short", timeZone: decision.candidate.time.timezone,
+                  })}
+                </time>
+              </p>
+              <p className="mt-1 text-xs text-slate-500">
+                {decision.candidate.time.timezone}
+              </p>
+            </div>
+            <div className="rounded-xl bg-white/80 p-3">
+              <p className="text-xs text-slate-500">1인 예상 비용</p>
+              <p className="mt-1 font-semibold text-slate-950">
+                {decision.candidate.estimatedCostPerPersonKrw.toLocaleString("ko-KR")}원
               </p>
             </div>
             <div className="rounded-xl bg-white/80 p-3">
