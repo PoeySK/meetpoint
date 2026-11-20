@@ -2,7 +2,6 @@
 
 import type { FormEvent } from "react";
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRoom } from "@/entities/room";
 import { RoomApiError } from "@/shared/api/http-client";
@@ -103,15 +102,8 @@ export function CreateRoomForm() {
   }
 
   return (
-    <section className="mp-card mp-card-raised p-4 sm:p-6">
-      <div className="mb-5 space-y-1.5">
-        <p className="text-sm font-semibold text-emerald-700">새 방</p>
-        <h2 className="text-xl font-semibold tracking-tight">모임 정보 입력</h2>
-        <p className="text-sm leading-6 text-slate-500">
-          방을 만든 사람이 방장이 되어 후보와 참여자를 관리합니다.
-        </p>
-      </div>
-
+    <section className="mp-card p-4 sm:p-6">
+      <h2 className="mb-4 text-lg font-bold">새 모임</h2>
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div className="space-y-2">
           <label className="text-sm font-semibold text-slate-800" htmlFor="title">
@@ -125,6 +117,7 @@ export function CreateRoomForm() {
             maxLength={80}
             onChange={(event) => setTitle(event.target.value)}
             placeholder="예: 우리 동네 저녁 모임"
+            required
             value={title}
           />
           {fieldErrors.title && (
@@ -133,10 +126,6 @@ export function CreateRoomForm() {
             </p>
           )}
         </div>
-
-        <p className="rounded-xl bg-emerald-50 px-3 py-2.5 text-xs leading-5 text-emerald-800">
-          모임 시간은 한국 시간 기준으로 입력하고 표시합니다.
-        </p>
 
         <div className="space-y-2">
           <label
@@ -156,6 +145,7 @@ export function CreateRoomForm() {
             maxLength={30}
             onChange={(event) => setDisplayName(event.target.value)}
             placeholder="예: 민수"
+            required
             value={displayName}
           />
           {fieldErrors.displayName && (
@@ -181,18 +171,6 @@ export function CreateRoomForm() {
         >
           {isSubmitting ? "방을 만드는 중..." : "방 만들기"}
         </button>
-        <p className="text-center text-xs leading-5 text-slate-400">
-          방장 입장 정보는 이 브라우저에만 저장됩니다.
-        </p>
-        <p className="text-center text-sm text-slate-500">
-          초대받은 분이라면?{" "}
-          <Link
-            className="font-semibold text-emerald-700 hover:text-emerald-800"
-            href="/join"
-          >
-            방 코드로 입장하기
-          </Link>
-        </p>
       </form>
     </section>
   );

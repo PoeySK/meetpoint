@@ -5,7 +5,7 @@ export function LoadingView() {
   return (
     <div className='flex min-h-[48vh] items-center justify-center'>
       <div className='mp-card px-5 py-4 text-center'>
-        <div className='mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-4 border-slate-200 border-t-emerald-600' />
+        <div className='mx-auto mb-3 h-7 w-7 animate-spin rounded-full border-4 border-slate-200 border-t-slate-600' />
         <p className='text-sm font-medium text-slate-600'>
           방을 준비하는 중...
         </p>
@@ -25,7 +25,7 @@ export function ErrorView({
     <div className='mx-auto flex min-h-[48vh] w-full max-w-lg items-center justify-center'>
       <section
         aria-live='polite'
-        className='mp-card mp-card-raised w-full border-rose-100 p-5 text-center sm:p-7'
+        className='mp-card w-full border-rose-100 p-5 text-center sm:p-7'
       >
         <div className='mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-lg text-rose-600'>
           !

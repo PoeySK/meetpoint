@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f8f6;
-  --foreground: #0f172a;
+  --background: #f6f6f5;
+  --foreground: #202225;
 }
 
 @theme inline {
@@ -36,34 +36,27 @@ textarea {
 }
 
 ::selection {
-  background: #a7f3d0;
-  color: #064e3b;
+  background: #e2e3e5;
+  color: #202225;
 }
 
 @layer components {
   .mp-page {
     min-height: 100vh;
-    background:
-      radial-gradient(circle at 12% 0%, rgb(209 250 229 / 0.55), transparent 28rem),
-      linear-gradient(145deg, #f8faf8 0%, #f3f6f4 100%);
+    background: var(--background);
   }
 
   .mp-card {
-    border: 1px solid rgb(226 232 240 / 0.9);
-    border-radius: 1.25rem;
-    background: rgb(255 255 255 / 0.92);
-    box-shadow: 0 12px 32px -26px rgb(15 23 42 / 0.35);
-  }
-
-  .mp-card-raised {
-    box-shadow: 0 20px 48px -34px rgb(15 23 42 / 0.42);
+    border: 1px solid #e0e1e3;
+    border-radius: 1rem;
+    background: #fff;
   }
 
   .mp-input {
     width: 100%;
-    border: 1px solid #cbd5e1;
+    border: 1px solid #c9cace;
     border-radius: 0.75rem;
-    background: rgb(255 255 255 / 0.95);
+    background: #fff;
     padding: 0.65rem 0.8rem;
     font-size: 0.9375rem;
     line-height: 1.25rem;
@@ -72,12 +65,12 @@ textarea {
   }
 
   .mp-input::placeholder {
-    color: #94a3b8;
+    color: #666a72;
   }
 
   .mp-input:focus {
-    border-color: #10b981;
-    box-shadow: 0 0 0 3px rgb(167 243 208 / 0.55);
+    border-color: #515661;
+    box-shadow: 0 0 0 2px #e2e3e5;
   }
 
   .mp-button {
@@ -101,31 +94,32 @@ textarea {
 
   .mp-button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgb(167 243 208 / 0.7);
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #515661;
   }
 
   .mp-button-primary {
-    background: #0f172a;
+    background: #272a30;
     color: white;
   }
 
   .mp-button-primary:hover:not(:disabled) {
-    background: #047857;
+    background: #41454d;
   }
 
   .mp-button-primary:disabled {
     cursor: not-allowed;
-    background: #cbd5e1;
+    background: #d7d8db;
+    color: #30333a;
   }
 
   .mp-button-secondary {
-    border: 1px solid #cbd5e1;
-    background: rgb(255 255 255 / 0.8);
-    color: #475569;
+    border: 1px solid #c9cace;
+    background: #fff;
+    color: #30333a;
   }
 
   .mp-button-secondary:hover:not(:disabled) {
-    border-color: #10b981;
-    color: #047857;
+    border-color: #696d76;
+    background: #f6f6f5;
   }
 }

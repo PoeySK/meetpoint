@@ -199,7 +199,7 @@ export function CandidateDatePicker({
         className={`mp-input flex items-center justify-between text-left ${
           error
             ? "border-rose-400"
-            : "border-slate-300 focus:border-emerald-500"
+            : "border-slate-300 focus:border-slate-600"
         }`}
         onClick={() => (isOpen ? setIsOpen(false) : openCalendar())}
         disabled={disabled}
@@ -223,7 +223,7 @@ export function CandidateDatePicker({
           <div className="mb-3 flex items-center justify-between">
             <button
               aria-label="이전 달"
-              className="rounded-lg px-2 py-1.5 text-base text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="rounded-lg px-2 py-1.5 text-base text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-200"
               onClick={() => moveMonth(-1)}
               type="button"
             >
@@ -234,7 +234,7 @@ export function CandidateDatePicker({
             </p>
             <button
               aria-label="다음 달"
-              className="rounded-lg px-2 py-1.5 text-base text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="rounded-lg px-2 py-1.5 text-base text-slate-600 hover:bg-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-200"
               onClick={() => moveMonth(1)}
               type="button"
             >
@@ -264,10 +264,10 @@ export function CandidateDatePicker({
                 <button
                   aria-label={`${visibleMonth.year}년 ${visibleMonth.month}월 ${day}일`}
                   aria-pressed={isSelected}
-                  className={`rounded-lg px-1 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-emerald-200 ${
+                  className={`rounded-lg px-1 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-slate-200 ${
                     isSelected
-                      ? "bg-emerald-600 font-semibold text-white"
-                      : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-700"
+                      ? "bg-slate-200 font-semibold text-white"
+                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-700"
                   }`}
                   key={dayValue}
                   onClick={() => {

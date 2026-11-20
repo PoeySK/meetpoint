@@ -96,6 +96,7 @@ test('429 안내·조건과 의견 초안 유지·인증 복구 미실행·계�
   const card = opinion(host, 'E2E inside');
   await card.getByRole('button', { name: '가능', exact: true }).click();
   await card.getByRole('button', { name: '편함', exact: true }).click();
+  await openDisclosure(card, /메모 (추가|보기)/);
   await card.getByLabel(/^메모/).fill('429 뒤에도 보존할 초안');
   const save = card.getByRole('button', { name: /^(의견 저장|변경 저장)$/ });
   await action(host, save, 'PUT', /\/responses\//, 429);
@@ -134,6 +135,10 @@ test('429 안내·조건과 의견 초안 유지·인증 복구 미실행·계�
 function section(page: Page, heading: string) {
   return page.locator('section').filter({ has: page.getByRole('heading', { name: heading, exact: true }) }).last();
 }
+async function openDisclosure(scope: Page | Locator, title: string | RegExp) {
+  const summary = scope.locator('summary').filter({ hasText: title });
+  if (!(await summary.evaluate(node => node.closest('details')?.open))) await summary.click();
+}
 function opinion(page: Page, name: string) {
   return section(page, '후보별 의견').getByRole('article').filter({ has: page.getByRole('heading', { name, exact: true }) });
 }
@@ -155,19 +160,24 @@ async function action(page: Page, locator: Locator, method: string, endpoint: Re
   await locator.click();
   expect((await response).status(), 'Action response status').toBe(status);
 }
-async function addCandidate(page: Page, name: string, second: boolean) {
+async function addCandidate(page: Page, name: string, second: boolean, withDetails = true) {
   const management = section(page, '모임 후보 관리');
+  await openDisclosure(management, '날짜·시간 빠른 선택');
   await management.getByRole('button', { name: '내일', exact: true }).click();
   await management.getByRole('button', { name: second ? '저녁 18:00~20:00' : '점심 12:00~14:00', exact: true }).click();
   await management.getByLabel('장소명', { exact: true }).fill(name);
-  await management.getByLabel('지역', { exact: true }).fill('중구');
   await management.getByLabel('주소', { exact: true }).fill('서울 중구 테스트길 1');
   await management.getByLabel('1인 예상 비용 (원)', { exact: true }).fill(second ? '40000' : '10000');
-  await management.getByLabel('특징', { exact: true }).fill(second ? '야외' : '실내, 카페');
+  if (withDetails) {
+    await openDisclosure(management, '지역·장소 특징 (선택)');
+    await management.getByLabel('지역', { exact: true }).fill('중구');
+    await management.getByLabel('특징', { exact: true }).fill(second ? '야외' : '실내, 카페');
+  }
   await action(page, management.getByRole('button', { name: '후보 등록', exact: true }), 'POST', /\/candidates$/, 201);
-  await expect(opinion(page, name)).toBeVisible();
+  await expect(management.getByRole('heading', { name, exact: true })).toBeVisible();
 }
 async function saveCondition(page: Page) {
+  await openDisclosure(page, /^선택 조건 (추가|보기)$/);
   const current = await room(page);
   const date = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(new Date(current.candidates[0].time.startsAt));
   const condition = section(page, '원하는 조건을 알려주세요');
@@ -180,6 +190,7 @@ async function saveCondition(page: Page) {
   await condition.getByLabel('있으면 좋은 특징', { exact: true }).fill('카페');
   await condition.getByLabel('피하고 싶은 특징', { exact: true }).fill('야외');
   await action(page, condition.getByRole('button', { name: '선택 조건 저장', exact: true }), 'PUT', /\/conditions$/, 200);
+  await openDisclosure(section(page, '후보별 의견'), '빠른 입력 도구');
   await expect(section(page, '후보별 의견').getByRole('button', { name: '내 기준으로 의견 채우기', exact: true })).toBeEnabled();
   const saved = (await room(page)).myCondition!;
   expect(saved.maxBudgetKrw).toBe(20000);
@@ -187,11 +198,12 @@ async function saveCondition(page: Page) {
   expect(saved.availabilityWindows).toEqual([{ startsAt: current.candidates[0].time.startsAt, endsAt: current.candidates[0].time.endsAt }]);
 }
 async function quickSave(page: Page) {
+  await openDisclosure(section(page, '후보별 의견'), '빠른 입력 도구');
   const quick = page.getByRole('region', { name: '한 번에 의견 입력', exact: true });
   await quick.getByRole('button', { name: '가능', exact: true }).click();
   await quick.getByRole('button', { name: '편함', exact: true }).click();
   await quick.getByRole('button', { name: '이 선택을 모든 후보에 저장', exact: true }).click();
-  await expect(quick.getByText('후보 2개의 의견을 모두 저장했습니다.', { exact: true })).toBeVisible();
+  await expect(section(page, '후보별 의견').getByText('후보 2개의 의견을 저장했습니다.', { exact: true })).toBeVisible();
   await expect.poll(async () => (await room(page)).myResponses.length).toBe(2);
 }
 async function setup(world: World, hostName = 'E2E host') {
@@ -224,7 +236,7 @@ async function setup(world: World, hostName = 'E2E host') {
   await addCandidate(host, 'E2E outside', true);
   for (const page of [host, ...members]) {
     await expect(opinion(page, 'E2E outside')).toBeVisible();
-    await expect(opinion(page, 'E2E inside').getByRole('button', { name: '보류', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await expect(opinion(page, 'E2E inside').locator('button[aria-pressed="true"]')).toHaveCount(0);
   }
   await saveCondition(host);
   for (const member of members) await saveCondition(member);
@@ -252,6 +264,91 @@ async function confirm(page: Page, name = 'E2E outside') {
   expect((await room(page)).room.status).toBe('CONFIRMED');
 }
 
+test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 도구를 제공한다', async ({ world }) => {
+  const host = await world.page();
+  await host.setViewportSize({ width: 390, height: 844 });
+  await host.goto('/');
+  await expect(host.locator('input[required]:visible')).toHaveCount(2);
+  await expect(host.getByRole('link', { name: '방 코드로 입장하기' })).toBeInViewport({ ratio: 1 });
+  await host.getByLabel('모임 제목', { exact: true }).fill(`browser-e2e-${Date.now()}`);
+  await host.getByLabel('방장 이름', { exact: true }).fill('방장');
+  await host.getByRole('button', { name: '방 만들기', exact: true }).click();
+  await expect(host).toHaveURL(/\/rooms\/[0-9a-f-]+$/);
+
+  const register = host.getByRole('button', { name: '후보 등록하기', exact: true });
+  await expect(register).toBeInViewport({ ratio: 1 });
+  const initialRoom = await room(host);
+  world.track(initialRoom.room.id);
+  const recoveryToggle = host.locator('summary').filter({ hasText: '방 접근 및 복구' });
+  const recoveryFile = host.getByRole('button', { name: '개인 복구 파일 보관', exact: true });
+  await expect(recoveryFile).toBeHidden();
+  await recoveryToggle.click();
+  await expect(recoveryFile).toBeVisible();
+  await recoveryToggle.press('Enter');
+  await expect(recoveryFile).toBeHidden();
+  await register.click();
+  await expect(host.locator('#room-candidates')).toBeFocused();
+  await expect(section(host, '모임 후보 관리')).toBeInViewport();
+
+  const member = await world.page();
+  await member.setViewportSize({ width: 390, height: 844 });
+  await member.goto(`/join/${initialRoom.room.roomCode}`);
+  await expect(member.locator('input[required]:visible')).toHaveCount(1);
+  await member.getByLabel('이름', { exact: true }).fill('참가자');
+  await member.getByRole('button', { name: '방에 입장하기', exact: true }).click();
+  await expect(member.getByRole('heading', { name: '방장이 후보를 준비하고 있어요', exact: true })).toBeInViewport({ ratio: 1 });
+  await expect(member.getByRole('button', { name: '후보 등록하기', exact: true })).toHaveCount(0);
+  await host.bringToFront();
+  await expect(host.getByLabel('지역', { exact: true })).toBeHidden();
+  await expect(host.getByRole('button', { name: '내일', exact: true })).toBeHidden();
+  await addCandidate(host, '첫 번째 후보', false, false);
+  expect((await room(host)).candidates[0].place.area).toBe('서울 중구 테스트길 1');
+  await expect(host.getByRole('heading', { name: '후보를 하나 더 등록해 주세요', exact: true })).toBeVisible();
+  const management = section(host, '모임 후보 관리');
+  await management.getByRole('button', { name: '다른 시간 추가', exact: true }).click();
+  await expect(management.getByLabel('장소명', { exact: true })).toHaveValue('첫 번째 후보');
+  await expect(management.getByLabel('주소', { exact: true })).toHaveValue('서울 중구 테스트길 1');
+  await expect(management.getByLabel('시작 시간', { exact: true })).toHaveValue('');
+  await openDisclosure(management, '날짜·시간 빠른 선택');
+  await management.getByRole('button', { name: '저녁 18:00~20:00', exact: true }).click();
+  await action(host, management.getByRole('button', { name: '후보 등록', exact: true }), 'POST', /\/candidates$/, 201);
+  await member.bringToFront();
+  const respond = member.getByRole('button', { name: '내 의견 남기기', exact: true });
+  await expect(respond).toBeInViewport({ ratio: 1 });
+  await respond.click();
+  await expect(member.locator('#room-responses')).toBeFocused();
+  await expect(member.getByRole('heading', { name: '후보별 의견', exact: true })).toBeInViewport();
+  const memberOpinions = section(member, '후보별 의견');
+  const cards = memberOpinions.getByRole('article');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first().locator('button[aria-pressed="true"]')).toHaveCount(0);
+  await expect(cards.first().getByLabel('메모 (선택)')).toBeHidden();
+  await expect(memberOpinions.getByRole('region', { name: '한 번에 의견 입력' })).toBeHidden();
+  await cards.first().getByRole('button', { name: '가능', exact: true }).click();
+  await cards.first().getByRole('button', { name: '편함', exact: true }).click();
+  await cards.last().getByRole('button', { name: '보류', exact: true }).click();
+  await cards.last().getByRole('button', { name: '부담됨', exact: true }).click();
+  expect((await room(member)).myResponses.length).toBe(0);
+  await memberOpinions.getByRole('button', { name: '작성한 의견 저장 (2개)', exact: true }).click();
+  await expect(member.getByRole('heading', { name: '의견을 모두 남겼어요', exact: true })).toBeVisible();
+  const savedStatuses = (await room(member)).myResponses.map(response => response.availabilityStatus);
+  expect(savedStatuses.sort()).toEqual(['AVAILABLE', 'MAYBE']);
+
+  await host.bringToFront();
+  await host.getByRole('button', { name: '내 의견 남기기', exact: true }).click();
+  await expect(host.locator('#room-responses')).toBeFocused();
+  await quickSave(host);
+  await expect(host.getByRole('heading', { name: '참여자를 더 초대해 주세요', exact: true })).toBeVisible();
+  await host.getByRole('button', { name: '참여자 보기', exact: true }).click();
+  await expect(host.getByRole('region', { name: '함께하는 사람', exact: true })).toBeInViewport();
+
+  await member.goto(`/join/${initialRoom.room.roomCode}`);
+  await expect(member.getByRole('link', { name: '기존 참여 이어가기', exact: true })).toBeVisible();
+  await expect(member.getByLabel('이름', { exact: true })).toBeHidden();
+  await member.getByRole('button', { name: '새 참여자로 입장', exact: true }).click();
+  await expect(member.getByLabel('이름', { exact: true })).toBeVisible();
+});
+
 test('생성·참여 → 조건·자동 초안·수동 수정·저장 → 실제 계산·확정 → 재검토·재계산', async ({ world }) => {
   const { host, members } = await setup(world);
   const responsePanel = section(host, '후보별 의견');
@@ -274,10 +371,11 @@ test('생성·참여 → 조건·자동 초안·수동 수정·저장 → 실제
   await expect(opinion(host, 'E2E outside').getByRole('button', { name: '불가', exact: true })).toHaveAttribute('aria-pressed', 'true');
   await expect(opinion(host, 'E2E outside')).toContainText('피하고 싶은 특징이 포함되어 있습니다: 야외');
   await opinion(host, 'E2E inside').getByRole('button', { name: '변경 저장', exact: true }).click();
-  await expect(opinion(host, 'E2E inside')).toContainText('이동 부담을 선택해야 합니다.');
+  await expect(opinion(host, 'E2E inside')).toContainText('이동 부담을 선택해 주세요.');
   expect(writes).toBe(0);
   for (const name of ['E2E inside', 'E2E outside']) {
     await opinion(host, name).getByRole('button', { name: '편함', exact: true }).click();
+    await openDisclosure(opinion(host, name), /메모 (추가|보기)/);
     await opinion(host, name).getByLabel(/^메모/).fill(`E2E saved ${name}`);
     await action(host, opinion(host, name).getByRole('button', { name: '변경 저장', exact: true }), 'PUT', /\/responses\//, 200);
     await expect(opinion(host, name).getByText('의견 저장됨', { exact: true })).toBeVisible();
@@ -303,14 +401,20 @@ test('생성·참여 → 조건·자동 초안·수동 수정·저장 → 실제
   await action(host, host.getByRole('button', { name: '확정 내용 다시 검토하기', exact: true }), 'POST', /\/decision\/reopen$/, 200);
   const retainedHistory = await world.db.query('SELECT candidates, ranking, metadata FROM score_results WHERE id = $1', [firstCalculation]);
   const oldCandidate = (await room(host)).candidates.find(candidate => candidate.place.name === 'E2E inside')!;
+  await openDisclosure(opinion(members[0], 'E2E inside'), /메모 (추가|보기)/);
   await opinion(members[0], 'E2E inside').getByLabel(/^메모/).fill('후보 변경 중에도 유지할 초안');
   await host.getByText('후보 관리', { exact: true }).click();
   const management = section(host, '모임 후보 관리');
   await management.getByRole('article').filter({ has: host.getByRole('heading', { name: 'E2E inside', exact: true }) }).getByRole('button', { name: '수정', exact: true }).click();
-  await management.getByLabel('주소', { exact: true }).fill('서울 중구 테스트길 2');
+  const editAddress = management.getByLabel('주소', { exact: true });
+  await expect(editAddress).toHaveValue(oldCandidate.place.address);
+  await editAddress.fill('서울 중구 테스트길 2');
   await action(host, management.getByRole('button', { name: '수정 내용 저장', exact: true }), 'PATCH', /\/candidates\//, 200);
+  const updatedCandidate = (await room(host)).candidates.find(candidate => candidate.id === oldCandidate.id)!;
+  expect(updatedCandidate.place.address).toBe('서울 중구 테스트길 2');
   await expect(section(host, '모임 추천 결과 확인')).toContainText('이 결과는 최신 내용이 아닙니다.');
   for (const page of [host, ...members]) {
+    await page.bringToFront();
     await expect(opinion(page, 'E2E inside')).toContainText('후보가 변경되어 의견 재확인이 필요합니다');
     await expect(opinion(page, 'E2E inside').getByText('의견 저장됨', { exact: true })).toHaveCount(0);
     await expect(opinion(page, 'E2E outside').getByText('의견 저장됨', { exact: true })).toBeVisible();
@@ -412,8 +516,19 @@ test('모바일 결과 근거·키보드 펼침·후보 선택·polling 초안 �
   for (const name of ['추천 결과 만들기', '이 후보 선택', '이 후보로 일정 확정']) await expect(member.getByRole('button', { name, exact: true })).toHaveCount(0);
   await action(host, confirmButton, 'POST', /\/decision$/, 201);
   await expect(host.getByRole('heading', { name: '방장이 일정을 확정했습니다', exact: true })).toBeVisible();
+  await member.bringToFront();
   await expect(member.getByRole('heading', { name: '방장이 일정을 확정했습니다', exact: true })).toBeVisible();
   expect((await room(host)).room.status).toBe('CONFIRMED');
+  for (const page of [host, member]) {
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.reload();
+    const schedule = page.getByRole('region', { name: '방장이 일정을 확정했습니다', exact: true });
+    await expect(schedule).toBeInViewport({ ratio: 1 });
+    await expect(schedule.getByText('E2E inside', { exact: true })).toBeVisible();
+    await expect(schedule).toContainText('서울 중구 테스트길 1');
+    await expect(schedule.locator('time')).toHaveCount(2);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  }
 });
 
 async function digest(db: Database, roomId: string) {
@@ -430,6 +545,7 @@ async function digest(db: Database, roomId: string) {
   return createHash('sha256').update(JSON.stringify(data)).digest('hex');
 }
 async function recoveryCode(page: Page) {
+  await page.locator('summary').filter({ hasText: '방 접근 및 복구' }).click();
   const pending = page.waitForEvent('download');
   await page.getByRole('button', { name: '개인 복구 파일 보관', exact: true }).click();
   const download = await pending;

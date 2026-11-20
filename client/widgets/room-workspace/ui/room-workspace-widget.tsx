@@ -1,15 +1,22 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { CandidateManagementPanel } from "@/features/candidate-management";
 import { CalculationResultPanel } from "@/features/calculation";
 import { ParticipantResponsePanel } from "@/features/participant-response";
 import { ParticipantConditionPanel } from "@/features/participant-condition";
 import type { CalculationPayload } from "@/entities/calculation";
 import type { DecisionPayload } from "@/entities/decision";
-import type { RoomDetailsResponse } from "@/entities/room";
+import type { RoomDetailsResponse, RoomStatus } from "@/entities/room";
 
 type WorkspaceStep = "candidates" | "condition" | "responses" | "result";
+type WorkspaceTarget = WorkspaceStep | "participants";
+
+type NextAction = {
+  title: string;
+  message: string;
+  link?: { label: string; target: WorkspaceTarget };
+};
 
 type RoomWorkspaceWidgetProps = {
   roomId: string;
@@ -20,6 +27,7 @@ type RoomWorkspaceWidgetProps = {
   onRoomRefresh: () => Promise<void>;
   latestScoreResult: CalculationPayload | null;
   decision: DecisionPayload | null;
+  roomTools: ReactNode;
 };
 
 const stepLabels: Record<WorkspaceStep, string> = {
@@ -49,17 +57,83 @@ function getSectionClassName(
   return `${isActiveOnMobile ? "block" : "hidden"} lg:block ${desktopPlacement}`;
 }
 
-function getStatusLabel(status: RoomDetailsResponse["room"]["status"]) {
-  const labels = {
-    DRAFT: "준비 중",
-    OPEN: "의견 받는 중",
-    CALCULATING: "추천 결과 준비 중",
-    CALCULATED: "추천 결과 확인",
-    CONFIRMED: "일정 확정",
-    CLOSED: "종료됨",
-  } as const;
+function getNextAction({ status, isHost, candidateCount, responseCount, participantCount, respondedCount }: {
+  status: RoomStatus;
+  isHost: boolean;
+  candidateCount: number;
+  responseCount: number;
+  participantCount: number;
+  respondedCount: number;
+}): NextAction | null {
+  if (status === "CONFIRMED" || status === "CLOSED") return null;
 
-  return labels[status];
+  if (status === "CALCULATING") {
+    return {
+      title: "추천 결과를 준비하고 있어요",
+      message: "결과가 준비되면 이 방에서 확인할 수 있어요.",
+      link: { label: "진행 상황 보기", target: "result" },
+    };
+  }
+
+  if (isHost && status === "CALCULATED") {
+    return {
+      title: "추천 결과를 확인해 주세요",
+      message: "후보별 의견과 확인할 점을 살펴보고 일정을 정할 수 있어요.",
+      link: { label: "결과로 이동", target: "result" },
+    };
+  }
+
+  if (isHost && candidateCount < 2) {
+    return {
+      title: candidateCount === 0 ? "첫 후보를 등록해 주세요" : "후보를 하나 더 등록해 주세요",
+      message: "시간과 장소를 정해 후보를 두 개 이상 준비해 주세요.",
+      link: { label: "후보 등록하기", target: "candidates" },
+    };
+  }
+
+  if (candidateCount === 0) {
+    return {
+      title: "방장이 후보를 준비하고 있어요",
+      message: "후보가 등록되면 여기에서 의견을 남길 수 있어요.",
+    };
+  }
+
+  if (responseCount < candidateCount) {
+    return {
+      title: "후보에 의견을 남겨 주세요",
+      message: `내 의견 ${responseCount}/${candidateCount}개 완료 · 참석 가능 여부와 이동 부담을 알려 주세요.`,
+      link: { label: "내 의견 남기기", target: "responses" },
+    };
+  }
+
+  if (!isHost) {
+    return status === "CALCULATED"
+      ? {
+          title: "추천 결과가 나왔어요",
+          message: "후보별 추천 근거를 볼 수 있어요. 최종 일정은 방장이 정해요.",
+          link: { label: "결과로 이동", target: "result" },
+        }
+      : {
+          title: "의견을 모두 남겼어요",
+          message: "방장이 추천 결과를 만들면 이 방에서 확인할 수 있어요.",
+        };
+  }
+
+  if (participantCount < 3 || respondedCount < participantCount) {
+    return {
+      title: participantCount < 3 ? "참여자를 더 초대해 주세요" : "참여자 의견을 확인해 주세요",
+      message: participantCount < 3
+        ? "추천 결과를 만들려면 방장을 포함해 3명이 필요해요. 위의 초대 링크를 보내 주세요."
+        : `${respondedCount}/${participantCount}명이 의견을 모두 남겼어요.`,
+      link: { label: "참여자 보기", target: "participants" },
+    };
+  }
+
+  return {
+    title: "추천 결과를 만들 수 있어요",
+    message: `${respondedCount}명이 모든 후보에 의견을 남겼어요.`,
+    link: { label: "추천 단계로 이동", target: "result" },
+  };
 }
 
 export function RoomWorkspaceWidget({
@@ -71,6 +145,7 @@ export function RoomWorkspaceWidget({
   onRoomRefresh,
   latestScoreResult,
   decision,
+  roomTools,
 }: RoomWorkspaceWidgetProps) {
   const isHost = participantId === room.room.hostParticipantId;
   const [mobileStep, setMobileStep] = useState<WorkspaceStep>(() =>
@@ -79,31 +154,24 @@ export function RoomWorkspaceWidget({
   const [isCandidatePanelOpen, setIsCandidatePanelOpen] = useState(
     () => isHost && room.candidates.length === 0,
   );
+  const [isConditionPanelOpen, setIsConditionPanelOpen] = useState(false);
 
   const candidateIds = new Set(room.candidates.map((candidate) => candidate.id));
   const responseCount = room.myResponses.filter((response) =>
     candidateIds.has(response.candidateId) && response.status === "SUBMITTED",
   ).length;
-  const responseComplete =
-    room.candidates.length > 0 && responseCount === room.candidates.length;
   const respondedParticipantCount = room.participants.filter(
     (participant) => participant.status === "RESPONDED",
   ).length;
-  const progressLabel =
-    room.candidates.length === 0
-      ? isHost
-        ? "후보를 먼저 등록해 주세요"
-        : "방장이 후보를 준비하면 의견을 남길 수 있습니다"
-      : isHost
-        ? `${respondedParticipantCount}/${room.participants.length}명 응답 완료`
-        : `${responseCount}/${room.candidates.length}개 후보 응답 완료`;
-  const completedSteps = [
-    ...(isHost ? [room.candidates.length > 0] : []),
-    responseComplete,
-    room.room.status === "CALCULATED" || room.room.status === "CONFIRMED",
-  ].filter(Boolean).length;
-  const totalSteps = isHost ? 3 : 2;
-  const progressPercent = Math.round((completedSteps / totalSteps) * 100);
+  const nextAction = getNextAction({
+    status: room.room.status,
+    isHost,
+    candidateCount: room.candidates.length,
+    responseCount,
+    participantCount: room.participants.length,
+    respondedCount: respondedParticipantCount,
+  });
+  const actionLink = nextAction?.link;
 
   const mobileSteps: WorkspaceStep[] = [
     ...(isHost ? ["candidates" as const] : []),
@@ -111,22 +179,19 @@ export function RoomWorkspaceWidget({
     "condition",
     "result",
   ];
-  const currentStepIndex = mobileSteps.indexOf(mobileStep);
-  const canAdvance =
-    mobileStep !== "result" &&
-    (mobileStep !== "candidates" || room.candidates.length > 0);
-
-  function advanceMobileStep() {
-    if (!canAdvance) {
-      return;
-    }
-    setMobileStep(mobileSteps[currentStepIndex + 1]);
+  function selectStep(step: WorkspaceStep) {
+    setMobileStep(step);
+    if (step === "candidates") setIsCandidatePanelOpen(true);
+    if (step === "condition") setIsConditionPanelOpen(true);
   }
 
-  function goBackMobileStep() {
-    if (currentStepIndex > 0) {
-      setMobileStep(mobileSteps[currentStepIndex - 1]);
-    }
+  function goToTarget(target: WorkspaceTarget) {
+    if (target !== "participants") selectStep(target);
+    window.requestAnimationFrame(() => {
+      const panel = document.getElementById(`room-${target}`);
+      panel?.focus({ preventScroll: true });
+      panel?.scrollIntoView({ block: "start" });
+    });
   }
 
   async function refreshAfterConditionSave() {
@@ -143,134 +208,76 @@ export function RoomWorkspaceWidget({
 
   return (
     <section className="space-y-4">
-      <section className="mp-card mp-card-raised border-slate-200 bg-white/95 p-4 sm:p-5 lg:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <p className="text-sm font-semibold text-emerald-700">
-                모임 진행
-              </p>
-              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">
-                {getStatusLabel(room.room.status)}
-              </span>
-            </div>
-            <h2 className="mt-1 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
-              함께 정하는 시간과 장소
-            </h2>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
-              {isHost && room.candidates.length === 0
-                ? "후보를 준비하면 참여자들의 의견을 모을 수 있습니다."
-                : room.room.status === "CALCULATED" ||
-                    room.room.status === "CONFIRMED"
-                  ? "추천 결과와 확정된 일정을 확인할 수 있습니다."
-                  : !responseComplete
-                    ? "후보마다 의견을 남겨 주세요. 선택 조건은 입력하지 않아도 됩니다."
-                    : !room.myCondition
-                      ? "의견을 저장했습니다. 선택 조건을 추가하면 시간·예산·특징도 함께 비교합니다."
-                      : "모든 준비가 끝나면 방장이 추천 결과를 만들 수 있습니다."}
-            </p>
-          </div>
-          <div className="shrink-0 rounded-xl bg-slate-950 px-3.5 py-3 text-white sm:min-w-44 sm:text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
-              진행 현황
-            </p>
-            <p className="mt-1 text-lg font-bold">{progressLabel}</p>
-            <p className="mt-1 text-xs text-slate-400">후보 · 의견 · 선택 조건</p>
-          </div>
-        </div>
-
-        <div className="mt-5">
-          <div className="flex items-center justify-between gap-3 text-xs font-semibold text-slate-500">
-            <span>준비 진행률</span>
-            <span>{progressPercent}%</span>
-          </div>
-          <div
-            aria-label={`준비 진행률 ${progressPercent}%`}
-            aria-valuemax={100}
-            aria-valuemin={0}
-            aria-valuenow={progressPercent}
-            className="mt-2 h-2 overflow-hidden rounded-full bg-slate-100"
-            role="progressbar"
-          >
-            <div
-              className="h-full rounded-full bg-emerald-600 transition-[width] duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-        </div>
-
-        <nav
-          aria-label="방 진행 단계"
-          className="mt-5 border-t border-slate-100 pt-4 lg:hidden"
+      {nextAction && (
+        <section
+          aria-labelledby="room-next-action-heading"
+          className="border-b border-slate-200 px-1 pb-4 pt-1 sm:flex sm:items-center sm:justify-between sm:gap-5"
         >
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {mobileSteps.map((step, index) => {
-              const isActive = step === mobileStep;
-              const isComplete =
-                (step === "candidates" && room.candidates.length > 0) ||
-                (step === "condition" && room.myCondition !== null) ||
-                (step === "responses" && responseComplete) ||
-                (step === "result" &&
-                  (room.room.status === "CALCULATED" ||
-                    room.room.status === "CONFIRMED"));
-
-              return (
-                <button
-                  aria-current={isActive ? "step" : undefined}
-                  className={`min-w-fit rounded-xl border px-3 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-emerald-200 ${
-                    isActive
-                      ? "border-slate-950 bg-slate-950 text-white"
-                      : isComplete
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                        : "border-slate-200 bg-white text-slate-500"
-                  }`}
-                  key={step}
-                  onClick={() => {
-                    setMobileStep(step);
-                    if (step === "candidates") {
-                      setIsCandidatePanelOpen(true);
-                    }
-                  }}
-                  type="button"
-                >
-                  <span className="block text-[11px] font-semibold uppercase tracking-wide opacity-70">
-                    {index + 1}단계
-                  </span>
-                  <span className="mt-0.5 block text-sm font-semibold">
-                    {stepLabels[step]}
-                  </span>
-                </button>
-              );
-            })}
+          <div>
+            <h2 className="text-lg font-bold tracking-tight" id="room-next-action-heading">
+              {nextAction.title}
+            </h2>
+            <p className="mt-1 text-sm leading-5 text-slate-700">{nextAction.message}</p>
           </div>
-        </nav>
-      </section>
+          {actionLink && (
+            <button
+              className="mp-button mp-button-primary mt-3 w-full sm:mt-0 sm:w-auto sm:shrink-0"
+              onClick={() => goToTarget(actionLink.target)}
+              type="button"
+            >
+              {actionLink.label}
+            </button>
+          )}
+        </section>
+      )}
+
+      {roomTools}
+
+      <nav aria-label="방 진행 단계" className="lg:hidden">
+        <div className="flex flex-wrap gap-1.5">
+          {mobileSteps.map((step) => {
+            const isActive = step === mobileStep;
+
+            return (
+              <button
+                aria-current={isActive ? "step" : undefined}
+                className={`mp-button rounded-lg border px-2.5 py-2 text-xs ${
+                  isActive
+                    ? "border-slate-800 bg-slate-100 text-slate-950"
+                    : "border-transparent text-slate-600 hover:bg-slate-100"
+                }`}
+                key={step}
+                onClick={() => selectStep(step)}
+                type="button"
+              >
+                {stepLabels[step]}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
 
       <div className="grid items-start gap-5 lg:grid-cols-12">
         {isHost && (
           <div
             className={getSectionClassName(
               mobileStep === "candidates",
-              "lg:col-span-12 lg:row-start-1",
+              "scroll-mt-4 lg:col-span-12 lg:row-start-1",
             )}
+            id="room-candidates"
+            tabIndex={-1}
           >
             <details
-              className="group overflow-hidden rounded-[1.25rem] border border-emerald-100 bg-emerald-50/45"
+              className="mp-card group"
               onToggle={(event) =>
                 setIsCandidatePanelOpen(event.currentTarget.open)
               }
               open={isCandidatePanelOpen}
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-4 py-3.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 sm:px-5 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-slate-600 sm:px-5 [&::-webkit-details-marker]:hidden">
                 <span>
-                  <span className="block text-xs font-semibold uppercase tracking-wide text-emerald-700">
-                    방장 도구
-                  </span>
-                  <span className="mt-1 block text-base font-semibold text-slate-950">
+                  <span className="block text-sm font-semibold text-slate-950">
                     후보 관리
-                  </span>
-                  <span className="mt-1 block text-sm text-slate-600">
-                    {room.candidates.length} / 5개 후보 · 수정하거나 새 추천에서 제외할 수 있습니다.
                   </span>
                 </span>
                 <span
@@ -280,7 +287,7 @@ export function RoomWorkspaceWidget({
                   ⌄
                 </span>
               </summary>
-              <div className="border-t border-emerald-100/80 p-2 sm:p-3">
+              <div className="border-t border-slate-200">
                 <CandidateManagementPanel
                   onRoomRefresh={onRoomRefresh}
                   participantId={participantId}
@@ -294,7 +301,9 @@ export function RoomWorkspaceWidget({
         )}
 
         <div
-          className={getSectionClassName(mobileStep === "responses", responsePlacement)}
+          className={getSectionClassName(mobileStep === "responses", `scroll-mt-4 ${responsePlacement}`)}
+          id="room-responses"
+          tabIndex={-1}
         >
           <section className="mp-card p-4 sm:p-6">
             <ParticipantResponsePanel
@@ -316,7 +325,11 @@ export function RoomWorkspaceWidget({
         <div
           className={getSectionClassName(mobileStep === "condition", conditionPlacement)}
         >
-          <ParticipantConditionPanel
+          <details className="mp-card" onToggle={(event) => setIsConditionPanelOpen(event.currentTarget.open)} open={isConditionPanelOpen}>
+            <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-slate-600">
+              선택 조건 {room.myCondition ? "보기" : "추가"}
+            </summary>
+            <ParticipantConditionPanel
             condition={room.myCondition}
             isReadOnly={
               room.room.status === "CONFIRMED" || room.room.status === "CLOSED"
@@ -325,14 +338,17 @@ export function RoomWorkspaceWidget({
             participantId={participantId}
             roomId={roomId}
             token={token}
-          />
+            />
+          </details>
         </div>
 
         <div
           className={getSectionClassName(
             mobileStep === "result",
-            "lg:col-span-12",
+            "scroll-mt-4 lg:col-span-12",
           )}
+          id="room-result"
+          tabIndex={-1}
         >
           <CalculationResultPanel
             decision={decision}
@@ -346,31 +362,6 @@ export function RoomWorkspaceWidget({
         </div>
       </div>
 
-      <div className="sticky bottom-3 z-10 flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-lg shadow-slate-900/10 backdrop-blur lg:hidden">
-        <button
-          className="mp-button mp-button-secondary min-w-20"
-          disabled={currentStepIndex <= 0}
-          onClick={goBackMobileStep}
-          type="button"
-        >
-          이전
-        </button>
-        <p className="min-w-0 text-center text-xs font-medium text-slate-500">
-          {stepLabels[mobileStep]}
-        </p>
-        <button
-          className="mp-button mp-button-primary min-w-24"
-          disabled={!canAdvance}
-          onClick={advanceMobileStep}
-          type="button"
-        >
-          {mobileStep === "candidates"
-            ? "의견 입력"
-            : mobileStep === "responses"
-              ? "선택 조건(선택)"
-              : "추천 결과 보기"}
-        </button>
-      </div>
     </section>
   );
 }

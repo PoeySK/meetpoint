@@ -15,6 +15,8 @@ import {
   fillFormsFromCondition,
   getMissingFields,
   getMissingFieldsMessage,
+  getResponseState,
+  messageClassName,
   synchronizeResponseForms,
   type PanelMessage,
   type ResponseForm,
@@ -109,6 +111,13 @@ export function ParticipantResponsePanel({
       createResponseForm(responsesByCandidateId.get(candidateId))
     );
   }
+
+  const candidateForms = activeCandidates.map((candidate) => ({ candidate, form: getForm(candidate.id) }));
+  const readyToSave = candidateForms.filter(({ form }) => {
+    const state = getResponseState(form);
+    const wasEdited = state === 'dirty' || (state === 'reconfirm' && form.manuallyEdited);
+    return wasEdited && getMissingFields(form).length === 0;
+  });
 
   function updateForm(candidateId: string, update: Partial<ResponseForm>) {
     setForms((current) => ({
@@ -224,41 +233,14 @@ export function ParticipantResponsePanel({
       return;
     }
 
-    const formsToSave = activeCandidates.map((candidate) => ({
-      candidate,
-      form: {
-        ...getForm(candidate.id),
-        ...quickResponse,
-      },
-    }));
-    const incompleteForms = formsToSave.filter(
-      ({ form }) => getMissingFields(form).length > 0
-    );
-
-    if (incompleteForms.length > 0) {
-      setForms((current) => {
-        const next = { ...current };
-
-        for (const { candidate, form } of incompleteForms) {
-          next[candidate.id] = {
-            ...form,
-            message: getMissingFieldsMessage(form),
-            messageKind: 'error',
-          };
-        }
-
-        return next;
-      });
-      setBulkMessage({
-        text: `모든 후보에 참석 가능 여부와 이동 부담을 선택해 주세요. 아직 선택하지 않은 후보 ${incompleteForms.length}개가 있습니다.`,
-        kind: 'error',
-      });
-      return;
-    }
+    const formsToSave = quickResponse
+      ? candidateForms.map(({ candidate, form }) => ({ candidate, form: { ...form, ...quickResponse } }))
+      : readyToSave;
+    if (formsToSave.length === 0) return;
 
     setIsBulkSubmitting(true);
     setBulkMessage({
-      text: `${activeCandidates.length}개 후보의 의견을 저장하는 중입니다...`,
+      text: `${formsToSave.length}개 후보의 의견을 저장하는 중입니다...`,
       kind: 'info',
     });
     setForms((current) => {
@@ -312,7 +294,7 @@ export function ParticipantResponsePanel({
     setBulkMessage({
       text:
         failureCount === 0
-          ? `후보 ${successCount}개의 의견을 모두 저장했습니다.`
+          ? `후보 ${successCount}개의 의견을 저장했습니다.`
           : `후보 ${successCount}개는 저장했고 ${failureCount}개는 저장하지 못했습니다. 실패한 후보의 입력은 유지됩니다.`,
       kind: failureCount === 0 ? 'success' : 'error',
     });
@@ -339,13 +321,11 @@ export function ParticipantResponsePanel({
   return (
     <section className='space-y-4'>
       <div className='space-y-2'>
-        <p className='text-sm font-semibold text-emerald-700'>내 의견</p>
         <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
           후보별 의견
         </h2>
         <p className='text-sm leading-6 text-slate-500'>
-          미응답 후보는 보류로 표시하지만 아직 미제출입니다. 참석 가능 여부와
-          이동 부담을 확인한 뒤 의견 저장을 누르세요. 메모는 선택 사항입니다.
+          후보마다 참석 가능 여부와 이동 부담을 선택해 주세요.
         </p>
         {isReadOnly && (
           <p className='rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600'>
@@ -361,38 +341,6 @@ export function ParticipantResponsePanel({
         </div>
       ) : (
         <>
-          <div className='rounded-xl border border-sky-100 bg-sky-50/55 p-4 space-y-2'>
-            <button
-              className='mp-button mp-button-secondary'
-              type='button'
-              disabled={isInteractionDisabled || !condition}
-              onClick={fillFromCondition}
-            >
-              {Object.values(forms).some((form) => form.autoFill)
-                ? '내 기준으로 다시 채우기'
-                : '내 기준으로 의견 채우기'}
-            </button>
-            <p className='text-xs leading-5 text-slate-600'>
-              {condition
-                ? '서버에서 불러온 저장된 내 기준을 사용합니다. 가능 여부만 초안으로 채우며, 저장된 의견과 직접 편집한 후보는 유지합니다. 내 기준을 바꿔도 초안을 자동으로 덮어쓰지 않습니다.'
-                : '저장된 내 기준이 없습니다. 내 기준을 먼저 저장해 주세요. 저장하지 않은 입력은 사용할 수 없습니다.'}
-            </p>
-            {fillMessage && (
-              <p role='status' className='text-sm text-slate-700'>
-                {fillMessage}
-              </p>
-            )}
-          </div>
-          <QuickResponsePanel
-            availabilityStatus={fastAvailabilityStatus}
-            isDisabled={isInteractionDisabled}
-            message={bulkMessage}
-            onAvailabilityChange={setFastAvailabilityStatus}
-            onSave={saveQuickResponses}
-            onTravelChange={setFastTravelBurden}
-            travelBurden={fastTravelBurden}
-          />
-
           <div className='grid gap-3 lg:grid-cols-2'>
             {activeCandidates.map((candidate) => (
               <CandidateResponseCard
@@ -417,6 +365,41 @@ export function ParticipantResponsePanel({
               />
             ))}
           </div>
+          {!isReadOnly && activeCandidates.length > 1 && (
+            <button
+              className='mp-button mp-button-primary w-full'
+              disabled={isInteractionDisabled || readyToSave.length === 0}
+              onClick={() => void saveAllResponses()}
+              type='button'
+            >
+              작성한 의견 저장{readyToSave.length > 0 ? ` (${readyToSave.length}개)` : ''}
+            </button>
+          )}
+          {!isReadOnly && (
+            <details className='overflow-hidden rounded-xl border border-slate-200'>
+              <summary className='cursor-pointer px-4 py-3 text-sm font-semibold'>빠른 입력 도구</summary>
+              <div className='space-y-3 border-t border-slate-200 p-3'>
+                {condition && (
+                  <div className='space-y-2'>
+                    <button className='mp-button mp-button-secondary' disabled={isInteractionDisabled} onClick={fillFromCondition} type='button'>
+                      {Object.values(forms).some((form) => form.autoFill) ? '내 기준으로 다시 채우기' : '내 기준으로 의견 채우기'}
+                    </button>
+                    <p className='text-xs text-slate-600'>저장된 조건으로 참석 가능 여부만 채웁니다. 선택을 확인한 뒤 저장해 주세요.</p>
+                    {fillMessage && <p role='status' className='text-sm text-slate-700'>{fillMessage}</p>}
+                  </div>
+                )}
+                <QuickResponsePanel
+                  availabilityStatus={fastAvailabilityStatus}
+                  isDisabled={isInteractionDisabled}
+                  onAvailabilityChange={setFastAvailabilityStatus}
+                  onSave={saveQuickResponses}
+                  onTravelChange={setFastTravelBurden}
+                  travelBurden={fastTravelBurden}
+                />
+              </div>
+            </details>
+          )}
+          {bulkMessage && <p className={`text-sm ${messageClassName(bulkMessage.kind)}`} role='status'>{bulkMessage.text}</p>}
         </>
       )}
     </section>
