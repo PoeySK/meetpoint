@@ -2,9 +2,7 @@
 
 import {
   availabilityOptions,
-  messageClassName,
   travelOptions,
-  type PanelMessage,
 } from "@/features/participant-response/model/response-form";
 import type {
   AvailabilityStatus,
@@ -15,7 +13,6 @@ type QuickResponsePanelProps = {
   isDisabled: boolean;
   availabilityStatus: AvailabilityStatus | null;
   travelBurden: TravelBurden | null;
-  message: PanelMessage | null;
   onAvailabilityChange: (value: AvailabilityStatus) => void;
   onTravelChange: (value: TravelBurden) => void;
   onSave: () => void;
@@ -25,7 +22,6 @@ export function QuickResponsePanel({
   isDisabled,
   availabilityStatus,
   travelBurden,
-  message,
   onAvailabilityChange,
   onTravelChange,
   onSave,
@@ -33,7 +29,7 @@ export function QuickResponsePanel({
   return (
     <section
       aria-labelledby="quick-response-heading"
-      className="rounded-xl border border-emerald-100 bg-emerald-50/55 p-4 sm:p-5"
+      className="space-y-3"
     >
       <div className="space-y-2">
         <h3
@@ -43,8 +39,7 @@ export function QuickResponsePanel({
           한 번에 의견 입력
         </h3>
         <p className="text-sm leading-6 text-slate-600">
-          모든 후보에 같은 의견을 남길 때 사용하세요. 두 항목을 선택한 뒤 한 번에
-          저장할 수 있습니다.
+          같은 의견을 모든 후보에 적용합니다.
         </p>
       </div>
 
@@ -60,7 +55,7 @@ export function QuickResponsePanel({
                 className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
                   availabilityStatus === option.value
                     ? "border-emerald-600 bg-emerald-600 text-white"
-                    : "border-white bg-white text-slate-600 hover:border-emerald-300"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
                 }`}
                 disabled={isDisabled}
                 key={option.value}
@@ -84,7 +79,7 @@ export function QuickResponsePanel({
                 className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
                   travelBurden === option.value
                     ? "border-slate-950 bg-slate-950 text-white"
-                    : "border-white bg-white text-slate-600 hover:border-slate-400"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
                 }`}
                 disabled={isDisabled}
                 key={option.value}
@@ -100,8 +95,8 @@ export function QuickResponsePanel({
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <button
-          className="mp-button w-full bg-emerald-700 px-3 py-2 text-sm text-white hover:bg-emerald-800 disabled:cursor-not-allowed disabled:bg-emerald-300 sm:w-auto"
-          disabled={isDisabled}
+          className="mp-button mp-button-secondary w-full border-emerald-700 text-emerald-800 sm:w-auto"
+          disabled={isDisabled || !availabilityStatus || !travelBurden}
           onClick={onSave}
           type="button"
         >
@@ -109,18 +104,6 @@ export function QuickResponsePanel({
         </button>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-slate-600">
-        이동 부담은 실제 거리나 시간이 아니라 내가 느끼는 정도를 선택합니다. 저장하지
-        않은 내용은 추천 결과에 반영되지 않습니다.
-      </p>
-      {message && (
-        <p
-          aria-live="polite"
-          className={`mt-3 text-sm leading-6 ${messageClassName(message.kind)}`}
-        >
-          {message.text}
-        </p>
-      )}
     </section>
   );
 }

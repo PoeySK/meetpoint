@@ -82,13 +82,13 @@ test('budget and normalized required/avoid tags explain conflicts without changi
   c.maxBudgetKrw = null; c.preferences.requiredTags = []; c.preferences.avoidTags = [];
   assert.equal(model.getConditionWarnings(candidate(), c).length, 0);
 });
-test('default maybe is missing and clean, with no travel default or saved identity', () => {
+test('new responses leave both required choices empty', () => {
   const form = model.createResponseForm();
-  assert.equal(form.availabilityStatus, 'MAYBE');
+  assert.equal(form.availabilityStatus, null);
   assert.equal(form.travelBurden, null);
   assert.equal(model.isFormDirty(form), false);
   assert.equal(model.getResponseState(form), 'missing');
-  assert.equal(model.getMissingFieldsMessage(form), '이동 부담을 선택해 주세요.');
+  assert.equal(model.getMissingFieldsMessage(form), '참석 가능 여부와 이동 부담을 모두 선택해 주세요.');
 });
 test('fill skips saved, manually edited, submitting and archived candidates; retains memo/travel', () => {
   const cs = ['one', 'saved', 'manual', 'busy', 'archived'].map((id) => candidate(id));
@@ -111,7 +111,7 @@ test('polling preserves automatic/manual drafts; latest warnings and stale reaso
   forms.manual = model.editResponseForm(forms.manual, { availabilityStatus: 'UNAVAILABLE', note: 'Manual' });
   const incoming = model.synchronizeResponseForms(forms, [...cs, candidate('new')], [response()]);
   assert.equal(incoming.one, forms.one); assert.equal(incoming.manual, forms.manual);
-  assert.equal(incoming.new.availabilityStatus, 'MAYBE');
+  assert.equal(incoming.new.availabilityStatus, null);
   const changed = condition(); changed.maxBudgetKrw = 0;
   assert.match(model.getAutoFillDescription(forms.one, cs[0], changed), /変|바뀌었습니다/);
   assert.match(model.getConditionWarnings(cs[0], changed)[0], /예산/);
@@ -141,7 +141,9 @@ function panelHarness({ saved = [], criteria = condition(), readOnly = false } =
     '@/shared/api/http-client': { RoomApiError },
     '@/shared/lib/room-access-error': accessErrors,
     '@/entities/participant-response': { upsertParticipantResponse: async (_room, _participant, id, _token, input) => {
-      calls.push({ id, input }); if (fail) throw fail instanceof Error ? fail : new Error('Fixture failure');
+      calls.push({ id, input });
+      const error = typeof fail === 'function' ? fail(id) : fail;
+      if (error) throw error instanceof Error ? error : new Error('Fixture failure');
       if (pending) await pending;
       return { response: { ...response(id), ...input } };
     } },
@@ -227,10 +229,10 @@ test('missing travel blocks saving; failed save preserves draft and can retry', 
   h.fail(false); h.cards()[0].props.onSave(); await settle();
   assert.equal(model.getResponseState(h.cards()[0].props.form), 'saved');
 });
-test('read-only/missing criteria disable fill; polling does not overwrite manual or automatic drafts', () => {
+test('read-only or missing criteria hide fill; polling does not overwrite manual or automatic drafts', () => {
   for (const options of [{ criteria: null }, { readOnly: true }]) {
-    const h = panelHarness(options); assert.equal(h.fill().props.disabled, true);
-    h.fill().props.onClick(); assert.equal(h.cards()[0].props.form.autoFill, null); assert.equal(h.calls.length, 0);
+    const h = panelHarness(options); assert.equal(h.fill(), undefined);
+    assert.equal(h.cards()[0].props.form.autoFill, null); assert.equal(h.calls.length, 0);
   }
   const h = panelHarness(); h.fill().props.onClick();
   h.cards()[1].props.onUpdate({ availabilityStatus: 'UNAVAILABLE' });
@@ -254,6 +256,24 @@ test('quick save still submits all active candidates; failed overrides remain av
   assert.equal(h.cards().every((card) => model.getResponseState(card.props.form) === 'saved'), true);
   const reload = panelHarness({ saved: h.calls.slice(2).map(({ id, input }) => ({ ...response(id), ...input })) });
   assert.equal(reload.cards().every((card) => model.getResponseState(card.props.form) === 'saved'), true);
+});
+
+test('saving written responses skips untouched reconfirmations and retries only failed drafts', async () => {
+  const h = panelHarness({ saved: [{ ...response('two'), status: 'RECONFIRM_REQUIRED' }] });
+  h.props.candidates.push(candidate('three'));
+  const saveWritten = () => h.render().find(node => node.type === 'button' && String(node.props.children).startsWith('작성한 의견 저장'));
+  assert.equal(saveWritten().props.disabled, true);
+  h.cards()[0].props.onUpdate({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' });
+  h.cards()[2].props.onUpdate({ availabilityStatus: 'MAYBE', travelBurden: 'NORMAL' });
+  h.fail(id => id === 'three');
+  saveWritten().props.onClick(); await settle();
+  assert.deepEqual(h.calls.map(call => call.id), ['one', 'three']);
+  assert.equal(model.getResponseState(h.cards()[0].props.form), 'saved');
+  assert.equal(model.getResponseState(h.cards()[1].props.form), 'reconfirm');
+  h.fail(false);
+  saveWritten().props.onClick(); await settle();
+  assert.deepEqual(h.calls.map(call => call.id), ['one', 'three', 'three']);
+  assert.equal(model.getResponseState(h.cards()[2].props.form), 'saved');
 });
 
 test('saving disables fill and duplicate save; saved response and manual draft survive reapplication', async () => {
@@ -297,6 +317,9 @@ test('candidate and quick options expose MAYBE as 보류 including accessible pr
   const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
   const h = panelHarness();
   assert.equal(model.availabilityOptions.find((option) => option.value === 'MAYBE').label, '보류');
+  const initialHtml = renderToStaticMarkup(React.createElement(h.card.CandidateResponseCard, h.cards()[0].props));
+  assert.doesNotMatch(initialHtml, /aria-pressed="true"/);
+  h.cards()[0].props.onUpdate({ availabilityStatus: 'MAYBE' });
   const cardHtml = renderToStaticMarkup(React.createElement(h.card.CandidateResponseCard, h.cards()[0].props));
   const quick = h.quick(); const quickHtml = renderToStaticMarkup(React.createElement(quick.type, { ...quick.props, availabilityStatus: 'MAYBE' }));
   for (const html of [cardHtml, quickHtml]) { assert.match(html, /aria-pressed="true"[^>]*>보류<\/button>/); assert.doesNotMatch(html, /아마 가능/); }

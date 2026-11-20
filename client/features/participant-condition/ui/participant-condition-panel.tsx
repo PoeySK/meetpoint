@@ -263,21 +263,15 @@ export function ParticipantConditionPanel({
   }
 
   return (
-    <section className='mp-card border-sky-100 bg-sky-50/55 p-4 sm:p-6'>
+    <section className='border-t border-slate-200 p-4'>
       <div className='space-y-1.5'>
-        <p className='text-sm font-semibold text-sky-700'>선택 조건</p>
         <div className='flex flex-wrap items-center gap-2'>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
             원하는 조건을 알려주세요
           </h2>
-          <span className='rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-sky-700'>
-            선택 사항
-          </span>
         </div>
         <p className='text-sm leading-6 text-slate-600'>
-          원하는 시간, 1인 예산, 선호하는 특징을 입력하면 추천 결과에 참고로
-          반영됩니다. 입력하지 않아도 후보별 의견을 남기고 추천 결과를 만들 수 있으며, 자세한
-          선택 조건은 다른 참여자에게 공개되지 않습니다.
+          더 자세히 비교하고 싶을 때만 추가하세요. 내 조건은 다른 참여자에게 공개되지 않습니다.
         </p>
       </div>
 
@@ -289,7 +283,7 @@ export function ParticipantConditionPanel({
         <form className='mt-5 space-y-5' onSubmit={handleSubmit}>
           <fieldset className='space-y-3'>
             <legend className='text-sm font-semibold text-slate-800'>
-              내가 가능한 시간 <span className='font-normal text-slate-500'>입력한 시간과 다른 후보도 의견으로 남길 수 있으며 추천 결과에서 확인할 수 있습니다.</span>
+              가능한 시간 <span className='font-normal text-slate-600'>(조건 저장에 필요)</span>
             </legend>
             {windows.map((window, index) => (
               <div

@@ -1,6 +1,7 @@
 import type { CalculationPayload, ScoreResultCandidate } from "@/entities/calculation";
 import type { DecisionPayload } from "@/entities/decision";
 import type { RoomStatus } from "@/entities/room";
+import { DecisionSchedule } from "./decision-schedule";
 
 type DecisionConfirmationPanelProps = {
   calculation: CalculationPayload | null;
@@ -47,6 +48,8 @@ export function DecisionConfirmationPanel({
   selectedCandidateHasIssues,
   selectedCandidateName,
 }: DecisionConfirmationPanelProps) {
+  const scheduleAtTop = roomStatus === "CONFIRMED" && decision?.status === "CONFIRMED";
+
   return (
     <>
       {decision && (
@@ -61,49 +64,27 @@ export function DecisionConfirmationPanel({
                 className="mt-1 text-lg font-semibold text-slate-950"
                 id="decision-summary-heading"
               >
-                {decision.status === "CONFIRMED"
-                  ? "방장이 일정을 확정했습니다"
-                  : "확정 내용을 다시 검토하는 중입니다"}
+                {scheduleAtTop
+                  ? "확정 근거와 메모"
+                  : decision.status === "CONFIRMED"
+                    ? "방장이 일정을 확정했습니다"
+                    : "확정 내용을 다시 검토하는 중입니다"}
               </h3>
             </div>
             <span className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-slate-700">
               {decision.status === "CONFIRMED" ? "일정 확정" : "재검토 중"}
             </span>
           </div>
-          <div className="mt-4 grid gap-3 [overflow-wrap:anywhere] sm:grid-cols-3">
-            <div className="rounded-xl bg-white/80 p-3">
-              <p className="text-xs text-slate-500">선택한 후보</p>
-              <p className="mt-1 font-semibold text-slate-950">
-                {decision.candidate.place.name}
-              </p>
-              <p className="mt-1 text-sm leading-5 text-slate-600">
-                {decision.candidate.place.address}
-              </p>
+          {scheduleAtTop ? (
+            <a className="mt-3 inline-block text-sm font-semibold text-emerald-800 underline" href="#room-confirmed-schedule">
+              확정 일정 보기
+            </a>
+          ) : (
+            <div className="mt-4 rounded-xl bg-white/80 p-3">
+              <DecisionSchedule candidate={decision.candidate} />
             </div>
-            <div className="rounded-xl bg-white/80 p-3 sm:col-span-2">
-              <p className="text-xs text-slate-500">모임 일시</p>
-              <p className="mt-1 text-sm leading-6 text-slate-950">
-                <time className="block" dateTime={decision.candidate.time.startsAt}>
-                  시작: {new Date(decision.candidate.time.startsAt).toLocaleString("ko-KR", {
-                    dateStyle: "medium", timeStyle: "short", timeZone: decision.candidate.time.timezone,
-                  })}
-                </time>
-                <time className="block" dateTime={decision.candidate.time.endsAt}>
-                  종료: {new Date(decision.candidate.time.endsAt).toLocaleString("ko-KR", {
-                    dateStyle: "medium", timeStyle: "short", timeZone: decision.candidate.time.timezone,
-                  })}
-                </time>
-              </p>
-              <p className="mt-1 text-xs text-slate-500">
-                {decision.candidate.time.timezone}
-              </p>
-            </div>
-            <div className="rounded-xl bg-white/80 p-3">
-              <p className="text-xs text-slate-500">1인 예상 비용</p>
-              <p className="mt-1 font-semibold text-slate-950">
-                {decision.candidate.estimatedCostPerPersonKrw.toLocaleString("ko-KR")}원
-              </p>
-            </div>
+          )}
+          <div className="mt-4 grid gap-3 [overflow-wrap:anywhere] sm:grid-cols-2">
             <div className="rounded-xl bg-white/80 p-3">
               <p className="text-xs text-slate-500">추천 당시 점수</p>
               <p className="mt-1 font-semibold text-slate-950">

@@ -67,6 +67,9 @@ export function ParticipantJoinForm({
   const [formError, setFormError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [existingRoomId, setExistingRoomId] = useState<string | null>(null);
+  const [joiningAsNew, setJoiningAsNew] = useState(false);
+  const hasInviteCode = /^[A-Z0-9]{6}$/.test(initialRoomCode.toUpperCase());
+  const showJoinForm = !hasInviteCode || !existingRoomId || joiningAsNew;
   useEffect(() => {
     const timer = window.setTimeout(() => setExistingRoomId(getRememberedRoomAddress(roomCode.trim().toUpperCase())), 0);
     return () => window.clearTimeout(timer);
@@ -126,26 +129,27 @@ export function ParticipantJoinForm({
           <Link className='text-lg font-bold tracking-tight' href='/'>
             MeetPoint
           </Link>
-          <span className='text-xs font-medium text-slate-400'>방 입장</span>
         </div>
 
-        <section className='mp-card mp-card-raised p-4 sm:p-6'>
-          {existingRoomId && <p className="mb-4 text-sm">
-            이 브라우저에서 방문한 방입니다. <Link className="underline" href={`/rooms/${encodeURIComponent(existingRoomId)}`}>기존 참여자로 복구하기</Link>
-            . 아래 입장은 새 MEMBER를 만들며 기존 권한과 응답을 복구하지 않습니다.
-          </p>}
-          <div className='mb-5 space-y-1.5'>
-            <p className='text-sm font-semibold text-emerald-700'>참여자</p>
-            <h1 className='text-2xl font-semibold tracking-tight'>
-              초대받은 방에 입장하기
-            </h1>
-            <p className='text-sm leading-6 text-slate-500'>
-              방 코드와 이름을 입력하면 모임 방으로 바로 이동합니다.
-            </p>
-          </div>
+        <section className='mp-card mp-card-raised space-y-4 p-4 sm:p-6'>
+          <h1 className='text-2xl font-bold tracking-tight'>모임에 참여하기</h1>
+          {existingRoomId && (
+            <div className='space-y-3 border-b border-slate-200 pb-4'>
+              <p className='text-sm text-slate-700'>이미 이 모임에 참여한 기록이 있어요.</p>
+              <Link className='mp-button mp-button-primary inline-block' href={`/rooms/${encodeURIComponent(existingRoomId)}`}>
+                기존 참여 이어가기
+              </Link>
+              {!showJoinForm && (
+                <button className='mp-button mp-button-secondary ml-2' onClick={() => setJoiningAsNew(true)} type='button'>
+                  새 참여자로 입장
+                </button>
+              )}
+            </div>
+          )}
 
+          {showJoinForm && (
           <form className='space-y-4' onSubmit={handleSubmit} noValidate>
-            <div className='space-y-2'>
+            {!hasInviteCode && <div className='space-y-2'>
               <label
                 className='text-sm font-semibold text-slate-800'
                 htmlFor='roomCode'
@@ -167,6 +171,7 @@ export function ParticipantJoinForm({
                   setRoomCode(event.target.value.toUpperCase())
                 }
                 placeholder='예: A7K9P2'
+                required
                 value={roomCode}
               />
               {fieldErrors.roomCode && (
@@ -174,7 +179,7 @@ export function ParticipantJoinForm({
                   {fieldErrors.roomCode}
                 </p>
               )}
-            </div>
+            </div>}
 
             <div className='space-y-2'>
               <label
@@ -194,6 +199,7 @@ export function ParticipantJoinForm({
                 maxLength={30}
                 onChange={(event) => setDisplayName(event.target.value)}
                 placeholder='예: 지수'
+                required
                 value={displayName}
               />
               {fieldErrors.displayName && (
@@ -220,6 +226,8 @@ export function ParticipantJoinForm({
               {isSubmitting ? '입장하는 중...' : '방에 입장하기'}
             </button>
           </form>
+          )}
+          {hasInviteCode && <Link className='inline-block text-sm text-slate-700 underline underline-offset-4' href='/join'>다른 방 코드 입력</Link>}
         </section>
       </div>
     </main>

@@ -56,7 +56,7 @@ export const travelOptions: Array<{ value: TravelBurden; label: string }> = [
 export function createResponseForm(
   response?: ParticipantResponsePayload
 ): ResponseForm {
-  const availabilityStatus = response?.availabilityStatus ?? 'MAYBE';
+  const availabilityStatus = response?.availabilityStatus ?? null;
   const travelBurden = response?.travelBurden ?? null;
   const note = response?.note ?? '';
 
@@ -138,21 +138,6 @@ export function getMissingFieldsMessage(form: ResponseForm) {
   return missingFields[0] === '참석 가능 여부'
     ? '참석 가능 여부를 선택해 주세요.'
     : '이동 부담을 선택해 주세요.';
-}
-
-export function getMissingFieldsDescription(form: ResponseForm) {
-  const missingFields = getMissingFields(form);
-
-  if (missingFields.length === 0) {
-    return '';
-  }
-  if (missingFields.length === 2) {
-    return '참석 가능 여부와 이동 부담을 모두 선택해야 합니다.';
-  }
-
-  return missingFields[0] === '참석 가능 여부'
-    ? '참석 가능 여부를 선택해야 합니다.'
-    : '이동 부담을 선택해야 합니다.';
 }
 
 export function getConditionWarnings(
@@ -413,17 +398,4 @@ export function responseStateLabel(state: ReturnType<typeof getResponseState>) {
   }
 
   return '의견 미저장';
-}
-
-export function responseStateClassName(
-  state: ReturnType<typeof getResponseState>
-) {
-  if (state === 'saved') {
-    return 'bg-emerald-50 text-emerald-700';
-  }
-  if (state === 'dirty' || state === 'reconfirm') {
-    return 'bg-amber-50 text-amber-700';
-  }
-
-  return 'bg-slate-100 text-slate-600';
 }

@@ -7,19 +7,19 @@ const vm = require('node:vm');
 const ts = require('typescript');
 const { renderToStaticMarkup } = require('react-dom/server');
 
-const compiled = { exports: {} };
-const filename = path.resolve(__dirname, '../features/calculation/ui/calculation-result-view.tsx');
-vm.runInNewContext(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
-  compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-}).outputText, { module: compiled, exports: compiled.exports, require }, { filename });
-const { CompletedResult, CalculationStatus, groupCandidateIssues } = compiled.exports;
+function loadView(relativePath, dependencies = {}) {
+  const compiled = { exports: {} };
+  const filename = path.resolve(__dirname, relativePath);
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
+  }).outputText, { module: compiled, exports: compiled.exports, require: name => dependencies[name] ?? require(name) }, { filename });
+  return compiled.exports;
+}
 
-const decisionModule = { exports: {} };
-const decisionFilename = path.resolve(__dirname, '../features/decision-confirmation/ui/decision-confirmation-panel.tsx');
-vm.runInNewContext(ts.transpileModule(fs.readFileSync(decisionFilename, 'utf8'), {
-  compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.ReactJSX },
-}).outputText, { module: decisionModule, exports: decisionModule.exports, require }, { filename: decisionFilename });
-const { DecisionConfirmationPanel } = decisionModule.exports;
+const { CompletedResult, CalculationStatus, groupCandidateIssues } = loadView('../features/calculation/ui/calculation-result-view.tsx');
+const schedule = loadView('../features/decision-confirmation/ui/decision-schedule.tsx');
+const { DecisionConfirmationPanel } = loadView('../features/decision-confirmation/ui/decision-confirmation-panel.tsx', { './decision-schedule': schedule });
+const { RoomSummary } = loadView('../widgets/room/ui/room-summary.tsx', { '@/features/decision-confirmation': schedule });
 
 function fixture() {
   const participant = (id) => ({
@@ -101,10 +101,18 @@ test('confirmed summary shows the decision candidate schedule, address and cost 
       estimatedCostPerPersonKrw: 28000,
     },
   };
+  const room = {
+    room: { status: 'CONFIRMED', title: '모임', roomCode: 'AAAAAA', maxParticipants: 6 },
+    hostParticipant: { displayName: '방장 이름' }, participants: [{}, {}, {}],
+  };
+  const summary = renderToStaticMarkup(require('react').createElement(RoomSummary, { decision, room }));
+  for (const text of ['방장이 일정을 확정했습니다', '확정 장소', '서울 중구 확정길 28', '시작: 2026. 11. 3. 오후 11:30', '종료: 2026. 11. 4. 오전 1:30', 'Asia/Seoul', '1인 예상 비용', '28,000원']) assert.ok(summary.includes(text), text);
+  assert.ok(summary.includes('dateTime="2026-11-03T14:30:00Z"'));
+  assert.ok(summary.indexOf('확정 장소') < summary.indexOf('초대 링크 복사'));
   for (const isHost of [true, false]) {
     const html = renderToStaticMarkup(DecisionConfirmationPanel({ decision, isHost, roomStatus: 'CONFIRMED' }));
-    for (const text of ['방장이 일정을 확정했습니다', '확정 장소', '서울 중구 확정길 28', '시작: 2026. 11. 3. 오후 11:30', '종료: 2026. 11. 4. 오전 1:30', 'Asia/Seoul', '1인 예상 비용', '28,000원', '91.7점', '확정 메모 유지']) assert.ok(html.includes(text), text);
-    assert.ok(html.includes('dateTime="2026-11-03T14:30:00Z"'));
+    for (const text of ['#room-confirmed-schedule', '91.7점', '확정 메모 유지']) assert.ok(html.includes(text), text);
+    assert.ok(!html.includes('서울 중구 확정길 28'));
     assert.equal(html.includes('확정 내용 다시 검토하기'), isHost);
   }
 });

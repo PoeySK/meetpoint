@@ -24,7 +24,7 @@ import {
 import { RoomApiError } from '@/shared/api/http-client';
 import { getRoomAccessErrorMessage } from '@/shared/lib/room-access-error';
 import { MEETPOINT_TIMEZONE } from '@/shared/config/meetpoint';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 
 type CandidateManagementPanelProps = {
   roomId: string;
@@ -46,7 +46,7 @@ function getCandidateFormValues(candidate: Candidate) {
 
   return {
     address: candidate.place.address,
-    area: candidate.place.area,
+    area: candidate.place.area === candidate.place.address ? '' : candidate.place.area,
     cost: String(candidate.estimatedCostPerPersonKrw),
     date: startsAt.date,
     endTime: endsAt.time,
@@ -85,7 +85,6 @@ function validateCandidateForm(
   endTime: string,
   placeName: string,
   address: string,
-  area: string,
   cost: string,
   tags: string
 ) {
@@ -108,10 +107,9 @@ function validateCandidateForm(
     !placeName.trim() ||
     placeName.trim().length > 120 ||
     !address.trim() ||
-    address.trim().length > 120 ||
-    !area.trim()
+    address.trim().length > 120
   ) {
-    errors.place = '장소명과 주소는 1~120자, 지역은 반드시 입력해 주세요.';
+    errors.place = '장소명과 주소를 1~120자로 입력해 주세요.';
   }
 
   if (
@@ -190,49 +188,11 @@ export function CandidateManagementPanel({
     null,
   );
   const [isArchiving, setIsArchiving] = useState(false);
-  const hydratedEditingCandidateRef = useRef<string | null>(null);
 
   const editingCandidate = editingCandidateId
     ? room.candidates.find((candidate) => candidate.id === editingCandidateId) ??
       null
     : null;
-
-  useEffect(() => {
-    if (!editingCandidateId) {
-      hydratedEditingCandidateRef.current = null;
-      return;
-    }
-    if (hydratedEditingCandidateRef.current === editingCandidateId) {
-      return;
-    }
-
-    const candidate = room.candidates.find(
-      (item) => item.id === editingCandidateId,
-    );
-    if (!candidate) {
-      const timerId = window.setTimeout(() => {
-        setEditingCandidateId(null);
-      }, 0);
-      return () => window.clearTimeout(timerId);
-    }
-
-    const values = getCandidateFormValues(candidate);
-    const timerId = window.setTimeout(() => {
-      setDate(values.date);
-      setStartTime(values.startTime);
-      setEndTime(values.endTime);
-      setPlaceName(values.placeName);
-      setAddress(values.address);
-      setArea(values.area);
-      setCost(values.cost);
-      setTags(values.tags);
-      setFieldErrors({});
-      setFormError('');
-      setFormNotice('');
-      hydratedEditingCandidateRef.current = editingCandidateId;
-    }, 0);
-    return () => window.clearTimeout(timerId);
-  }, [editingCandidateId, room.candidates]);
 
   if (!isHost) {
     return null;
@@ -276,6 +236,27 @@ export function CandidateManagementPanel({
     setFormNotice('');
   }
 
+  function populateCandidateForm(values: ReturnType<typeof getCandidateFormValues>) {
+    setDate(values.date);
+    setStartTime(values.startTime);
+    setEndTime(values.endTime);
+    setPlaceName(values.placeName);
+    setAddress(values.address);
+    setArea(values.area);
+    setCost(values.cost);
+    setTags(values.tags);
+    setFieldErrors({});
+    setFormError('');
+    setPanelError('');
+    setFormNotice('');
+  }
+
+  function addAnotherTime(candidate: Candidate) {
+    setEditingCandidateId(null);
+    populateCandidateForm({ ...getCandidateFormValues(candidate), startTime: '', endTime: '' });
+    window.requestAnimationFrame(() => document.getElementById('candidate-start-time')?.focus());
+  }
+
   function applyTimePreset(start: string, end: string) {
     setStartTime(start);
     setEndTime(end);
@@ -294,13 +275,16 @@ export function CandidateManagementPanel({
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (editingCandidateId && !editingCandidate) {
+      setFormError('이 후보가 목록에서 제외되었습니다. 수정 취소를 눌러 주세요.');
+      return;
+    }
     const errors = validateCandidateForm(
       date,
       startTime,
       endTime,
       placeName,
       address,
-      area,
       cost,
       tags
     );
@@ -315,6 +299,12 @@ export function CandidateManagementPanel({
       .split(',')
       .map((tag) => tag.trim().toUpperCase())
       .filter(Boolean);
+    const normalizedName = placeName.trim();
+    const normalizedAddress = address.trim();
+    const knownArea = room.candidates.find(
+      (candidate) => candidate.id !== editingCandidateId &&
+        candidate.place.name === normalizedName && candidate.place.address === normalizedAddress
+    )?.place.area;
     const input: CreateCandidateInput = {
       displayOrder: editingCandidate?.displayOrder ?? candidateNumber,
       time: {
@@ -323,9 +313,9 @@ export function CandidateManagementPanel({
         timezone: MEETPOINT_TIMEZONE,
       },
       place: {
-        name: placeName.trim(),
-        address: address.trim(),
-        area: area.trim(),
+        name: normalizedName,
+        address: normalizedAddress,
+        area: area.trim() || knownArea || normalizedAddress,
       },
       estimatedCostPerPersonKrw: Number(cost),
       tags: normalizedTags,
@@ -369,9 +359,7 @@ export function CandidateManagementPanel({
   function startEditing(candidate: Candidate) {
     setArchiveCandidateId(null);
     setEditingCandidateId(candidate.id);
-    setFormError('');
-    setPanelError('');
-    setFormNotice('');
+    populateCandidateForm(getCandidateFormValues(candidate));
   }
 
   function cancelEditing() {
@@ -413,49 +401,19 @@ export function CandidateManagementPanel({
   }
 
   return (
-    <section className='mp-card border-emerald-100 bg-emerald-50/55 p-4 sm:p-6'>
-      <div className='mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
+    <section className='space-y-4 p-4 sm:p-6'>
+      <div className='flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1'>
         <div className='space-y-1.5'>
-          <p className='text-sm font-semibold text-emerald-700'>방장</p>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
             모임 후보 관리
           </h2>
           <p className='text-sm leading-6 text-slate-600'>
-            참여자들이 비교할 시간과 장소를 최대 5개까지 등록할 수 있습니다.
+            날짜·시간, 장소, 1인 예상 비용을 입력하세요.
           </p>
         </div>
-        <span className='w-fit rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600'>
+        <span className='text-xs font-semibold text-slate-600'>
           {room.candidates.length} / 5개 후보
         </span>
-      </div>
-
-      <div className='mb-4 rounded-xl border border-emerald-100 bg-white/75 p-3'>
-        <div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-          <div>
-            <p className='text-sm font-semibold text-slate-950'>빠른 입력</p>
-            <p className='mt-1 text-xs leading-5 text-slate-500'>
-              예시를 채워 입력 방법을 확인할 수 있습니다.
-            </p>
-          </div>
-          <div className='flex flex-wrap gap-2'>
-            <button
-              className='mp-button rounded-lg bg-emerald-700 px-3 py-1.5 text-xs text-white hover:bg-emerald-800'
-              onClick={fillExample}
-              disabled={isCandidateMutationDisabled || isSubmitting}
-              type='button'
-            >
-              예시로 채우기
-            </button>
-            <button
-              className='mp-button mp-button-secondary rounded-lg px-3 py-1.5 text-xs'
-              onClick={clearCandidateForm}
-              disabled={isCandidateMutationDisabled || isSubmitting}
-              type='button'
-            >
-              입력 지우기
-            </button>
-          </div>
-        </div>
       </div>
 
       {formNotice && (
@@ -475,15 +433,10 @@ export function CandidateManagementPanel({
         </p>
       )}
 
-      <div className='mb-5 space-y-3'>
-        {room.candidates.length === 0 ? (
-          <div className='rounded-xl border border-dashed border-emerald-200 bg-white/65 p-4 text-sm leading-5 text-slate-500'>
-            아직 후보가 없습니다. 아래 입력창에서 첫 후보를 등록해 주세요.
-          </div>
-        ) : (
-          room.candidates.map((candidate) => (
+      <div className='space-y-2 empty:hidden'>
+        {room.candidates.map((candidate) => (
             <article
-              className='rounded-xl border border-white/80 bg-white/80 p-4'
+              className='rounded-xl border border-white/80 bg-white/80 p-3.5'
               key={candidate.id}
             >
               <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
@@ -522,6 +475,16 @@ export function CandidateManagementPanel({
                 </div>
 
                 <div className='flex shrink-0 flex-wrap gap-2'>
+                  {!hasReachedCandidateLimit && !isCandidateMutationDisabled && (
+                    <button
+                      className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
+                      disabled={isSubmitting || isArchiving}
+                      onClick={() => addAnotherTime(candidate)}
+                      type='button'
+                    >
+                      다른 시간 추가
+                    </button>
+                  )}
                   <button
                     className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
                     disabled={isCandidateMutationDisabled || isSubmitting || isArchiving}
@@ -572,8 +535,7 @@ export function CandidateManagementPanel({
                 </div>
               )}
             </article>
-          ))
-        )}
+          ))}
       </div>
 
       {isCandidateMutationDisabled ? (
@@ -582,7 +544,7 @@ export function CandidateManagementPanel({
             ? '추천 결과를 준비 중이라 후보를 바꿀 수 없습니다.'
             : '일정이 확정되었거나 종료된 방에서는 후보를 변경할 수 없습니다.'}
         </p>
-      ) : hasReachedCandidateLimit && !editingCandidate ? (
+      ) : hasReachedCandidateLimit && !editingCandidateId ? (
         <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
           후보 5개가 이미 등록되어 더 추가할 수 없습니다. 기존 후보를 제외하면 새 후보를 등록할 수 있습니다.
         </p>
@@ -596,11 +558,11 @@ export function CandidateManagementPanel({
           fieldErrors={fieldErrors}
           formError={formError}
           isSubmitting={isSubmitting}
-          mode={editingCandidate ? 'edit' : 'create'}
+          mode={editingCandidateId ? 'edit' : 'create'}
           nextCandidateNumber={candidateNumber}
           onAddressChange={setAddress}
           onAreaChange={setArea}
-          onCancel={editingCandidate ? cancelEditing : undefined}
+          onCancel={editingCandidateId ? cancelEditing : undefined}
           onCostChange={setCost}
           onDateChange={applyDate}
           onEndTimeChange={(value) => applyTimeChange(setEndTime, value)}
@@ -613,6 +575,15 @@ export function CandidateManagementPanel({
           startTime={startTime}
           tags={tags}
         />
+      )}
+      {!isCandidateMutationDisabled && (!hasReachedCandidateLimit || editingCandidate) && (
+        <details className='mt-4 text-sm text-slate-700'>
+          <summary className='cursor-pointer py-1 font-semibold'>입력 도구</summary>
+          <div className='mt-2 flex flex-wrap gap-2'>
+            <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={fillExample} type='button'>예시로 채우기</button>
+            <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={clearCandidateForm} type='button'>입력 지우기</button>
+          </div>
+        </details>
       )}
     </section>
   );
