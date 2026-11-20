@@ -221,7 +221,7 @@ export function RoomWorkspaceWidget({
           </div>
           {actionLink && (
             <button
-              className="mp-button mp-button-primary mt-3 w-full bg-emerald-800 sm:mt-0 sm:w-auto sm:shrink-0"
+              className="mp-button mp-button-primary mt-3 w-full sm:mt-0 sm:w-auto sm:shrink-0"
               onClick={() => goToTarget(actionLink.target)}
               type="button"
             >
@@ -243,7 +243,7 @@ export function RoomWorkspaceWidget({
                 aria-current={isActive ? "step" : undefined}
                 className={`mp-button rounded-lg border px-2.5 py-2 text-xs ${
                   isActive
-                    ? "border-slate-950 bg-slate-950 text-white"
+                    ? "border-slate-800 bg-slate-100 text-slate-950"
                     : "border-transparent text-slate-600 hover:bg-slate-100"
                 }`}
                 key={step}
@@ -268,13 +268,13 @@ export function RoomWorkspaceWidget({
             tabIndex={-1}
           >
             <details
-              className="mp-card group border-emerald-100 bg-emerald-50/45"
+              className="mp-card group"
               onToggle={(event) =>
                 setIsCandidatePanelOpen(event.currentTarget.open)
               }
               open={isCandidatePanelOpen}
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-emerald-600 sm:px-5 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-slate-600 sm:px-5 [&::-webkit-details-marker]:hidden">
                 <span>
                   <span className="block text-sm font-semibold text-slate-950">
                     후보 관리
@@ -287,7 +287,7 @@ export function RoomWorkspaceWidget({
                   ⌄
                 </span>
               </summary>
-              <div className="border-t border-emerald-100/80">
+              <div className="border-t border-slate-200">
                 <CandidateManagementPanel
                   onRoomRefresh={onRoomRefresh}
                   participantId={participantId}
@@ -326,7 +326,7 @@ export function RoomWorkspaceWidget({
           className={getSectionClassName(mobileStep === "condition", conditionPlacement)}
         >
           <details className="mp-card" onToggle={(event) => setIsConditionPanelOpen(event.currentTarget.open)} open={isConditionPanelOpen}>
-            <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-emerald-600">
+            <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-slate-600">
               선택 조건 {room.myCondition ? "보기" : "추가"}
             </summary>
             <ParticipantConditionPanel

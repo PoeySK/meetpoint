@@ -144,10 +144,10 @@ export function CalculationResultPanel({
   }
 
   return (
-    <section className='mp-card mp-card-raised p-4 sm:p-6'>
+    <section className='mp-card p-4 sm:p-6'>
       <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
         <div className='space-y-1.5'>
-          <p className='text-sm font-semibold text-emerald-700'>추천 결과</p>
+          <p className='text-sm font-semibold text-slate-700'>추천 결과</p>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
             모임 추천 결과 확인
           </h2>
@@ -191,7 +191,7 @@ export function CalculationResultPanel({
       )}
       {isLoadingResult && !calculation && (
         <div className='mt-4 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-600'>
-          <span className='h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-600' />
+          <span className='h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600' />
           추천 결과를 불러오고 있습니다.
         </div>
       )}

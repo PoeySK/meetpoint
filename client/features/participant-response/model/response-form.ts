@@ -379,7 +379,7 @@ export function formatCandidateTime(candidate: Candidate) {
 
 export function messageClassName(kind: ResponseMessageKind) {
   if (kind === 'success') {
-    return 'text-emerald-700';
+    return 'text-slate-700';
   }
   if (kind === 'info') {
     return 'text-slate-600';

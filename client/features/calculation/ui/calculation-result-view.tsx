@@ -112,8 +112,8 @@ export function CalculationStatus({
 }) {
   if (isCalculationRunning(calculation.status)) {
     return (
-      <div className="flex items-center gap-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
-        <span className="h-4 w-4 animate-spin rounded-full border-2 border-amber-200 border-t-amber-700" />
+      <div className="flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
+        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-slate-600" />
         추천 결과를 준비하고 있습니다. 준비되면 자동으로 보여드릴게요.
       </div>
     );
@@ -191,7 +191,7 @@ export function CompletedResult({
       </div>
 
       {calculation.recommendationWarnings.length > 0 && (
-        <div className="rounded-xl bg-amber-50 px-3 py-2.5 text-sm text-amber-800">
+        <div className="rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-700">
           확인할 점: {calculation.recommendationWarnings
             .map(getCalculationCodeLabel)
             .join(", ")}
@@ -206,8 +206,8 @@ export function CompletedResult({
           const isSelected = selectedCandidateId === candidate.candidateId;
           const issues = groupCandidateIssues(candidate);
           const selectionClassName = isSelected
-            ? "mp-button mt-4 w-full border border-emerald-700 bg-emerald-700 px-3 py-2.5 text-sm text-white hover:bg-emerald-800"
-            : "mp-button mp-button-secondary mt-4 w-full px-3 py-2.5 text-sm hover:border-emerald-500 hover:text-emerald-700";
+            ? "mp-button mt-4 w-full border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm text-white hover:bg-slate-800"
+            : "mp-button mp-button-secondary mt-4 w-full px-3 py-2.5 text-sm hover:border-slate-600 hover:text-slate-700";
 
           return (
             <article
@@ -216,7 +216,7 @@ export function CompletedResult({
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
                     {candidate.rank}순위
                   </p>
                   <h3 className="mt-1 text-lg font-semibold text-slate-950">
@@ -250,7 +250,7 @@ export function CompletedResult({
                 <span
                   className={
                     candidate.eligible
-                      ? "rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700"
+                      ? "rounded-full bg-slate-50 px-2.5 py-1 text-slate-700"
                       : "rounded-full bg-rose-50 px-2.5 py-1 text-rose-700"
                   }
                 >
@@ -299,7 +299,7 @@ export function CompletedResult({
                     className="rounded-lg bg-slate-50 text-sm"
                     key={participant.participantId}
                   >
-                    <summary className="cursor-pointer rounded-lg p-3 text-slate-700 focus-visible:outline-2 focus-visible:outline-emerald-600">
+                    <summary className="cursor-pointer rounded-lg p-3 text-slate-700 focus-visible:outline-2 focus-visible:outline-slate-600">
                       <span>{participantName(room, participant.participantId)}</span>{" "}
                       <strong className="text-slate-950">{participant.score.toFixed(1)}점</strong>{" "}
                       <span className="text-xs">상세 근거</span>

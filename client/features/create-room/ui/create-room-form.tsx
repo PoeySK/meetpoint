@@ -102,7 +102,7 @@ export function CreateRoomForm() {
   }
 
   return (
-    <section className="mp-card mp-card-raised p-4 sm:p-6">
+    <section className="mp-card p-4 sm:p-6">
       <h2 className="mb-4 text-lg font-bold">새 모임</h2>
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div className="space-y-2">

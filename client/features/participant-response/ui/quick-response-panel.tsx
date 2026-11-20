@@ -52,9 +52,9 @@ export function QuickResponsePanel({
             {availabilityOptions.map((option) => (
               <button
                 aria-pressed={availabilityStatus === option.value}
-                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                   availabilityStatus === option.value
-                    ? "border-emerald-600 bg-emerald-600 text-white"
+                    ? "border-slate-800 bg-slate-100 text-slate-950"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
                 }`}
                 disabled={isDisabled}
@@ -76,9 +76,9 @@ export function QuickResponsePanel({
             {travelOptions.map((option) => (
               <button
                 aria-pressed={travelBurden === option.value}
-                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                   travelBurden === option.value
-                    ? "border-slate-950 bg-slate-950 text-white"
+                    ? "border-slate-800 bg-slate-100 text-slate-950"
                     : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
                 }`}
                 disabled={isDisabled}
@@ -95,7 +95,7 @@ export function QuickResponsePanel({
 
       <div className="mt-5 flex flex-col gap-3 sm:flex-row">
         <button
-          className="mp-button mp-button-secondary w-full border-emerald-700 text-emerald-800 sm:w-auto"
+          className="mp-button mp-button-secondary w-full sm:w-auto"
           disabled={isDisabled || !availabilityStatus || !travelBurden}
           onClick={onSave}
           type="button"

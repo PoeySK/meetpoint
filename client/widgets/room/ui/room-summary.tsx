@@ -45,7 +45,7 @@ export function RoomSummary({
   }
 
   return (
-    <header className='mp-card mp-card-raised overflow-hidden'>
+    <header className='mp-card overflow-hidden'>
       <div className='flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-4 sm:px-6'>
         <div className='min-w-0'>
           <h1 className='text-xl font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere] sm:text-2xl'>
@@ -55,7 +55,7 @@ export function RoomSummary({
             방장 {room.hostParticipant.displayName} · 참여자 {room.participants.length}/{room.room.maxParticipants}명
           </p>
         </div>
-        <span className='rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-800'>
+        <span className='rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700'>
           {statusLabels[room.room.status]}
         </span>
       </div>
@@ -63,11 +63,11 @@ export function RoomSummary({
       {isConfirmed && (
         <section
           aria-labelledby='room-confirmed-schedule-heading'
-          className='mx-3 mb-3 scroll-mt-4 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-3.5 sm:mx-5 sm:p-4'
+          className='mx-3 mb-3 scroll-mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 sm:mx-5 sm:p-4'
           id='room-confirmed-schedule'
           tabIndex={-1}
         >
-          <h2 className='mb-3 text-base font-bold text-emerald-950' id='room-confirmed-schedule-heading'>
+          <h2 className='mb-3 text-base font-bold text-slate-700' id='room-confirmed-schedule-heading'>
             {decision?.status === 'CONFIRMED'
               ? '방장이 일정을 확정했습니다'
               : '확정 일정'}
@@ -93,7 +93,7 @@ export function RoomSummary({
             {copyState === 'copied' ? '코드 복사됨' : '코드 복사'}
           </button>
           <button
-            className='mp-button mp-button-secondary px-2.5 py-2 text-xs text-emerald-800'
+            className='mp-button mp-button-secondary px-2.5 py-2 text-xs text-slate-700'
             onClick={copyInviteLink}
             type='button'
           >

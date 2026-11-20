@@ -419,7 +419,7 @@ export function CandidateManagementPanel({
       {formNotice && (
         <p
           aria-live='polite'
-          className='mb-4 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm leading-5 text-emerald-800'
+          className='mb-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700'
         >
           {formNotice}
         </p>
@@ -436,12 +436,12 @@ export function CandidateManagementPanel({
       <div className='space-y-2 empty:hidden'>
         {room.candidates.map((candidate) => (
             <article
-              className='rounded-xl border border-white/80 bg-white/80 p-3.5'
+              className='rounded-xl border border-slate-200 p-3.5'
               key={candidate.id}
             >
               <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
                 <div className='min-w-0 space-y-1'>
-                  <p className='text-xs font-semibold text-emerald-700'>
+                  <p className='text-xs font-semibold text-slate-700'>
                     후보 {candidate.displayOrder}번
                   </p>
                   <h3 className='text-base font-semibold text-slate-950'>
@@ -464,7 +464,7 @@ export function CandidateManagementPanel({
                     <div className='flex flex-wrap gap-1.5 pt-1'>
                       {candidate.tags.map((tag) => (
                         <span
-                          className='rounded-full bg-emerald-50 px-2 py-1 text-xs font-medium text-emerald-700'
+                          className='rounded-full bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700'
                           key={tag}
                         >
                           {tag}

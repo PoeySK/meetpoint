@@ -287,7 +287,7 @@ export function ParticipantConditionPanel({
             </legend>
             {windows.map((window, index) => (
               <div
-                className='rounded-xl border border-sky-100 bg-white/80 p-3'
+                className='rounded-xl border border-slate-200 bg-white/80 p-3'
                 key={`condition-window-${index}`}
               >
                 <div className='mb-2 flex items-center justify-between gap-2'>
@@ -442,7 +442,7 @@ export function ParticipantConditionPanel({
           </fieldset>
 
           {formMessage && (
-            <p aria-live='polite' className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-sky-800'>
+            <p aria-live='polite' className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-700'>
               {formMessage}
             </p>
           )}

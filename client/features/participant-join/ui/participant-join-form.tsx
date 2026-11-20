@@ -131,7 +131,7 @@ export function ParticipantJoinForm({
           </Link>
         </div>
 
-        <section className='mp-card mp-card-raised space-y-4 p-4 sm:p-6'>
+        <section className='mp-card space-y-4 p-4 sm:p-6'>
           <h1 className='text-2xl font-bold tracking-tight'>모임에 참여하기</h1>
           {existingRoomId && (
             <div className='space-y-3 border-b border-slate-200 pb-4'>

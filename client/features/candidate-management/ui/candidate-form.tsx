@@ -195,7 +195,7 @@ export function CandidateForm({
       {formError && <p aria-live="polite" className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formError}</p>}
 
       <div className="flex flex-col gap-2 sm:flex-row-reverse">
-        <button className="mp-button mp-button-primary w-full bg-emerald-700 hover:bg-emerald-800" disabled={isSubmitting} type="submit">
+        <button className="mp-button mp-button-primary w-full" disabled={isSubmitting} type="submit">
           {isSubmitting ? "저장 중..." : mode === "edit" ? "수정 내용 저장" : "후보 등록"}
         </button>
         {mode === "edit" && onCancel && (

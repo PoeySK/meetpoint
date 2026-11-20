@@ -72,7 +72,7 @@ export function CandidateResponseCard({
           {formatCandidateTime(candidate)}
         </p>
         {form.reconfirmRequired && (
-          <p role='status' className='text-sm leading-6 text-amber-800'>
+          <p role='status' className='text-sm leading-6 text-slate-700'>
             후보가 변경되어 의견 재확인이 필요합니다. 이전 의견은 초안으로 남아 있습니다.
             현재 시간·장소·비용·특징을 확인하고 다시 저장해 주세요.
           </p>
@@ -84,7 +84,7 @@ export function CandidateResponseCard({
           <div className='flex flex-wrap gap-2 pt-1'>
             {candidate.tags.map((tag) => (
               <span
-                className='text-xs text-emerald-700'
+                className='text-xs text-slate-600'
                 key={tag}
               >
                 #{tag}
@@ -103,9 +103,9 @@ export function CandidateResponseCard({
             {availabilityOptions.map((option) => (
               <button
                 aria-pressed={form.availabilityStatus === option.value}
-                className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                   form.availabilityStatus === option.value
-                    ? 'border-emerald-600 bg-emerald-600 text-white'
+                    ? 'border-slate-800 bg-slate-100 text-slate-950'
                     : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'
                 }`}
                 disabled={isDisabled}
@@ -122,7 +122,7 @@ export function CandidateResponseCard({
         </fieldset>
 
         {autoFillDescription && (
-          <p className='text-sm leading-5 text-sky-800'>
+          <p className='text-sm leading-5 text-slate-700'>
             {autoFillDescription} 아직 저장하지 않은 초안입니다.
           </p>
         )}
@@ -135,9 +135,9 @@ export function CandidateResponseCard({
             {travelOptions.map((option) => (
               <button
                 aria-pressed={form.travelBurden === option.value}
-                className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-emerald-100 disabled:cursor-not-allowed disabled:opacity-60 ${
+                className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
                   form.travelBurden === option.value
-                    ? 'border-slate-950 bg-slate-950 text-white'
+                    ? 'border-slate-800 bg-slate-100 text-slate-950'
                     : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
                 }`}
                 disabled={isDisabled}
@@ -154,7 +154,7 @@ export function CandidateResponseCard({
         {condition && (
           <div
             aria-live='polite'
-            className='rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800'
+            className='rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700'
           >
             <p className='font-semibold'>저장된 선택 조건과 비교</p>
             <p className='mt-1'>

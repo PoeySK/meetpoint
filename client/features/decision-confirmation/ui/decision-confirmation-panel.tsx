@@ -55,11 +55,11 @@ export function DecisionConfirmationPanel({
       {decision && (
         <section
           aria-labelledby="decision-summary-heading"
-          className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/55 p-4"
+          className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
         >
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold text-emerald-700">확정 결과</p>
+              <p className="text-sm font-semibold text-slate-700">확정 결과</p>
               <h3
                 className="mt-1 text-lg font-semibold text-slate-950"
                 id="decision-summary-heading"
@@ -76,7 +76,7 @@ export function DecisionConfirmationPanel({
             </span>
           </div>
           {scheduleAtTop ? (
-            <a className="mt-3 inline-block text-sm font-semibold text-emerald-800 underline" href="#room-confirmed-schedule">
+            <a className="mt-3 inline-block text-sm font-semibold text-slate-700 underline" href="#room-confirmed-schedule">
               확정 일정 보기
             </a>
           ) : (
@@ -99,7 +99,7 @@ export function DecisionConfirmationPanel({
             </div>
           </div>
           {decision.status === "REOPENED" && (
-            <p className="mt-4 text-sm leading-6 text-amber-800">
+            <p className="mt-4 text-sm leading-6 text-slate-700">
               <strong>다시 검토하는 이유:</strong>{" "}
               {decision.reopenReason ?? "이유가 기록되었습니다."}
               <br />
@@ -108,7 +108,7 @@ export function DecisionConfirmationPanel({
             </p>
           )}
           {decision.status === "CONFIRMED" && isHost && (
-            <div className="mt-5 border-t border-emerald-100 pt-5">
+            <div className="mt-5 border-t border-slate-200 pt-5">
               <label className="block space-y-2 text-sm font-semibold text-slate-800">
                 다시 검토하는 이유
                 <textarea
@@ -136,7 +136,7 @@ export function DecisionConfirmationPanel({
       {decisionNotice && (
         <p
           aria-live="polite"
-          className="mt-4 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm leading-5 text-emerald-700"
+          className="mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700"
         >
           {decisionNotice}
         </p>
@@ -158,7 +158,7 @@ export function DecisionConfirmationPanel({
             aria-labelledby="decision-form-heading"
             className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4"
           >
-            <p className="text-sm font-semibold text-emerald-700">최종 일정 확정</p>
+            <p className="text-sm font-semibold text-slate-700">최종 일정 확정</p>
             <h3
               className="mt-1 text-lg font-semibold text-slate-950"
               id="decision-form-heading"
@@ -181,7 +181,7 @@ export function DecisionConfirmationPanel({
                   선택한 후보: <strong>{selectedCandidateName ?? "후보 정보를 불러오지 못했습니다"}</strong>
                 </p>
                 {!coverageIsComplete && (
-                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-800">
+                  <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
                     응답 {calculation.coverage.submittedResponses}개 /
                     전체 {calculation.coverage.expectedResponses}개가 저장되어야 일정을 확정할 수 있습니다.
                   </p>
@@ -190,7 +190,7 @@ export function DecisionConfirmationPanel({
                   <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
                     <input
                       checked={acknowledgeIssues}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-emerald-700 focus:ring-emerald-500"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
                       onChange={(event) =>
                         onAcknowledgeIssuesChange(event.target.checked)
                       }

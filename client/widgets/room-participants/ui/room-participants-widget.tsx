@@ -55,11 +55,11 @@ export function RoomParticipantsWidget({
   return (
     <section
       aria-labelledby='room-participants-heading'
-      className='mp-card mp-card-raised p-4 sm:p-6'
+      className='mp-card p-4 sm:p-6'
     >
       <div className='flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between'>
         <div>
-          <p className='text-sm font-semibold text-emerald-700'>참여자</p>
+          <p className='text-sm font-semibold text-slate-700'>참여자</p>
           <h2
             className='mt-1 text-xl font-semibold tracking-tight text-slate-950'
             id='room-participants-heading'
@@ -72,7 +72,7 @@ export function RoomParticipantsWidget({
         </p>
       </div>
 
-      <div className='mt-4 rounded-xl bg-emerald-50 px-3 py-2.5 text-sm text-emerald-800'>
+      <div className='mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm text-slate-700'>
         <div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
           <p>
             <span className='font-semibold'>
@@ -82,7 +82,7 @@ export function RoomParticipantsWidget({
           </p>
           {!isHost && (
             <button
-              className='mp-button mp-button-secondary w-fit border-emerald-700 px-3 py-1.5 text-xs text-emerald-800 hover:border-emerald-700 hover:bg-emerald-100'
+              className='mp-button mp-button-secondary w-fit px-3 py-1.5 text-xs'
               disabled={
                 !canChangeParticipants ||
                 isLeaving ||
@@ -98,7 +98,7 @@ export function RoomParticipantsWidget({
       </div>
 
       {!canChangeParticipants && (
-        <p className='mt-3 rounded-xl bg-amber-50 px-3 py-2.5 text-sm leading-5 text-amber-800'>
+        <p className='mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700'>
           추천 결과를 준비 중이거나 일정이 확정된 뒤, 또는 모임이 종료된 뒤에는 참여자를 바꿀 수 없습니다.
         </p>
       )}
@@ -109,7 +109,7 @@ export function RoomParticipantsWidget({
           className={`mt-3 rounded-xl px-3 py-2.5 text-sm leading-5 ${
             actionError
               ? 'bg-rose-50 text-rose-700'
-              : 'bg-emerald-50 text-emerald-800'
+              : 'bg-slate-50 text-slate-700'
           }`}
         >
           {actionError ?? actionNotice}
@@ -129,7 +129,7 @@ export function RoomParticipantsWidget({
                 <p className='font-semibold text-slate-950 [overflow-wrap:anywhere]'>
                   {participant.displayName}
                   {isCurrentParticipant && (
-                    <span className='ml-2 text-xs font-semibold text-emerald-700'>
+                    <span className='ml-2 text-xs font-semibold text-slate-700'>
                       나
                     </span>
                   )}
@@ -163,7 +163,7 @@ export function RoomParticipantsWidget({
                           : '제외 확인'}
                       </button>
                       <button
-                        className='rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-500 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-emerald-200 disabled:cursor-not-allowed disabled:opacity-50'
+                        className='rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-slate-500 hover:text-slate-950 focus:outline-none focus:ring-2 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-50'
                         disabled={Boolean(removingParticipantId)}
                         onClick={cancelKick}
                         type='button'
