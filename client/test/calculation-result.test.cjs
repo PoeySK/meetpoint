@@ -106,9 +106,9 @@ test('confirmed summary shows the decision candidate schedule, address and cost 
     hostParticipant: { displayName: '방장 이름' }, participants: [{}, {}, {}],
   };
   const summary = renderToStaticMarkup(require('react').createElement(RoomSummary, { decision, room }));
-  for (const text of ['방장이 일정을 확정했습니다', '확정 장소', '서울 중구 확정길 28', '시작: 2026. 11. 3. 오후 11:30', '종료: 2026. 11. 4. 오전 1:30', 'Asia/Seoul', '1인 예상 비용', '28,000원']) assert.ok(summary.includes(text), text);
+  for (const text of ['일정이 확정됐어요', '확정 장소', '서울 중구 확정길 28', '시작: 2026. 11. 3. 오후 11:30', '종료: 2026. 11. 4. 오전 1:30', 'Asia/Seoul', '1인 예상 비용', '28,000원']) assert.ok(summary.includes(text), text);
   assert.ok(summary.includes('dateTime="2026-11-03T14:30:00Z"'));
-  assert.ok(summary.indexOf('확정 장소') < summary.indexOf('초대 링크 복사'));
+  assert.ok(!summary.includes('초대 링크 복사'));
   for (const isHost of [true, false]) {
     const html = renderToStaticMarkup(DecisionConfirmationPanel({ decision, isHost, roomStatus: 'CONFIRMED' }));
     for (const text of ['#room-confirmed-schedule', '91.7점', '확정 메모 유지']) assert.ok(html.includes(text), text);
@@ -128,5 +128,5 @@ test('reopened summary uses the candidate timezone and preserves zero cost and r
   };
   const html = renderToStaticMarkup(DecisionConfirmationPanel({ decision, isHost: false, roomStatus: 'OPEN' }));
   for (const text of ['확정 내용을 다시 검토하는 중입니다', '검토할 주소', '시작: 2026. 11. 2. 오후 11:30', '종료: 2026. 11. 3. 오전 1:30', 'America/New_York', '0원', '시간 재검토', '기록 없음']) assert.ok(html.includes(text), text);
-  assert.ok(!html.includes('이 후보로 일정 확정'));
+  assert.ok(!html.includes('확정 전 일정 확인'));
 });

@@ -1,6 +1,8 @@
 import type { CalculationPayload, ScoreResultCandidate } from "@/entities/calculation";
+import type { Candidate } from "@/entities/candidate";
 import type { DecisionPayload } from "@/entities/decision";
 import type { RoomStatus } from "@/entities/room";
+import { useRef } from "react";
 import { DecisionSchedule } from "./decision-schedule";
 
 type DecisionConfirmationPanelProps = {
@@ -13,7 +15,7 @@ type DecisionConfirmationPanelProps = {
   isConfirming: boolean;
   isHost: boolean;
   isReopening: boolean;
-  onConfirm: () => void;
+  onConfirm: () => Promise<true | undefined>;
   onDecisionNoteChange: (value: string) => void;
   onReopen: () => void;
   onReopenReasonChange: (value: string) => void;
@@ -21,10 +23,79 @@ type DecisionConfirmationPanelProps = {
   roomStatus: RoomStatus;
   selectedCandidate: ScoreResultCandidate | undefined;
   selectedCandidateHasIssues: boolean;
-  selectedCandidateName: string | null;
+  selectedSchedule: Candidate | undefined;
   acknowledgeIssues: boolean;
   onAcknowledgeIssuesChange: (value: boolean) => void;
 };
+
+function DecisionReview({
+  candidate,
+  disabled,
+  error,
+  isConfirming,
+  onConfirm,
+}: {
+  candidate: Candidate;
+  disabled: boolean;
+  error: string | null;
+  isConfirming: boolean;
+  onConfirm: DecisionConfirmationPanelProps["onConfirm"];
+}) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+
+  async function confirmSchedule() {
+    if (disabled) return;
+    if (await onConfirm()) dialogRef.current?.close();
+  }
+
+  return (
+    <>
+      <button
+        aria-haspopup="dialog"
+        className="mp-button mp-button-accent min-h-11 w-full rounded-lg"
+        disabled={disabled}
+        onClick={() => dialogRef.current?.showModal()}
+        type="button"
+      >
+        확정 전 일정 확인
+      </button>
+      <dialog
+        aria-labelledby="decision-review-heading"
+        className="m-auto max-h-[calc(100dvh-1.5rem)] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-4 text-slate-950 shadow-xl transition-opacity duration-150 backdrop:bg-slate-950/40 sm:p-6 motion-reduce:transition-none starting:open:opacity-0"
+        onCancel={(event) => { if (isConfirming) event.preventDefault(); }}
+        ref={dialogRef}
+      >
+        <h2 className="text-xl font-bold tracking-tight" id="decision-review-heading">이 일정으로 확정할까요?</h2>
+        <p className="mt-1.5 break-keep text-sm leading-5 text-slate-600">
+          확정하면 방장과 참가자 모두 이 일정을 보게 됩니다.
+        </p>
+        <div className="my-4 rounded-lg border border-stone-200 bg-stone-50 p-3.5 sm:p-4">
+          <DecisionSchedule candidate={candidate} />
+        </div>
+        {error && <p className="mb-3 text-sm leading-5 text-rose-700" role="alert">{error}</p>}
+        <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+          <button
+            autoFocus
+            className="mp-button mp-button-secondary min-h-11 rounded-lg"
+            disabled={isConfirming}
+            onClick={() => dialogRef.current?.close()}
+            type="button"
+          >
+            돌아가기
+          </button>
+          <button
+            className="mp-button mp-button-accent min-h-11 rounded-lg"
+            disabled={disabled}
+            onClick={() => void confirmSchedule()}
+            type="button"
+          >
+            {isConfirming ? "일정을 확정하는 중…" : "일정 확정"}
+          </button>
+        </div>
+      </dialog>
+    </>
+  );
+}
 
 export function DecisionConfirmationPanel({
   acknowledgeIssues,
@@ -46,7 +117,7 @@ export function DecisionConfirmationPanel({
   roomStatus,
   selectedCandidate,
   selectedCandidateHasIssues,
-  selectedCandidateName,
+  selectedSchedule,
 }: DecisionConfirmationPanelProps) {
   const scheduleAtTop = roomStatus === "CONFIRMED" && decision?.status === "CONFIRMED";
 
@@ -178,7 +249,7 @@ export function DecisionConfirmationPanel({
             {selectedCandidate && calculation && (
               <div className="mt-3 space-y-3 rounded-xl bg-white p-3.5">
                 <p className="text-sm text-slate-700">
-                  선택한 후보: <strong>{selectedCandidateName ?? "후보 정보를 불러오지 못했습니다"}</strong>
+                  선택한 후보: <strong>{selectedSchedule?.place.name ?? "후보 정보를 불러오지 못했습니다"}</strong>
                 </p>
                 {!coverageIsComplete && (
                   <p className="rounded-lg bg-slate-50 px-3 py-2 text-sm leading-6 text-slate-700">
@@ -190,7 +261,7 @@ export function DecisionConfirmationPanel({
                   <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
                     <input
                       checked={acknowledgeIssues}
-                      className="mt-1 h-4 w-4 rounded border-slate-300 text-slate-700 focus:ring-slate-500"
+                      className="mt-1 h-4 w-4 shrink-0 accent-teal-700"
                       onChange={(event) =>
                         onAcknowledgeIssuesChange(event.target.checked)
                       }
@@ -217,19 +288,21 @@ export function DecisionConfirmationPanel({
                     {decisionNote.length}/300
                   </span>
                 </label>
-                <button
-                  className="mp-button mp-button-primary w-full"
-                  disabled={
-                    isConfirming ||
-                    !coverageIsComplete ||
-                    (selectedCandidateHasIssues &&
-                      (!acknowledgeIssues || !decisionNote.trim()))
-                  }
-                  onClick={onConfirm}
-                  type="button"
-                >
-                  {isConfirming ? "일정을 확정하는 중..." : "이 후보로 일정 확정"}
-                </button>
+                {selectedSchedule && (
+                  <DecisionReview
+                    candidate={selectedSchedule}
+                    disabled={
+                      isConfirming ||
+                      !coverageIsComplete ||
+                      (selectedCandidateHasIssues &&
+                        (!acknowledgeIssues || !decisionNote.trim()))
+                    }
+                    error={decisionError}
+                    isConfirming={isConfirming}
+                    key={`${calculation.id}:${selectedSchedule.id}:${selectedSchedule.version}`}
+                    onConfirm={onConfirm}
+                  />
+                )}
               </div>
             )}
           </section>

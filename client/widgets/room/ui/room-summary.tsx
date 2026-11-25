@@ -3,7 +3,7 @@
 import type { DecisionPayload } from '@/entities/decision';
 import type { RoomDetailsResponse, RoomStatus } from '@/entities/room';
 import { DecisionSchedule } from '@/features/decision-confirmation';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 const statusLabels: Record<RoomStatus, string> = {
   DRAFT: '준비 중',
@@ -24,6 +24,13 @@ export function RoomSummary({
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const [inviteCopyState, setInviteCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
   const isConfirmed = room.room.status === 'CONFIRMED';
+  const confirmedHeadingRef = useRef<HTMLHeadingElement>(null);
+  const wasConfirmed = useRef(isConfirmed);
+
+  useEffect(() => {
+    if (isConfirmed && !wasConfirmed.current) confirmedHeadingRef.current?.focus();
+    wasConfirmed.current = isConfirmed;
+  }, [isConfirmed]);
 
   async function copyRoomCode() {
     try {
@@ -44,6 +51,41 @@ export function RoomSummary({
     }
   }
 
+  if (isConfirmed) {
+    const confirmedDecision = decision?.status === 'CONFIRMED' ? decision : null;
+
+    return (
+      <section
+        aria-labelledby='room-confirmed-schedule-heading'
+        className='mp-card mx-auto max-w-3xl scroll-mt-4 rounded-xl p-4 sm:p-7'
+        id='room-confirmed-schedule'
+        tabIndex={-1}
+      >
+        <header className='flex items-start gap-3.5 sm:gap-4'>
+          <span aria-hidden='true' className='grid size-10 shrink-0 place-items-center rounded-lg bg-stone-100 text-xl font-bold text-stone-700'>✓</span>
+          <div className='min-w-0 [overflow-wrap:anywhere]'>
+            <p className='text-sm font-medium text-slate-600'>{room.room.title}</p>
+            <h1
+              className='mt-0.5 text-2xl font-bold tracking-tight text-slate-950 outline-none sm:text-3xl'
+              id='room-confirmed-schedule-heading'
+              ref={confirmedHeadingRef}
+              tabIndex={-1}
+            >
+              {confirmedDecision ? '일정이 확정됐어요' : '확정 일정'}
+            </h1>
+          </div>
+        </header>
+        <div className='mt-4 rounded-lg border border-stone-200 bg-stone-50 p-4 sm:mt-6 sm:p-5'>
+          {confirmedDecision ? (
+            <DecisionSchedule candidate={confirmedDecision.candidate} emphasized />
+          ) : (
+            <p className='text-sm text-slate-700'>일정 정보를 확인하려면 방을 다시 불러와 주세요.</p>
+          )}
+        </div>
+      </section>
+    );
+  }
+
   return (
     <header className='mp-card overflow-hidden'>
       <div className='flex flex-wrap items-start justify-between gap-x-4 gap-y-2 p-4 sm:px-6'>
@@ -59,26 +101,6 @@ export function RoomSummary({
           {statusLabels[room.room.status]}
         </span>
       </div>
-
-      {isConfirmed && (
-        <section
-          aria-labelledby='room-confirmed-schedule-heading'
-          className='mx-3 mb-3 scroll-mt-4 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 sm:mx-5 sm:p-4'
-          id='room-confirmed-schedule'
-          tabIndex={-1}
-        >
-          <h2 className='mb-3 text-base font-bold text-slate-700' id='room-confirmed-schedule-heading'>
-            {decision?.status === 'CONFIRMED'
-              ? '방장이 일정을 확정했습니다'
-              : '확정 일정'}
-          </h2>
-          {decision?.status === 'CONFIRMED' ? (
-            <DecisionSchedule candidate={decision.candidate} />
-          ) : (
-            <p className='text-sm text-slate-700'>일정 정보를 확인하려면 방을 다시 불러와 주세요.</p>
-          )}
-        </section>
-      )}
 
       <div className='border-t border-slate-100 px-4 py-2.5 sm:px-6'>
         <div className='flex flex-wrap items-center gap-x-2 gap-y-1'>

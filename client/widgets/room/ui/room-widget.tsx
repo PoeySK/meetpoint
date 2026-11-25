@@ -57,6 +57,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
   });
 
   const requiresRecovery = Boolean(refreshError?.requiresRecovery) || !accessToken;
+  const isConfirmed = room?.room.status === 'CONFIRMED';
   const roomTools = !requiresRecovery && (
     <details className='group rounded-xl border border-slate-200 bg-white/70' open={Boolean(recoveryRegistrationError)}>
       <summary className='flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-slate-600 [&::-webkit-details-marker]:hidden'>
@@ -110,37 +111,47 @@ export function RoomWidget({ roomId }: { roomId: string }) {
             {requiresRecovery && (
               <RoomRecoveryPanel roomId={roomId} token={null} onRecovered={() => void loadRoom()} />
             )}
-            {accessToken && participantId ? (
-              <RoomWorkspaceWidget
-                onRoomReload={refreshRoom}
-                onRoomRefresh={refreshRoom}
-                participantId={participantId}
-                room={room}
-                roomId={roomId}
-                roomTools={roomTools}
-                token={accessToken}
-                decision={decision}
-                latestScoreResult={latestScoreResult}
-              />
-            ) : (
-              <section className='mp-card border-slate-200 bg-slate-50 p-4 text-sm leading-5 text-slate-700'>
-                이 브라우저에서 방 입장 정보를 찾을 수 없어 후보 등록과 의견
-                작성을 사용할 수 없습니다. 개인 복구 수단으로 기존 참여자의
-                접근을 복구해 주세요.
-              </section>
-            )}
-            <div className='scroll-mt-4' id='room-participants' tabIndex={-1}>
-              <RoomParticipantsWidget
-                actionError={lifecycleError}
-                actionNotice={lifecycleNotice}
-                currentParticipant={room.currentParticipant}
-                isLeaving={isLeaving}
-                onKick={handleKick}
-                onLeave={handleLeave}
-                removingParticipantId={removingParticipantId}
-                room={room}
-              />
-            </div>
+            <details className='group/confirmed' open={!isConfirmed}>
+              <summary
+                className={`mp-card mx-auto max-w-3xl cursor-pointer list-none items-center justify-between gap-3 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:border-slate-400 focus-visible:outline-2 focus-visible:outline-slate-600 [&::-webkit-details-marker]:hidden ${isConfirmed ? 'flex' : 'hidden'}`}
+              >
+                <span>추천 근거와 방 관리</span>
+                <span aria-hidden='true' className='transition-transform group-open/confirmed:rotate-180 motion-reduce:transition-none'>⌄</span>
+              </summary>
+              <div className={isConfirmed ? 'mt-3 space-y-3' : 'space-y-3'}>
+                {accessToken && participantId ? (
+                  <RoomWorkspaceWidget
+                    onRoomReload={refreshRoom}
+                    onRoomRefresh={refreshRoom}
+                    participantId={participantId}
+                    room={room}
+                    roomId={roomId}
+                    roomTools={roomTools}
+                    token={accessToken}
+                    decision={decision}
+                    latestScoreResult={latestScoreResult}
+                  />
+                ) : (
+                  <section className='mp-card border-slate-200 bg-slate-50 p-4 text-sm leading-5 text-slate-700'>
+                    이 브라우저에서 방 입장 정보를 찾을 수 없어 후보 등록과 의견
+                    작성을 사용할 수 없습니다. 개인 복구 수단으로 기존 참여자의
+                    접근을 복구해 주세요.
+                  </section>
+                )}
+                <div className='scroll-mt-4' id='room-participants' tabIndex={-1}>
+                  <RoomParticipantsWidget
+                    actionError={lifecycleError}
+                    actionNotice={lifecycleNotice}
+                    currentParticipant={room.currentParticipant}
+                    isLeaving={isLeaving}
+                    onKick={handleKick}
+                    onLeave={handleLeave}
+                    removingParticipantId={removingParticipantId}
+                    room={room}
+                  />
+                </div>
+              </div>
+            </details>
           </div>
         )}
       </div>

@@ -255,7 +255,7 @@ test('explicit reload and personal recovery keep mounted room/condition/response
 });
 test('loaded room exposes the existing explicit retry action and keeps the workspace during recovery', () => {
   const workspace = () => null; const recovery = () => null; let retries = 0;
-  const session = { room: { currentParticipant: {} }, accessToken: 'fixture', participantId: 'original', isLoading: false, error: null, refreshError: { requiresRecovery: true, message: 'Fixture' }, retryRoom: () => { retries++; }, loadRoom() {} };
+  const session = { room: { room: { status: 'OPEN' }, currentParticipant: {} }, accessToken: 'fixture', participantId: 'original', isLoading: false, error: null, refreshError: { requiresRecovery: true, message: 'Fixture' }, retryRoom: () => { retries++; }, loadRoom() {} };
   const { RoomWidget } = load('widgets/room/ui/room-widget.tsx', {
     react: { useCallback: (fn) => fn }, 'next/navigation': { useRouter: () => ({}) }, 'next/link': () => null,
     '@/features/participant-lifecycle': { useParticipantLifecycle: () => ({}) }, '@/features/room-recovery': { RoomRecoveryPanel: recovery },
