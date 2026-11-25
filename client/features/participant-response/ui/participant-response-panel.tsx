@@ -113,6 +113,7 @@ export function ParticipantResponsePanel({
   }
 
   const candidateForms = activeCandidates.map((candidate) => ({ candidate, form: getForm(candidate.id) }));
+  const savedCount = candidateForms.filter(({ form }) => form.savedResponseId && !form.reconfirmRequired).length;
   const readyToSave = candidateForms.filter(({ form }) => {
     const state = getResponseState(form);
     const wasEdited = state === 'dirty' || (state === 'reconfirm' && form.manuallyEdited);
@@ -324,9 +325,12 @@ export function ParticipantResponsePanel({
         <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
           후보별 의견
         </h2>
-        <p className='text-sm leading-6 text-slate-500'>
-          후보마다 참석 가능 여부와 이동 부담을 선택해 주세요.
-        </p>
+        {!isReadOnly && activeCandidates.length > 0 && (
+          <div className='space-y-1.5'>
+            <p className='text-sm font-medium text-slate-700'>{activeCandidates.length}개 후보 중 {savedCount}개에 의견을 남겼어요</p>
+            <progress aria-label='내 의견 저장 진행률' className='block h-1.5 w-full max-w-xs accent-stone-700' max={activeCandidates.length} value={savedCount} />
+          </div>
+        )}
         {isReadOnly && (
           <p className='rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600'>
             현재 방 상태에서는 의견을 수정할 수 없습니다. 계산 중에는 완료를
@@ -341,12 +345,12 @@ export function ParticipantResponsePanel({
         </div>
       ) : (
         <>
-          <div className='grid gap-3 lg:grid-cols-2'>
-            {activeCandidates.map((candidate) => (
+          <div className='grid grid-cols-[repeat(auto-fit,minmax(min(100%,21rem),1fr))] items-start gap-3'>
+            {candidateForms.map(({ candidate, form }) => (
               <CandidateResponseCard
                 candidate={candidate}
                 condition={condition}
-                form={getForm(candidate.id)}
+                form={form}
                 isBulkSubmitting={isBulkSubmitting}
                 isReadOnly={isReadOnly}
                 key={candidate.id}

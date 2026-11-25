@@ -24,7 +24,7 @@ import {
 import { RoomApiError } from '@/shared/api/http-client';
 import { getRoomAccessErrorMessage } from '@/shared/lib/room-access-error';
 import { MEETPOINT_TIMEZONE } from '@/shared/config/meetpoint';
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 
 type CandidateManagementPanelProps = {
   roomId: string;
@@ -56,12 +56,12 @@ function getCandidateFormValues(candidate: Candidate) {
   };
 }
 
-function formatCandidateDateTime(value: string, timezone: string) {
+function formatCandidateTimeRange({ startsAt, endsAt, timezone }: Candidate['time']) {
   return new Intl.DateTimeFormat('ko-KR', {
     dateStyle: 'medium',
     timeStyle: 'short',
     timeZone: timezone,
-  }).format(new Date(value));
+  }).formatRange(new Date(startsAt), new Date(endsAt));
 }
 
 function parseTimeValue(value: string) {
@@ -181,6 +181,9 @@ export function CandidateManagementPanel({
   const [panelError, setPanelError] = useState('');
   const [formNotice, setFormNotice] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddingCandidate, setIsAddingCandidate] = useState(false);
+  const composerRef = useRef<HTMLElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [editingCandidateId, setEditingCandidateId] = useState<string | null>(
     null,
   );
@@ -203,6 +206,7 @@ export function CandidateManagementPanel({
     room.room.status === 'CONFIRMED' ||
     room.room.status === 'CLOSED';
   const hasReachedCandidateLimit = room.candidates.length >= 5;
+  const showComposer = room.candidates.length === 0 || isAddingCandidate || Boolean(editingCandidateId);
   const candidateNumber = editingCandidate?.displayOrder ??
     room.candidates.length + 1;
 
@@ -254,7 +258,12 @@ export function CandidateManagementPanel({
   function addAnotherTime(candidate: Candidate) {
     setEditingCandidateId(null);
     populateCandidateForm({ ...getCandidateFormValues(candidate), startTime: '', endTime: '' });
-    window.requestAnimationFrame(() => document.getElementById('candidate-start-time')?.focus());
+    openComposer();
+  }
+
+  function openComposer() {
+    setIsAddingCandidate(true);
+    window.requestAnimationFrame(() => composerRef.current?.focus());
   }
 
   function applyTimePreset(start: string, end: string) {
@@ -340,9 +349,11 @@ export function CandidateManagementPanel({
       } else {
         await createCandidate(roomId, token, input);
         clearCandidateForm();
-        setFormNotice('후보를 등록했습니다. 참여자들에게 의견을 남겨 달라고 알려 주세요.');
+        setFormNotice('후보를 올렸어요. 다른 시간이나 장소도 후보로 올릴 수 있어요.');
       }
+      setIsAddingCandidate(false);
       await onRoomRefresh();
+      window.requestAnimationFrame(() => headingRef.current?.focus());
     } catch (error) {
       setFormError(describeCandidateError(error));
       if (
@@ -360,11 +371,14 @@ export function CandidateManagementPanel({
     setArchiveCandidateId(null);
     setEditingCandidateId(candidate.id);
     populateCandidateForm(getCandidateFormValues(candidate));
+    openComposer();
   }
 
-  function cancelEditing() {
+  function closeComposer() {
     setEditingCandidateId(null);
+    setIsAddingCandidate(false);
     clearCandidateForm();
+    window.requestAnimationFrame(() => headingRef.current?.focus());
   }
 
   async function handleArchive(candidate: Candidate) {
@@ -404,16 +418,18 @@ export function CandidateManagementPanel({
     <section className='space-y-4 p-4 sm:p-6'>
       <div className='flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1'>
         <div className='space-y-1.5'>
-          <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
+          <h2 className='scroll-mt-4 text-xl font-semibold tracking-tight text-slate-950' ref={headingRef} tabIndex={-1}>
             모임 후보 관리
           </h2>
-          <p className='text-sm leading-6 text-slate-600'>
-            날짜·시간, 장소, 1인 예상 비용을 입력하세요.
-          </p>
         </div>
-        <span className='text-xs font-semibold text-slate-600'>
-          {room.candidates.length} / 5개 후보
-        </span>
+        <div className='flex items-center gap-3'>
+          <span className='text-xs font-semibold text-slate-600'>후보 {room.candidates.length}/5</span>
+          {!showComposer && !hasReachedCandidateLimit && !isCandidateMutationDisabled && (
+            <button className='mp-button mp-button-accent min-h-11 rounded-lg' onClick={openComposer} type='button'>
+              후보 추가
+            </button>
+          )}
+        </div>
       </div>
 
       {formNotice && (
@@ -436,29 +452,19 @@ export function CandidateManagementPanel({
       <div className='space-y-2 empty:hidden'>
         {room.candidates.map((candidate) => (
             <article
-              className='rounded-xl border border-slate-200 p-3.5'
+              className='rounded-xl border border-stone-200 bg-stone-50 p-3.5 sm:p-4'
               key={candidate.id}
             >
               <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
                 <div className='min-w-0 space-y-1'>
                   <p className='text-xs font-semibold text-slate-700'>
-                    후보 {candidate.displayOrder}번
+                    {formatCandidateTimeRange(candidate.time)}
                   </p>
                   <h3 className='text-base font-semibold text-slate-950'>
                     {candidate.place.name}
                   </h3>
                   <p className='text-sm leading-5 text-slate-600'>
-                    {formatCandidateDateTime(
-                      candidate.time.startsAt,
-                      candidate.time.timezone,
-                    )}{' '}
-                    ~ {formatCandidateDateTime(
-                      candidate.time.endsAt,
-                      candidate.time.timezone,
-                    )}
-                  </p>
-                  <p className='text-sm leading-5 text-slate-500'>
-                    {candidate.place.address} · 1인 {candidate.estimatedCostPerPersonKrw.toLocaleString()}원
+                    {candidate.place.address} · 1인 {candidate.estimatedCostPerPersonKrw.toLocaleString('ko-KR')}원
                   </p>
                   {candidate.tags.length > 0 && (
                     <div className='flex flex-wrap gap-1.5 pt-1'>
@@ -548,42 +554,42 @@ export function CandidateManagementPanel({
         <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
           후보 5개가 이미 등록되어 더 추가할 수 없습니다. 기존 후보를 제외하면 새 후보를 등록할 수 있습니다.
         </p>
-      ) : (
-        <CandidateForm
-          address={address}
-          area={area}
-          cost={cost}
-          date={date}
-          endTime={endTime}
-          fieldErrors={fieldErrors}
-          formError={formError}
-          isSubmitting={isSubmitting}
-          mode={editingCandidateId ? 'edit' : 'create'}
-          nextCandidateNumber={candidateNumber}
-          onAddressChange={setAddress}
-          onAreaChange={setArea}
-          onCancel={editingCandidateId ? cancelEditing : undefined}
-          onCostChange={setCost}
-          onDateChange={applyDate}
-          onEndTimeChange={(value) => applyTimeChange(setEndTime, value)}
-          onPlaceNameChange={setPlaceName}
-          onStartTimeChange={(value) => applyTimeChange(setStartTime, value)}
-          onSubmit={handleSubmit}
-          onTagsChange={setTags}
-          onTimePreset={applyTimePreset}
-          placeName={placeName}
-          startTime={startTime}
-          tags={tags}
-        />
-      )}
-      {!isCandidateMutationDisabled && (!hasReachedCandidateLimit || editingCandidate) && (
-        <details className='mt-4 text-sm text-slate-700'>
-          <summary className='cursor-pointer py-1 font-semibold'>입력 도구</summary>
-          <div className='mt-2 flex flex-wrap gap-2'>
-            <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={fillExample} type='button'>예시로 채우기</button>
-            <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={clearCandidateForm} type='button'>입력 지우기</button>
-          </div>
-        </details>
+      ) : showComposer && (
+        <section aria-label={editingCandidateId ? '후보 수정' : '후보 올리기'} className='scroll-mt-4 rounded-xl border border-stone-200 bg-white p-3 sm:p-4' ref={composerRef} tabIndex={-1}>
+          <CandidateForm
+            address={address}
+            area={area}
+            cost={cost}
+            date={date}
+            endTime={endTime}
+            fieldErrors={fieldErrors}
+            formError={formError}
+            isSubmitting={isSubmitting}
+            mode={editingCandidateId ? 'edit' : 'create'}
+            nextCandidateNumber={candidateNumber}
+            onAddressChange={setAddress}
+            onAreaChange={setArea}
+            onCancel={editingCandidateId || room.candidates.length > 0 ? closeComposer : undefined}
+            onCostChange={setCost}
+            onDateChange={applyDate}
+            onEndTimeChange={(value) => applyTimeChange(setEndTime, value)}
+            onPlaceNameChange={setPlaceName}
+            onStartTimeChange={(value) => applyTimeChange(setStartTime, value)}
+            onSubmit={handleSubmit}
+            onTagsChange={setTags}
+            onTimePreset={applyTimePreset}
+            placeName={placeName}
+            startTime={startTime}
+            tags={tags}
+          />
+          <details className='mt-3 text-sm text-slate-700'>
+            <summary className='cursor-pointer py-1 font-semibold'>입력 도구</summary>
+            <div className='mt-2 flex flex-wrap gap-2'>
+              <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={fillExample} type='button'>예시로 채우기</button>
+              <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={clearCandidateForm} type='button'>입력 지우기</button>
+            </div>
+          </details>
+        </section>
       )}
     </section>
   );

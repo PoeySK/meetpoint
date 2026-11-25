@@ -202,7 +202,11 @@ test('default and fill do not call API; manual edits are drafts until explicit s
   h.fill().props.onClick();
   assert.equal(h.calls.length, 0);
   let card = h.cards()[0];
-  const rendered = h.card.CandidateResponseCard(card.props);
+  const directCard = load('features/participant-response/ui/candidate-response-card.tsx', {
+    '@/features/participant-response/model/response-form': model,
+    react: { useRef: () => ({ current: null }) },
+  });
+  const rendered = directCard.CandidateResponseCard(card.props);
   function find(node, label) {
     if (!node || typeof node !== 'object') return null;
     if (Array.isArray(node)) return node.map((n) => find(n, label)).find(Boolean);
@@ -211,7 +215,7 @@ test('default and fill do not call API; manual edits are drafts until explicit s
   }
   find(rendered, '불가').props.onClick();
   card = h.cards()[0];
-  find(h.card.CandidateResponseCard(card.props), '보통').props.onClick();
+  find(directCard.CandidateResponseCard(card.props), '보통').props.onClick();
   assert.equal(h.calls.length, 0);
   h.cards()[0].props.onSave(); await settle();
   assert.equal(h.calls.length, 1); assert.equal(h.calls[0].input.availabilityStatus, 'UNAVAILABLE');
