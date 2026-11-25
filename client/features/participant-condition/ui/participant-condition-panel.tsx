@@ -176,6 +176,7 @@ export function ParticipantConditionPanel({
   const [formMessage, setFormMessage] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const hydratedKeyRef = useRef<string | null>(null);
+  const extraConditionsRef = useRef<HTMLDetailsElement>(null);
   const conditionKey = `${participantId}:${condition?.updatedAt ?? 'empty'}`;
 
   useEffect(() => {
@@ -226,6 +227,9 @@ export function ParticipantConditionPanel({
     );
     setFieldErrors(errors);
     setFormMessage(null);
+    if ((errors.budget || errors.preferences) && extraConditionsRef.current) {
+      extraConditionsRef.current.open = true;
+    }
     if (
       errors.windows ||
       errors.budget ||
@@ -271,7 +275,7 @@ export function ParticipantConditionPanel({
           </h2>
         </div>
         <p className='text-sm leading-6 text-slate-600'>
-          더 자세히 비교하고 싶을 때만 추가하세요. 내 조건은 다른 참여자에게 공개되지 않습니다.
+          후보를 비교할 때 참고할 내 기준이에요. 다른 참여자에게는 공개되지 않아요.
         </p>
       </div>
 
@@ -283,7 +287,7 @@ export function ParticipantConditionPanel({
         <form className='mt-5 space-y-5' onSubmit={handleSubmit}>
           <fieldset className='space-y-3'>
             <legend className='text-sm font-semibold text-slate-800'>
-              가능한 시간 <span className='font-normal text-slate-600'>(조건 저장에 필요)</span>
+              언제 시간이 괜찮아요? <span className='font-normal text-slate-600'>(조건 저장에 필요)</span>
             </legend>
             {windows.map((window, index) => (
               <div
@@ -305,8 +309,8 @@ export function ParticipantConditionPanel({
                     삭제
                   </button>
                 </div>
-                <div className='grid gap-3 sm:grid-cols-3'>
-                  <label className='space-y-1 text-sm font-medium text-slate-700'>
+                <div className='grid grid-cols-2 gap-2'>
+                  <label className='col-span-2 space-y-1 text-sm font-medium text-slate-700'>
                     날짜
                     <input
                       aria-describedby={fieldErrors.windowErrors[index] ? `condition-window-error-${index}` : undefined}
@@ -318,7 +322,7 @@ export function ParticipantConditionPanel({
                       value={window.date}
                     />
                   </label>
-                  <label className='space-y-1 text-sm font-medium text-slate-700'>
+                  <label className='min-w-0 space-y-1 text-sm font-medium text-slate-700'>
                     시작
                     <input
                       aria-invalid={Boolean(fieldErrors.windowErrors[index])}
@@ -329,7 +333,7 @@ export function ParticipantConditionPanel({
                       value={window.startsAt}
                     />
                   </label>
-                  <label className='space-y-1 text-sm font-medium text-slate-700'>
+                  <label className='min-w-0 space-y-1 text-sm font-medium text-slate-700'>
                     종료
                     <input
                       aria-invalid={Boolean(fieldErrors.windowErrors[index])}
@@ -364,82 +368,87 @@ export function ParticipantConditionPanel({
             </button>
           </fieldset>
 
-          <fieldset className='space-y-2'>
-            <legend className='text-sm font-semibold text-slate-800'>예산 <span className='font-normal text-slate-500'>예산을 넘는 후보도 의견으로 남길 수 있습니다.</span></legend>
-            <label className='flex items-center gap-2 text-sm text-slate-700'>
-              <input
-                checked={noBudgetLimit}
-                disabled={isSubmitting}
-                onChange={(event) => setNoBudgetLimit(event.target.checked)}
-                type='checkbox'
-              />
-              예산 제한 없음
-            </label>
-            {!noBudgetLimit && (
-              <div>
-                <label className='block space-y-1 text-sm font-medium text-slate-700'>
-                  1인 최대 예산 (원)
+          <details className='rounded-xl border border-stone-200 bg-stone-50' ref={extraConditionsRef}>
+            <summary className='cursor-pointer px-3 py-3 text-sm font-semibold'>예산·장소 특징 (선택)</summary>
+            <div className='space-y-4 border-t border-stone-200 p-3'>
+              <fieldset className='space-y-2'>
+                <legend className='text-sm font-semibold text-slate-800'>예산 <span className='font-normal text-slate-500'>예산을 넘는 후보도 의견으로 남길 수 있습니다.</span></legend>
+                <label className='flex items-center gap-2 text-sm text-slate-700'>
                   <input
-                    aria-describedby={fieldErrors.budget ? 'condition-budget-error' : undefined}
-                    aria-invalid={Boolean(fieldErrors.budget)}
+                    checked={noBudgetLimit}
+                    disabled={isSubmitting}
+                    onChange={(event) => setNoBudgetLimit(event.target.checked)}
+                    type='checkbox'
+                  />
+                  예산 제한 없음
+                </label>
+                {!noBudgetLimit && (
+                  <div>
+                    <label className='block space-y-1 text-sm font-medium text-slate-700'>
+                      1인 최대 예산 (원)
+                      <input
+                        aria-describedby={fieldErrors.budget ? 'condition-budget-error' : undefined}
+                        aria-invalid={Boolean(fieldErrors.budget)}
+                        className='mp-input'
+                        disabled={isSubmitting}
+                        inputMode='numeric'
+                        min='0'
+                        onChange={(event) => {
+                          setBudget(event.target.value);
+                          setFieldErrors((current) => ({ ...current, budget: undefined }));
+                        }}
+                        placeholder='예: 30000'
+                        type='number'
+                        value={budget}
+                      />
+                    </label>
+                    {fieldErrors.budget && (
+                      <p className='mt-2 text-xs leading-5 text-rose-600' id='condition-budget-error'>
+                        {fieldErrors.budget}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </fieldset>
+
+              <fieldset className='space-y-3'>
+                <legend className='text-sm font-semibold text-slate-800'>선호하는 특징 <span className='font-normal text-slate-500'>추천 결과에 참고합니다. 쉼표로 구분해 입력해 주세요.</span></legend>
+                <label className='block space-y-1 text-sm font-medium text-slate-700'>
+                  꼭 필요한 특징
+                  <input
                     className='mp-input'
                     disabled={isSubmitting}
-                    inputMode='numeric'
-                    min='0'
-                    onChange={(event) => {
-                      setBudget(event.target.value);
-                      setFieldErrors((current) => ({ ...current, budget: undefined }));
-                    }}
-                    placeholder='예: 30000'
-                    type='number'
-                    value={budget}
+                    onChange={(event) => setRequiredTags(event.target.value)}
+                    placeholder='예: 실내, 조용한 곳'
+                    value={requiredTags}
                   />
                 </label>
-                {fieldErrors.budget && (
-                  <p className='mt-2 text-xs leading-5 text-rose-600' id='condition-budget-error'>
-                    {fieldErrors.budget}
-                  </p>
+                <label className='block space-y-1 text-sm font-medium text-slate-700'>
+                  있으면 좋은 특징
+                  <input
+                    className='mp-input'
+                    disabled={isSubmitting}
+                    onChange={(event) => setPreferredTags(event.target.value)}
+                    placeholder='예: 카페, 주차 가능'
+                    value={preferredTags}
+                  />
+                </label>
+                <label className='block space-y-1 text-sm font-medium text-slate-700'>
+                  피하고 싶은 특징
+                  <input
+                    className='mp-input'
+                    disabled={isSubmitting}
+                    onChange={(event) => setAvoidTags(event.target.value)}
+                    placeholder='예: 흡연, 계단'
+                    value={avoidTags}
+                  />
+                </label>
+                {fieldErrors.preferences && (
+                  <p className='text-xs leading-5 text-rose-600'>{fieldErrors.preferences}</p>
                 )}
-              </div>
-            )}
-          </fieldset>
-
-          <fieldset className='space-y-3'>
-            <legend className='text-sm font-semibold text-slate-800'>선호하는 특징 <span className='font-normal text-slate-500'>추천 결과에 참고합니다. 쉼표로 구분해 입력해 주세요.</span></legend>
-            <label className='block space-y-1 text-sm font-medium text-slate-700'>
-              꼭 필요한 특징
-              <input
-                className='mp-input'
-                disabled={isSubmitting}
-                onChange={(event) => setRequiredTags(event.target.value)}
-                placeholder='예: 실내, 조용한 곳'
-                value={requiredTags}
-              />
-            </label>
-            <label className='block space-y-1 text-sm font-medium text-slate-700'>
-              있으면 좋은 특징
-              <input
-                className='mp-input'
-                disabled={isSubmitting}
-                onChange={(event) => setPreferredTags(event.target.value)}
-                placeholder='예: 카페, 주차 가능'
-                value={preferredTags}
-              />
-            </label>
-            <label className='block space-y-1 text-sm font-medium text-slate-700'>
-              피하고 싶은 특징
-              <input
-                className='mp-input'
-                disabled={isSubmitting}
-                onChange={(event) => setAvoidTags(event.target.value)}
-                placeholder='예: 흡연, 계단'
-                value={avoidTags}
-              />
-            </label>
-            {fieldErrors.preferences && (
-              <p className='text-xs leading-5 text-rose-600'>{fieldErrors.preferences}</p>
-            )}
-          </fieldset>
+              </fieldset>
+            </div>
+          </details>
 
           {formMessage && (
             <p aria-live='polite' className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-700'>
@@ -447,7 +456,7 @@ export function ParticipantConditionPanel({
             </p>
           )}
           <button
-            className='mp-button mp-button-primary w-full sm:w-auto'
+            className='mp-button mp-button-accent min-h-11 w-full rounded-lg'
             disabled={isSubmitting}
             type='submit'
           >

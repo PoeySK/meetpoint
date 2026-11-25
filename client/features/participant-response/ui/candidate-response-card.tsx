@@ -2,6 +2,7 @@
 
 import type { Candidate } from '@/entities/candidate';
 import type { ParticipantCondition } from '@/entities/participant-condition';
+import { useRef } from 'react';
 import {
   availabilityOptions,
   formatCandidateTime,
@@ -36,6 +37,7 @@ export function CandidateResponseCard({
   onUpdate,
   onSave,
 }: CandidateResponseCardProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
   const responseState = getResponseState(form);
   const conditionWarnings = getConditionWarnings(candidate, condition);
   const autoFillDescription = getAutoFillDescription(
@@ -44,6 +46,7 @@ export function CandidateResponseCard({
     condition
   );
   const isDisabled = isReadOnly || form.isSubmitting || isBulkSubmitting;
+  const showTravel = Boolean(form.availabilityStatus || form.travelBurden || isReadOnly);
 
   function updateResponse(update: ResponseSaveOverrides) {
     onUpdate({ ...update, message: '', messageKind: null });
@@ -51,15 +54,16 @@ export function CandidateResponseCard({
 
   return (
     <article
-      className='rounded-xl border border-slate-200 p-3.5'
+      className='min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white'
     >
-      <div className='space-y-2'>
+      <div className='space-y-2 border-b border-stone-200 bg-stone-50 p-4'>
+        <p className='break-keep text-sm font-semibold text-stone-700'>{formatCandidateTime(candidate)}</p>
         <div className='flex items-start justify-between gap-3'>
-          <h3 className='min-w-0 text-base font-bold text-slate-950 [overflow-wrap:anywhere]'>
+          <h3 className='min-w-0 text-lg font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere]'>
             {candidate.place.name}
           </h3>
           <span
-            className='shrink-0 text-xs font-semibold text-slate-600'
+            className='shrink-0 rounded-md bg-white px-2 py-1 text-xs font-semibold text-stone-700'
           >
             {responseState === 'dirty' && !form.savedResponseId
               ? form.autoFill && !form.manuallyEdited
@@ -68,16 +72,13 @@ export function CandidateResponseCard({
               : responseStateLabel(responseState)}
           </span>
         </div>
-        <p className='text-sm text-slate-600'>
-          {formatCandidateTime(candidate)}
-        </p>
         {form.reconfirmRequired && (
           <p role='status' className='text-sm leading-6 text-slate-700'>
             후보가 변경되어 의견 재확인이 필요합니다. 이전 의견은 초안으로 남아 있습니다.
             현재 시간·장소·비용·특징을 확인하고 다시 저장해 주세요.
           </p>
         )}
-        <p className='text-sm text-slate-600'>
+        <p className='text-sm text-slate-600 [overflow-wrap:anywhere]'>
           {candidate.place.address} · 1인 {candidate.estimatedCostPerPersonKrw.toLocaleString('ko-KR')}원
         </p>
         {candidate.tags.length > 0 && (
@@ -94,20 +95,26 @@ export function CandidateResponseCard({
         )}
       </div>
 
-      <div className='mt-4 space-y-3 border-t border-slate-100 pt-4'>
+      <div className='p-4'>
+        <button className='mp-button mp-button-accent min-h-11 w-full rounded-lg' onClick={() => dialogRef.current?.showModal()} type='button'>
+          {isReadOnly ? '내 의견 보기' : form.savedResponseId ? '의견 확인하기' : '의견 남기기'}
+        </button>
+      </div>
+      <dialog aria-label={`${candidate.place.name} 의견`} className='m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-xl bg-white p-0 shadow-xl backdrop:bg-slate-950/50' ref={dialogRef}>
+      <div className='space-y-3 p-4 sm:p-6'>
+        <div className='flex items-start justify-between gap-3'>
+          <h3 className='text-lg font-bold'>{candidate.place.name}에 대한 내 의견</h3>
+          <button aria-label='의견 창 닫기' className='mp-button mp-button-secondary rounded-lg' onClick={() => dialogRef.current?.close()} type='button'>닫기</button>
+        </div>
         <fieldset className='space-y-2'>
           <legend className='text-sm font-semibold text-slate-800'>
-            참석 가능 여부
+            이 일정에 올 수 있나요?
           </legend>
           <div className='grid grid-cols-3 gap-2'>
             {availabilityOptions.map((option) => (
               <button
                 aria-pressed={form.availabilityStatus === option.value}
-                className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
-                  form.availabilityStatus === option.value
-                    ? 'border-slate-800 bg-slate-100 text-slate-950'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'
-                }`}
+                className='mp-button mp-button-secondary min-h-11 rounded-lg px-2.5 aria-pressed:border-teal-600 aria-pressed:bg-teal-50 aria-pressed:text-teal-900'
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() =>
@@ -127,19 +134,15 @@ export function CandidateResponseCard({
           </p>
         )}
 
-        <fieldset className='space-y-2'>
+        {showTravel && <fieldset className='space-y-2'>
           <legend className='text-sm font-semibold text-slate-800'>
-            이동 부담
+            여기까지 오는 길은 어때요?
           </legend>
           <div className='grid grid-cols-3 gap-2'>
             {travelOptions.map((option) => (
               <button
                 aria-pressed={form.travelBurden === option.value}
-                className={`rounded-xl border px-3 py-2.5 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
-                  form.travelBurden === option.value
-                    ? 'border-slate-800 bg-slate-100 text-slate-950'
-                    : 'border-slate-200 bg-white text-slate-600 hover:border-slate-400'
-                }`}
+                className='mp-button mp-button-secondary min-h-11 rounded-lg px-2.5 aria-pressed:border-teal-600 aria-pressed:bg-teal-50 aria-pressed:text-teal-900'
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() => updateResponse({ travelBurden: option.value })}
@@ -149,7 +152,7 @@ export function CandidateResponseCard({
               </button>
             ))}
           </div>
-        </fieldset>
+        </fieldset>}
 
         {condition && (
           <div
@@ -194,8 +197,8 @@ export function CandidateResponseCard({
           </p>
         )}
 
-        {responseState !== 'saved' && !isReadOnly && <button
-          className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
+        {showTravel && responseState !== 'saved' && !isReadOnly && <button
+          className={`mp-button min-h-10 rounded-lg px-3 py-1.5 text-xs ${form.availabilityStatus && form.travelBurden ? 'mp-button-accent' : 'mp-button-secondary'}`}
           disabled={isDisabled}
           onClick={() => onSave()}
           type='button'
@@ -209,6 +212,7 @@ export function CandidateResponseCard({
                 : '의견 저장'}
         </button>}
       </div>
+      </dialog>
     </article>
   );
 }
