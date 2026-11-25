@@ -112,6 +112,21 @@ textarea {
     color: #30333a;
   }
 
+  .mp-button-accent {
+    background: #0f766e;
+    color: #fff;
+  }
+
+  .mp-button-accent:hover:not(:disabled) {
+    background: #115e59;
+  }
+
+  .mp-button-accent:disabled {
+    background: #e2e8f0;
+    color: #475569;
+    opacity: 1;
+  }
+
   .mp-button-secondary {
     border: 1px solid #c9cace;
     background: #fff;

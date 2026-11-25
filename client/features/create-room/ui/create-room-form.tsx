@@ -55,6 +55,8 @@ export function CreateRoomForm() {
     setFormError("");
 
     if (Object.keys(errors).length > 0) {
+      const form = event.currentTarget;
+      window.requestAnimationFrame(() => form.querySelector<HTMLInputElement>(errors.title ? '#title' : '#displayName')?.focus());
       return;
     }
 
@@ -102,20 +104,26 @@ export function CreateRoomForm() {
   }
 
   return (
-    <section className="mp-card p-4 sm:p-6">
-      <h2 className="mb-4 text-lg font-bold">새 모임</h2>
+    <section aria-labelledby="create-room-heading" className="mp-card rounded-xl border-stone-200 p-4 shadow-[0_14px_32px_-24px_#44302350] sm:p-6 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-9 lg:shadow-none xl:p-12">
+      <div className="mb-5">
+        <h1 className="break-keep text-2xl font-extrabold tracking-tight text-stone-950 sm:text-3xl" id="create-room-heading">약속 잡아 볼까요?</h1>
+        <p className="mt-1 text-sm leading-5 text-stone-600">만날 시간과 장소를 같이 정해요.</p>
+      </div>
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
-        <div className="space-y-2">
+        <div className="grid gap-1.5">
           <label className="text-sm font-semibold text-slate-800" htmlFor="title">
             모임 제목
           </label>
           <input
             aria-describedby={fieldErrors.title ? "title-error" : undefined}
             aria-invalid={Boolean(fieldErrors.title)}
-            className="mp-input"
+            className="mp-input min-h-11 rounded-lg text-base aria-invalid:border-rose-600"
             id="title"
             maxLength={80}
-            onChange={(event) => setTitle(event.target.value)}
+            onChange={(event) => {
+              setTitle(event.target.value);
+              if (fieldErrors.title) setFieldErrors((errors) => ({ ...errors, title: undefined }));
+            }}
             placeholder="예: 우리 동네 저녁 모임"
             required
             value={title}
@@ -127,7 +135,7 @@ export function CreateRoomForm() {
           )}
         </div>
 
-        <div className="space-y-2">
+        <div className="grid gap-1.5">
           <label
             className="text-sm font-semibold text-slate-800"
             htmlFor="displayName"
@@ -136,14 +144,17 @@ export function CreateRoomForm() {
           </label>
           <input
             aria-describedby={
-              fieldErrors.displayName ? "display-name-error" : undefined
+              fieldErrors.displayName ? "display-name-error create-name-hint" : "create-name-hint"
             }
             aria-invalid={Boolean(fieldErrors.displayName)}
             autoComplete="nickname"
-            className="mp-input"
+            className="mp-input min-h-11 rounded-lg text-base aria-invalid:border-rose-600"
             id="displayName"
             maxLength={30}
-            onChange={(event) => setDisplayName(event.target.value)}
+            onChange={(event) => {
+              setDisplayName(event.target.value);
+              if (fieldErrors.displayName) setFieldErrors((errors) => ({ ...errors, displayName: undefined }));
+            }}
             placeholder="예: 민수"
             required
             value={displayName}
@@ -153,25 +164,32 @@ export function CreateRoomForm() {
               {fieldErrors.displayName}
             </p>
           )}
+          <p className="text-xs leading-5 text-slate-600" id="create-name-hint">참가자에게 보이는 이름이에요.</p>
         </div>
 
         {formError && (
-          <p
-            aria-live="polite"
-            className="rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700"
-          >
+          <p className="rounded-lg bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700" role="alert">
             {formError}
           </p>
         )}
 
         <button
-          className="mp-button mp-button-primary flex w-full items-center justify-center"
+          className="mp-button mp-button-accent min-h-11 w-full rounded-lg"
           disabled={isSubmitting}
           type="submit"
         >
-          {isSubmitting ? "방을 만드는 중..." : "방 만들기"}
+          {isSubmitting ? "약속 방을 만드는 중..." : "약속 방 만들기"}
         </button>
       </form>
+      <details className="group mt-2 border-t border-stone-200">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-sm font-semibold text-stone-700 hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-700 [&::-webkit-details-marker]:hidden">
+          <span>방을 만든 뒤엔?</span>
+          <span aria-hidden="true" className="transition-transform group-open:rotate-180 motion-reduce:transition-none">⌄</span>
+        </summary>
+        <p className="pb-2 break-keep text-sm leading-6 text-stone-600">
+          시간과 장소 후보를 올리고 친구들에게 링크를 보내요. 모인 의견을 보고 약속을 정해요.
+        </p>
+      </details>
     </section>
   );
 }
