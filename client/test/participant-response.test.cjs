@@ -213,9 +213,9 @@ test('default and fill do not call API; manual edits are drafts until explicit s
     if (node.type === 'button' && node.props.children === label) return node;
     return find(node.props?.children, label);
   }
-  find(rendered, '불가').props.onClick();
+  find(rendered, '어려워요').props.onClick();
   card = h.cards()[0];
-  find(directCard.CandidateResponseCard(card.props), '보통').props.onClick();
+  find(directCard.CandidateResponseCard(card.props), '보통이에요').props.onClick();
   assert.equal(h.calls.length, 0);
   h.cards()[0].props.onSave(); await settle();
   assert.equal(h.calls.length, 1); assert.equal(h.calls[0].input.availabilityStatus, 'UNAVAILABLE');
@@ -265,7 +265,7 @@ test('quick save still submits all active candidates; failed overrides remain av
 test('saving written responses skips untouched reconfirmations and retries only failed drafts', async () => {
   const h = panelHarness({ saved: [{ ...response('two'), status: 'RECONFIRM_REQUIRED' }] });
   h.props.candidates.push(candidate('three'));
-  const saveWritten = () => h.render().find(node => node.type === 'button' && String(node.props.children).startsWith('작성한 의견 저장'));
+  const saveWritten = () => h.render().find(node => node.type === 'button' && String(node.props.children).startsWith('작성한 의견 한꺼번에 저장'));
   assert.equal(saveWritten().props.disabled, true);
   h.cards()[0].props.onUpdate({ availabilityStatus: 'AVAILABLE', travelBurden: 'EASY' });
   h.cards()[2].props.onUpdate({ availabilityStatus: 'MAYBE', travelBurden: 'NORMAL' });
@@ -317,16 +317,16 @@ test('condition time warnings use the same UTC containment rules as automatic fi
   assert.equal(model.getConditionWarnings(candidate('invalid', 'invalid'), c).length, 0);
   assert.match(model.timeMatchDescription('unknown'), /판단할 수 없습니다/);
 });
-test('candidate and quick options expose MAYBE as 보류 including accessible pressed selection', () => {
+test('candidate and quick options expose MAYBE as 아직 몰라요 including accessible pressed selection', () => {
   const React = require('react'); const { renderToStaticMarkup } = require('react-dom/server');
   const h = panelHarness();
-  assert.equal(model.availabilityOptions.find((option) => option.value === 'MAYBE').label, '보류');
+  assert.equal(model.availabilityOptions.find((option) => option.value === 'MAYBE').label, '아직 몰라요');
   const initialHtml = renderToStaticMarkup(React.createElement(h.card.CandidateResponseCard, h.cards()[0].props));
   assert.doesNotMatch(initialHtml, /aria-pressed="true"/);
   h.cards()[0].props.onUpdate({ availabilityStatus: 'MAYBE' });
   const cardHtml = renderToStaticMarkup(React.createElement(h.card.CandidateResponseCard, h.cards()[0].props));
   const quick = h.quick(); const quickHtml = renderToStaticMarkup(React.createElement(quick.type, { ...quick.props, availabilityStatus: 'MAYBE' }));
-  for (const html of [cardHtml, quickHtml]) { assert.match(html, /aria-pressed="true"[^>]*>보류<\/button>/); assert.doesNotMatch(html, /아마 가능/); }
+  for (const html of [cardHtml, quickHtml]) { assert.match(html, /aria-pressed="true"[^>]*>아직 몰라요<\/button>/); assert.doesNotMatch(html, /아마 가능/); }
 });
 test('authentication failure retains response draft and requires recovery before an explicit retry', async () => {
   const h = panelHarness(); h.fill().props.onClick(); h.cards()[0].props.onUpdate({ travelBurden: 'NORMAL', note: 'Auth failure draft' });

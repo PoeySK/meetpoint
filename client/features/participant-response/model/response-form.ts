@@ -42,15 +42,15 @@ export const availabilityOptions: Array<{
   value: AvailabilityStatus;
   label: string;
 }> = [
-  { value: 'AVAILABLE', label: '가능' },
-  { value: 'MAYBE', label: '보류' },
-  { value: 'UNAVAILABLE', label: '불가' },
+  { value: 'AVAILABLE', label: '갈 수 있어요' },
+  { value: 'MAYBE', label: '아직 몰라요' },
+  { value: 'UNAVAILABLE', label: '어려워요' },
 ];
 
 export const travelOptions: Array<{ value: TravelBurden; label: string }> = [
-  { value: 'EASY', label: '편함' },
-  { value: 'NORMAL', label: '보통' },
-  { value: 'HARD', label: '부담됨' },
+  { value: 'EASY', label: '편해요' },
+  { value: 'NORMAL', label: '보통이에요' },
+  { value: 'HARD', label: '부담돼요' },
 ];
 
 export function createResponseForm(
@@ -394,8 +394,8 @@ export function responseStateLabel(state: ReturnType<typeof getResponseState>) {
     return '의견 저장됨';
   }
   if (state === 'dirty') {
-    return '변경 후 저장 필요';
+    return '수정한 의견 저장 전';
   }
 
-  return '의견 미저장';
+  return '아직 남긴 의견이 없어요';
 }

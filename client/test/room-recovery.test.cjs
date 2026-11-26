@@ -257,9 +257,10 @@ test('loaded room exposes the existing explicit retry action and keeps the works
   const workspace = () => null; const recovery = () => null; let retries = 0;
   const session = { room: { room: { status: 'OPEN' }, currentParticipant: {} }, accessToken: 'fixture', participantId: 'original', isLoading: false, error: null, refreshError: { requiresRecovery: true, message: 'Fixture' }, retryRoom: () => { retries++; }, loadRoom() {} };
   const { RoomWidget } = load('widgets/room/ui/room-widget.tsx', {
-    react: { useCallback: (fn) => fn }, 'next/navigation': { useRouter: () => ({}) }, 'next/link': () => null,
+    react: { useCallback: (fn) => fn }, 'next/navigation': { useRouter: () => ({}) },
     '@/features/participant-lifecycle': { useParticipantLifecycle: () => ({}) }, '@/features/room-recovery': { RoomRecoveryPanel: recovery },
-    '@/shared/lib/room-session': {}, '@/widgets/room-participants': { RoomParticipantsWidget: () => null }, '@/widgets/room-workspace': { RoomWorkspaceWidget: workspace },
+    '@/shared/lib/room-session': {}, '@/shared/ui/meetpoint-brand': { MeetPointBrand: () => null },
+    '@/widgets/room-participants': { RoomParticipantsWidget: () => null }, '@/widgets/room-workspace': { RoomWorkspaceWidget: workspace },
     '../model/use-room-session': { useRoomSession: () => session }, './room-load-state': {}, './room-summary': { RoomSummary: () => null },
   });
   function flatten(node, result = []) { if (!node || typeof node !== 'object') return result; if (Array.isArray(node)) node.forEach((child) => flatten(child, result)); else { result.push(node); flatten(node.props?.children, result); } return result; }

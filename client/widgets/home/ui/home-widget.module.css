@@ -1,0 +1,239 @@
+.hero {
+  display: grid;
+  align-items: center;
+  gap: 1.75rem;
+  padding-block: 1.5rem 2.5rem;
+}
+
+.title {
+  font-size: clamp(2.45rem, 9.5vw, 5rem);
+  font-weight: 900;
+  line-height: 1.1;
+  letter-spacing: -0.055em;
+  word-break: keep-all;
+}
+
+.title span {
+  color: var(--mp-purple);
+}
+
+.intro {
+  margin-block: 1rem 1.25rem;
+  color: var(--mp-muted);
+  font-size: clamp(1rem, 1.6vw, 1.15rem);
+  line-height: 1.65;
+  word-break: keep-all;
+}
+
+.scene {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  min-width: 0;
+  min-height: 22rem;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #d8d0ed;
+  border-radius: 1.5rem;
+  background: #eae4fa;
+  padding: 3.35rem 1.35rem 3.75rem;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: radial-gradient(#cabde7 1px, transparent 1px) 0 0 / 16px 16px;
+}
+
+.road,
+.secondRoad,
+.route,
+.park,
+.marker {
+  position: absolute;
+}
+
+.road {
+  top: -28%;
+  left: -12%;
+  width: 79%;
+  height: 113%;
+  transform: rotate(-36deg);
+  border: 10px solid #f9f6ff;
+  border-radius: 5rem;
+}
+
+.secondRoad {
+  top: 57%;
+  left: 20%;
+  width: 105%;
+  height: 72%;
+  transform: rotate(-26deg);
+  border: 12px solid #f9f6ff;
+  border-radius: 5rem;
+}
+
+.route {
+  top: 16%;
+  right: 14%;
+  width: 29%;
+  height: 46%;
+  transform: rotate(12deg);
+  border-right: 2px dashed #a085cf;
+  border-bottom: 2px dashed #a085cf;
+  border-bottom-right-radius: 1.5rem;
+}
+
+.park {
+  bottom: 10%;
+  left: 3%;
+  width: 24%;
+  height: 17%;
+  transform: rotate(-24deg);
+  border: 2px solid #f7fbf1;
+  border-radius: 1.25rem;
+  background: #d8e9cd;
+}
+
+.marker {
+  --mp-pin-center: var(--mp-lime);
+  top: 5%;
+  right: 12%;
+  width: 1.85rem;
+  border: 3px solid white;
+  background: var(--mp-purple);
+  box-shadow: -2px 3px 8px #35216138;
+}
+
+.markerLow {
+  inset: auto auto 8% 12%;
+  width: 1.5rem;
+  background: #497463;
+}
+
+.preview {
+  position: relative;
+  width: min(100%, 21rem);
+  transform: rotate(-3deg);
+  border: 1px solid #d8ccea;
+  border-radius: 1.3rem;
+  background: var(--mp-surface);
+  padding: 1rem;
+  box-shadow: 0 16px 34px #35216126;
+}
+
+.previewHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--mp-line);
+  padding-bottom: 0.8rem;
+}
+
+.preview h2 {
+  font-size: clamp(1.25rem, 3.8vw, 1.55rem);
+  font-weight: 850;
+  letter-spacing: -0.04em;
+}
+
+.preview p,
+.previewProgress {
+  color: var(--mp-muted);
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.preview p {
+  margin-block: 0.25rem 0.75rem;
+}
+
+.previewProgress,
+.avatars {
+  display: flex;
+  align-items: center;
+}
+
+.previewProgress {
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.avatars span {
+  display: grid;
+  width: 1.65rem;
+  height: 1.65rem;
+  place-items: center;
+  border: 2px solid var(--mp-surface);
+  border-radius: 50%;
+  background: #ddd1f7;
+  color: var(--mp-ink);
+  font-size: 0.65rem;
+  font-weight: 800;
+}
+
+.avatars span + span { margin-left: -0.15rem; }
+.avatars span:nth-child(2) { background: #f4db9c; }
+.avatars span:nth-child(3) { background: #efd1dd; }
+.avatars span:nth-child(4) { background: #dbe9d8; }
+
+.sampleButton {
+  width: 100%;
+  margin-top: 0.85rem;
+  background: var(--mp-lime);
+  color: #293817;
+}
+
+.sampleButton:hover {
+  background: #d9ee91;
+}
+
+.bubble {
+  position: absolute;
+  z-index: 1;
+  border: 1px solid #d8ccea;
+  border-radius: 0.85rem;
+  background: var(--mp-surface);
+  padding: 0.4rem 0.65rem;
+  box-shadow: 0 6px 14px #4c309a15;
+  font-size: 0.78rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.bubble strong { color: var(--mp-purple); }
+
+.bubbleTop {
+  top: 8%;
+  left: 7%;
+  transform: rotate(-7deg);
+}
+
+.bubbleBottom {
+  right: 6%;
+  bottom: 7%;
+  transform: rotate(6deg);
+  border-color: #ccdd9a;
+  background: var(--mp-lime);
+}
+
+@media (width >= 48rem) {
+  .hero {
+    min-height: 37.5rem;
+    grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
+    gap: clamp(2rem, 5vw, 4.5rem);
+    padding-block: 2rem 3rem;
+  }
+
+  .title { font-size: clamp(2.55rem, 5.6vw, 5rem); }
+  .intro { margin-block: 1.35rem 1.65rem; }
+  .scene { min-height: clamp(25rem, 40vw, 30rem); }
+  .preview { padding: 1.25rem; }
+  .marker:not(.markerLow) { top: 10%; }
+  .bubble { padding: 0.5rem 0.8rem; font-size: 0.85rem; }
+  .bubbleTop { top: 11%; left: 8%; }
+  .bubbleBottom { right: 7%; bottom: 10%; }
+}

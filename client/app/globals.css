@@ -94,16 +94,16 @@ textarea {
 
   .mp-button:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 2px #fff, 0 0 0 4px #515661;
+    box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--mp-focus, #515661);
   }
 
   .mp-button-primary {
-    background: #272a30;
+    background: var(--mp-purple, #272a30);
     color: white;
   }
 
   .mp-button-primary:hover:not(:disabled) {
-    background: #41454d;
+    background: var(--mp-purple-hover, #41454d);
   }
 
   .mp-button-primary:disabled {
@@ -113,12 +113,12 @@ textarea {
   }
 
   .mp-button-accent {
-    background: #0f766e;
+    background: var(--mp-purple, #0f766e);
     color: #fff;
   }
 
   .mp-button-accent:hover:not(:disabled) {
-    background: #115e59;
+    background: var(--mp-purple-hover, #115e59);
   }
 
   .mp-button-accent:disabled {
@@ -128,13 +128,141 @@ textarea {
   }
 
   .mp-button-secondary {
-    border: 1px solid #c9cace;
-    background: #fff;
+    border: 1px solid var(--mp-line, #c9cace);
+    background: var(--mp-surface, #fff);
     color: #30333a;
   }
 
   .mp-button-secondary:hover:not(:disabled) {
-    border-color: #696d76;
-    background: #f6f6f5;
+    border-color: var(--mp-purple, #696d76);
+    background: var(--mp-lilac, #f6f6f5);
   }
+
+  .mp-appointment {
+    --mp-paper: #f8f7f2;
+    --mp-surface: #fffefa;
+    --mp-ink: #251e31;
+    --mp-muted: #625b6c;
+    --mp-purple: #533597;
+    --mp-purple-hover: #412679;
+    --mp-lilac: #ede6fa;
+    --mp-line: #ded7e6;
+    --mp-lime: #e7f5aa;
+    --mp-focus: #6943b7;
+    background: var(--mp-paper);
+    color: var(--mp-ink);
+  }
+
+  .mp-appointment .mp-card {
+    border-color: var(--mp-line);
+    background: var(--mp-surface);
+  }
+
+  .mp-appointment .mp-input:focus {
+    border-color: var(--mp-purple);
+    box-shadow: 0 0 0 2px var(--mp-lilac);
+  }
+
+  .mp-shell {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .mp-brand {
+    display: inline-flex;
+    min-height: 2.75rem;
+    align-items: center;
+    gap: 0.55rem;
+    border-radius: 0.75rem;
+    font-size: clamp(1.15rem, 2vw, 1.4rem);
+    font-weight: 900;
+    letter-spacing: -0.06em;
+  }
+
+  .mp-brand:focus-visible {
+    outline: 2px solid var(--mp-focus);
+    outline-offset: 3px;
+  }
+
+  .mp-brand-mark {
+    display: grid;
+    width: 2.2rem;
+    height: 2.2rem;
+    flex: none;
+    place-items: center;
+    border-radius: 0.75rem;
+    background: var(--mp-purple);
+  }
+
+  .mp-map-pin {
+    display: grid;
+    width: 1rem;
+    aspect-ratio: 1;
+    place-items: center;
+    transform: rotate(-45deg);
+    border-radius: 50% 50% 50% 18%;
+    background: var(--mp-lime);
+  }
+
+  .mp-map-pin::after {
+    width: 38%;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: var(--mp-pin-center, var(--mp-purple));
+    content: "";
+  }
+
+  .mp-status {
+    display: inline-flex;
+    flex-shrink: 0;
+    border-radius: 999px;
+    background: var(--mp-lilac);
+    padding: 0.25rem 0.6rem;
+    color: var(--mp-purple-hover);
+    font-size: 0.8125rem;
+    font-weight: 750;
+  }
+
+  .mp-dialog {
+    position: fixed;
+    inset: 0;
+    width: min(32rem, calc(100% - 1.5rem));
+    max-height: calc(100dvh - 1.5rem);
+    margin: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    border: 1px solid var(--mp-line);
+    border-radius: 1.35rem;
+    background: var(--mp-surface);
+    color: var(--mp-ink);
+    box-shadow: 0 20px 80px #291d4440;
+  }
+
+  .mp-dialog::backdrop {
+    background: #2d223b80;
+  }
+
+  .mp-progress {
+    display: block;
+    width: 100%;
+    height: 0.45rem;
+    appearance: none;
+    overflow: hidden;
+    border: 0;
+    border-radius: 999px;
+    background: #e8dff3;
+  }
+
+  .mp-progress::-webkit-progress-bar { background: #e8dff3; }
+  .mp-progress::-webkit-progress-value { border-radius: 999px; background: var(--mp-purple); }
+  .mp-progress::-moz-progress-bar { border-radius: 999px; background: var(--mp-purple); }
+
+  .mp-candidate-tag {
+    @apply inline-flex min-w-0 rounded-full px-2.5 py-1 text-xs font-semibold;
+    background: #efe7fa;
+    color: #40344b;
+    overflow-wrap: anywhere;
+  }
+
+  .mp-candidate:nth-child(3n + 2) .mp-candidate-tag { background: #e4eedb; }
+  .mp-candidate:nth-child(3n) .mp-candidate-tag { background: #fff0cd; }
 }
