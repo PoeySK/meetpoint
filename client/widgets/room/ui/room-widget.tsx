@@ -61,7 +61,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
   const roomTools = !requiresRecovery && (
     <details className='mp-card group' open={Boolean(recoveryRegistrationError)}>
       <summary className='flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-slate-600 [&::-webkit-details-marker]:hidden'>
-        방 접근 및 복구
+        방 다시 열기와 복구
         <span aria-hidden='true' className='transition-transform group-open:rotate-180'>⌄</span>
       </summary>
       <div className='space-y-3 border-t border-slate-200 px-3 py-3'>
@@ -87,13 +87,11 @@ export function RoomWidget({ roomId }: { roomId: string }) {
       <main className='mp-shell pb-10'>
         {isLoading && <LoadingView />}
         {!isLoading && error && (
-          <>
-            <ErrorView error={error} onRetry={() => void retryRoom()} />
-            <RoomRecoveryPanel
-              roomId={roomId}
-              onRecovered={() => void loadRoom()}
-            />
-          </>
+          <ErrorView
+            error={error}
+            onRetry={() => void retryRoom()}
+            recovery={<RoomRecoveryPanel roomId={roomId} onRecovered={() => void loadRoom()} />}
+          />
         )}
         {!isLoading && !error && room && (
           <div className='space-y-4 sm:space-y-5'>
@@ -131,9 +129,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
                   />
                 ) : (
                   <section className='mp-card border-slate-200 bg-slate-50 p-4 text-sm leading-5 text-slate-700'>
-                    이 브라우저에서 방 입장 정보를 찾을 수 없어 후보 등록과 의견
-                    작성을 사용할 수 없습니다. 개인 복구 수단으로 기존 참여자의
-                    접근을 복구해 주세요.
+                    후보를 올리거나 의견을 남기려면 개인 복구 코드로 방을 다시 열어 주세요.
                   </section>
                 )}
                 <div className='scroll-mt-4' id='room-participants' tabIndex={-1}>

@@ -115,8 +115,8 @@ test('failure UI distinguishes personal recovery from creating a new MEMBER', ()
   });
   const html = renderToStaticMarkup(React.createElement(RoomRecoveryPanel, { roomId: 'one', onRecovered() {} }));
   assert.equal(html.includes('개인 복구 코드'), true);
-  assert.equal(html.includes('분실한 HOST는 새 방'), true);
-  assert.equal(html.includes('새 참여자로 등록'), true);
+  assert.equal(html.includes('방장은 새 방을 만들어야 해요'), true);
+  assert.equal(html.includes('새 참여자로 입장'), true);
   assert.equal(html.includes('type="password"'), true);
 });
 
@@ -147,15 +147,14 @@ test('all six feature error messages separate expiry/invalid access from permiss
   ];
   for (const [file, name] of features) {
     const describe = load(file, { '@/shared/api/http-client': { RoomApiError }, '@/shared/lib/room-access-error': accessErrors, './calculation-result-view': {} }, {}, [name])[name];
-    for (const [code, reason] of [['TOKEN_EXPIRED', '만료'], ['INVALID_TOKEN', '유효하지'], ['MISSING_TOKEN', '없습니다']]) {
+    for (const [code, reason] of [['TOKEN_EXPIRED', '만료'], ['INVALID_TOKEN', '확인하지 못했어요'], ['MISSING_TOKEN', '없어요']]) {
       const message = describe(new RoomApiError('Fixture', 401, code));
       assert.match(message, new RegExp(reason), file); assert.match(message, /다시 불러오기/, file);
-      assert.match(message, /개인 복구 코드/, file); assert.match(message, /기존 권한 복구가 아닙니다/, file);
-      assert.match(message, /자동으로 다시 보내지 않습니다/, file);
+      assert.match(message, /개인 복구 코드/, file); assert.match(message, /하던 작업을 직접 다시 시도/, file);
       assert.doesNotMatch(message, /이름을 입력해 다시 입장/, file);
     }
     for (const error of [new Error('Fixture network'), new RoomApiError('Fixture forbidden', 403, 'HOST_ONLY')]) {
-      assert.doesNotMatch(describe(error), /개인 복구 코드|토큰이 만료/, file);
+      assert.doesNotMatch(describe(error), /개인 복구 코드|입장 정보가 만료/, file);
     }
     const limited = new RoomApiError('요청이 너무 많습니다. 60초 뒤에 다시 시도해 주세요.', 429, 'RATE_LIMITED');
     assert.equal(describe(limited), limited.message, file);

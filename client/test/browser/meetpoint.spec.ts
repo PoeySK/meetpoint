@@ -357,7 +357,7 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(host.getByRole('button', { name: '링크 복사됨', exact: true })).toBeVisible();
   const inviteLink = await host.evaluate(() => navigator.clipboard.readText());
   expect(new URL(inviteLink).pathname === `/join/${initialRoom.room.roomCode}`).toBe(true);
-  const recoveryToggle = host.locator('summary').filter({ hasText: '방 접근 및 복구' });
+  const recoveryToggle = host.locator('summary').filter({ hasText: '방 다시 열기와 복구' });
   const recoveryFile = host.getByRole('button', { name: '개인 복구 파일 보관', exact: true });
   await expect(recoveryFile).toBeHidden();
   await recoveryToggle.click();
@@ -721,7 +721,7 @@ async function digest(db: Database, roomId: string) {
   return createHash('sha256').update(JSON.stringify(data)).digest('hex');
 }
 async function recoveryCode(page: Page) {
-  await page.locator('summary').filter({ hasText: '방 접근 및 복구' }).click();
+  await page.locator('summary').filter({ hasText: '방 다시 열기와 복구' }).click();
   const pending = page.waitForEvent('download');
   await page.getByRole('button', { name: '개인 복구 파일 보관', exact: true }).click();
   const download = await pending;
@@ -789,15 +789,15 @@ test('CALCULATED·CONFIRMED에서 HttpOnly 탭 복구·토큰 만료·개인 파
   expect((await stranger.context().cookies()).length).toBe(0);
   await stranger.goto(host.url());
   await expect(stranger.getByLabel('개인 복구 코드 (초대 방 코드와 다릅니다)', { exact: true })).toBeVisible();
-  await expect(stranger.getByText(/일반 방 코드 입장은 기존 역할·조건·응답을 복구하지 않습니다/)).toBeVisible();
+  await expect(stranger.getByText(/일반 방 코드는 새 참여자로 입장할 때 쓰는 코드예요/)).toBeVisible();
   await stranger.getByLabel('개인 복구 코드 (초대 방 코드와 다릅니다)', { exact: true }).fill('invalid-private-recovery-code');
-  await action(stranger, stranger.getByRole('button', { name: '기존 참여자로 복구', exact: true }), 'POST', /\/recovery$/, 401);
-  await expect(stranger.getByText(/복구하지 못했습니다/)).toBeVisible();
+  await action(stranger, stranger.getByRole('button', { name: '개인 복구 코드로 방 열기', exact: true }), 'POST', /\/recovery$/, 401);
+  await expect(stranger.getByText(/방을 다시 열지 못했어요/)).toBeVisible();
   expect(await digest(world.db, roomId)).toBe(beforeConfirmed);
   const expectedMemberId = (await room(members[1])).currentParticipant.id;
   await members[1].close(); // 복구한 토큰이 기존 탭의 복구 요청으로 다시 무효화되는 것을 막는다.
   await stranger.getByLabel('개인 복구 코드 (초대 방 코드와 다릅니다)', { exact: true }).fill(code);
-  await action(stranger, stranger.getByRole('button', { name: '기존 참여자로 복구', exact: true }), 'POST', /\/recovery$/, 201);
+  await action(stranger, stranger.getByRole('button', { name: '개인 복구 코드로 방 열기', exact: true }), 'POST', /\/recovery$/, 201);
   await expect(stranger.getByRole('heading', { name: '일정이 확정됐어요', exact: true })).toBeVisible();
   const restored = await room(stranger);
   expect(restored.currentParticipant.id).toBe(expectedMemberId);

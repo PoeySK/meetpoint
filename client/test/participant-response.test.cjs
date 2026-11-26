@@ -332,7 +332,7 @@ test('authentication failure retains response draft and requires recovery before
   const h = panelHarness(); h.fill().props.onClick(); h.cards()[0].props.onUpdate({ travelBurden: 'NORMAL', note: 'Auth failure draft' });
   h.fail(new RoomApiError('Fixture expiry', 401, 'TOKEN_EXPIRED')); h.cards()[0].props.onSave(); await settle();
   const form = h.cards()[0].props.form;
-  assert.match(form.message, /토큰이 만료/); assert.match(form.message, /다시 불러오기/); assert.match(form.message, /기존 참여자/);
+  assert.match(form.message, /입장 정보가 만료/); assert.match(form.message, /다시 불러오기/); assert.match(form.message, /개인 복구 코드/);
   assert.equal(form.savedResponseId, null); assert.equal(form.note, 'Auth failure draft');
   h.props.token = 'fixture-recovered-token'; h.render(); h.flush(); await settle();
   assert.equal(h.calls.length, 1);

@@ -22,7 +22,7 @@ export function RoomRecoveryPanel({ roomId, token, onRecovered }: {
       setCode("");
       onRecovered();
     } catch (error) {
-      setNotice(error instanceof RoomApiError && error.status === 429 ? error.message : "복구하지 못했습니다. 코드의 만료·폐기 여부와 인터넷 연결을 확인해 주세요. 기존 조건과 응답은 삭제되지 않습니다.");
+      setNotice(error instanceof RoomApiError && error.status === 429 ? error.message : "방을 다시 열지 못했어요. 가장 최근에 받은 개인 복구 코드와 인터넷 연결을 확인해 주세요. 전에 저장한 조건과 의견은 그대로 있어요.");
     } finally { setBusy(false); }
   }
 
@@ -33,7 +33,7 @@ export function RoomRecoveryPanel({ roomId, token, onRecovered }: {
       const saved = window.sessionStorage.getItem(getRoomRecoveryStorageKey(roomId));
       let recovery: { code: string | null; expiresAt: string } = saved ? JSON.parse(saved) : { code: null, expiresAt: "" };
       if (replace || !recovery.code || Date.parse(recovery.expiresAt) <= Date.now()) {
-        if (!window.confirm("새 개인 복구 코드를 발급하면 이전 코드와 다른 브라우저의 복구 정보가 폐기됩니다. 계속할까요?")) return;
+        if (!window.confirm("새 개인 복구 코드를 받으면 예전 코드와 다른 브라우저에 저장된 복구 정보를 더 이상 쓸 수 없어요. 새 코드를 받을까요?")) return;
         recovery = (await registerRoomRecovery(roomId, token, true)).recovery;
         window.sessionStorage.setItem(getRoomRecoveryStorageKey(roomId), JSON.stringify(recovery));
       }
@@ -46,24 +46,25 @@ export function RoomRecoveryPanel({ roomId, token, onRecovered }: {
       link.download = `meetpoint-personal-recovery-${roomId}.txt`;
       link.click();
       window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      setNotice("개인 복구 파일을 안전한 곳에 보관하세요. 파일을 가진 사람은 본인의 방 권한을 사용할 수 있습니다.");
+      setNotice("개인 복구 파일을 안전한 곳에 보관해 주세요. 파일을 가진 사람은 내 이름으로 방에 들어올 수 있어요.");
     } catch (error) { setNotice(error instanceof RoomApiError && error.status === 429 ? error.message : "복구 파일을 보관하지 못했습니다. 브라우저 설정과 연결을 확인해 주세요."); }
     finally { setBusy(false); }
   }
 
   return <section className="mp-card space-y-3 p-4">
-    <h2 className="font-semibold">기존 참여자 복구</h2>
+    <h2 className="font-semibold">{token ? "개인 복구 파일 보관" : "이전에 참여한 방 다시 열기"}</h2>
     {token ? <>
-      <p className="text-sm">개인 복구 쿠키는 발급 후 30일에 만료되고 복구해도 만료일은 연장되지 않습니다. 유효한 쿠키가 있으면 탭을 닫아도 같은 방 주소에서 복구할 수 있습니다. 다른 기기나 쿠키 삭제에 대비해 개인 복구 파일을 보관하세요. 초대 링크와 함께 공유하지 마세요.</p>
+      <p className="text-sm">이 브라우저에 저장된 복구 정보는 발급일부터 30일 동안 쓸 수 있어요. 다른 기기에서 이어서 쓰거나 브라우저 데이터를 지우기 전에 개인 복구 파일을 받아 두세요. 파일은 본인만 보관해 주세요.</p>
       <div className="flex flex-wrap gap-2">
         <button type="button" className="mp-button mp-button-secondary" disabled={busy} onClick={() => void download()}>개인 복구 파일 보관</button>
-        <button type="button" className="mp-button mp-button-secondary" disabled={busy} onClick={() => void download(true)}>복구 코드 재발급</button>
+        <button type="button" className="mp-button mp-button-secondary" disabled={busy} onClick={() => void download(true)}>새 복구 코드 받기</button>
       </div>
     </> : <form onSubmit={(event) => { event.preventDefault(); void recover(); }} className="space-y-2">
       <label className="block text-sm" htmlFor="personal-recovery-code">개인 복구 코드 (초대 방 코드와 다릅니다)</label>
       <input id="personal-recovery-code" type="password" autoComplete="off" value={code} onChange={(event) => setCode(event.target.value)} required className="w-full rounded border p-2" />
-      <button type="submit" className="mp-button mp-button-primary" disabled={busy}>기존 참여자로 복구</button>
-      <p className="text-sm">모든 자격 증명을 분실한 HOST는 새 방을 만들어야 합니다. MEMBER의 일반 재입장은 입장이 열린 방에서만 가능하며 새 참여자로 등록됩니다. 일반 방 코드 입장은 기존 역할·조건·응답을 복구하지 않습니다. 복구 후에는 실패한 작업을 직접 다시 시도해 주세요.</p>
+      <button type="submit" className="mp-button mp-button-primary" disabled={busy}>개인 복구 코드로 방 열기</button>
+      <p className="text-sm">개인 복구 코드로 열면 이전에 저장한 조건과 의견을 이어서 쓸 수 있어요. 일반 방 코드는 새 참여자로 입장할 때 쓰는 코드예요.</p>
+      <p className="text-sm">브라우저의 복구 정보와 개인 코드를 모두 잃었다면, 방장은 새 방을 만들어야 해요. 참여자는 새 입장이 가능한 방에 다시 들어갈 수 있어요.</p>
     </form>}
     <p aria-live="polite" className="text-sm">{notice}</p>
   </section>;

@@ -1,5 +1,6 @@
 import type { RoomLoadError } from '../model/use-room-session';
 import Link from 'next/link';
+import type { ReactNode } from 'react';
 
 export function LoadingView() {
   return (
@@ -17,12 +18,25 @@ export function LoadingView() {
 export function ErrorView({
   error,
   onRetry,
+  recovery,
 }: {
   error: RoomLoadError;
   onRetry: () => void;
+  recovery: ReactNode;
 }) {
+  const entryLinks = (
+    <div className='flex flex-wrap justify-center gap-2'>
+      <Link className='mp-button mp-button-secondary' href='/'>
+        새 방 만들기
+      </Link>
+      <Link className='mp-button mp-button-secondary' href='/join'>
+        방 코드로 새로 입장
+      </Link>
+    </div>
+  );
+
   return (
-    <div className='mx-auto flex min-h-[48vh] w-full max-w-lg items-center justify-center'>
+    <div className='mx-auto w-full max-w-lg space-y-3'>
       <section
         aria-live='polite'
         className='mp-card w-full border-rose-100 p-5 text-center sm:p-7'
@@ -33,29 +47,18 @@ export function ErrorView({
         <h1 className='text-2xl font-semibold tracking-tight text-slate-950'>
           {error.title}
         </h1>
-        <p className='mt-3 text-sm leading-6 text-slate-500'>{error.message}</p>
-        <div className='mt-5 flex flex-col gap-2 sm:flex-row sm:justify-center'>
-          <button
-            className='mp-button mp-button-primary'
-            onClick={onRetry}
-            type='button'
-          >
-            다시 불러오기
-          </button>
-          <Link
-            className='mp-button mp-button-secondary'
-            href='/'
-          >
-            새 방 만들기
-          </Link>
-          <Link
-            className='mp-button mp-button-secondary'
-            href='/join'
-          >
-            새 MEMBER로 입장
-          </Link>
-        </div>
+        <p className='mt-3 break-keep text-sm leading-6 text-slate-600'>{error.message}</p>
+        <button
+          className='mp-button mp-button-primary mt-4 min-h-11 w-full sm:w-auto'
+          onClick={onRetry}
+          type='button'
+        >
+          다시 불러오기
+        </button>
       </section>
+      {!error.requiresRecovery && entryLinks}
+      {recovery}
+      {error.requiresRecovery && entryLinks}
     </div>
   );
 }
