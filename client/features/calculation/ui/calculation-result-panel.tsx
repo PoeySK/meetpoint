@@ -143,11 +143,15 @@ export function CalculationResultPanel({
     resetDecisionDraft();
   }
 
+  const canStartRecommendation =
+    (room.room.status === 'OPEN' || room.room.status === 'CALCULATED') &&
+    room.participants.length >= 3 && room.participants.length <= 6 &&
+    room.candidates.length >= 2 && room.candidates.length <= 5;
+
   return (
     <section className='mp-card p-4 sm:p-6'>
       <div className='flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between'>
         <div className='space-y-1.5'>
-          <p className='text-sm font-semibold text-slate-700'>추천 결과</p>
           <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
             모임 추천 결과 확인
           </h2>
@@ -156,18 +160,18 @@ export function CalculationResultPanel({
             비교합니다. 선택 조건을 입력하지 않은 사람의 의견도 반영됩니다.
           </p>
         </div>
-        {isHost && room.room.status !== 'CONFIRMED' && (
+        {isHost && room.room.status !== 'CONFIRMED' && room.room.status !== 'CLOSED' && (
           <button
-            className='mp-button mp-button-primary'
+            className='mp-button mp-button-primary min-h-11 shrink-0'
             disabled={
+              !canStartRecommendation ||
               isStarting ||
-              isRunning(calculation?.status) ||
-              room.room.status === 'CALCULATING'
+              isRunning(calculation?.status)
             }
             onClick={() => void handleStart()}
             type='button'
           >
-            {isStarting || isRunning(calculation?.status)
+            {isStarting || isRunning(calculation?.status) || room.room.status === 'CALCULATING'
               ? '결과 준비 중...'
               : '추천 결과 만들기'}
           </button>
@@ -176,7 +180,7 @@ export function CalculationResultPanel({
 
       {error && (
         <div className='mt-4 flex flex-col gap-2 rounded-xl bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700 sm:flex-row sm:items-center sm:justify-between'>
-          <span>{error}</span>
+          <span role='alert'>{error}</span>
           {isHost && (
             <button
               className='mp-button mp-button-secondary self-start border-rose-200 px-3 py-1.5 text-xs text-rose-700 hover:border-rose-300 hover:bg-white sm:self-auto'
@@ -197,8 +201,11 @@ export function CalculationResultPanel({
 
       {!room.room.latestScoreResultId && !isLoadingResult && !error && (
         <p className='mt-4 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          아직 추천 결과가 없습니다. 참여자가 3명 이상이고 후보가 2개 이상이면
-          방장이 추천 결과를 만들 수 있습니다.
+          {room.room.status === 'CLOSED'
+            ? '이 방은 종료됐어요.'
+            : canStartRecommendation
+              ? '아직 추천 결과가 없어요. 방장이 결과를 만들면 이곳에서 볼 수 있어요.'
+              : '참여자가 3명 이상이고 후보가 2개 이상이면 방장이 추천 결과를 만들 수 있어요.'}
         </p>
       )}
 

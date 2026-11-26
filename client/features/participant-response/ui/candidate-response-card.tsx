@@ -93,17 +93,19 @@ export function CandidateResponseCard({
               : '작성 중 · 저장 전'
             : responseStateLabel(responseState)}
         </p>
-        <button
-          className={`mp-button min-h-11 w-full ${isReadOnly || responseState === 'saved' ? 'mp-button-secondary' : 'mp-button-primary'}`}
-          onClick={() => {
-            const dialog = dialogRef.current;
-            dialog?.showModal();
-            dialog?.querySelector<HTMLButtonElement>('fieldset button:enabled')?.focus();
-          }}
-          type='button'
-        >
-          {isReadOnly ? '내 의견 보기' : form.savedResponseId ? '의견 확인하기' : '의견 남기기'}
-        </button>
+        {(!isReadOnly || responseState !== 'missing') && (
+          <button
+            className={`mp-button min-h-11 w-full ${isReadOnly || responseState === 'saved' ? 'mp-button-secondary' : 'mp-button-primary'}`}
+            onClick={() => {
+              const dialog = dialogRef.current;
+              dialog?.showModal();
+              dialog?.querySelector<HTMLButtonElement>('fieldset button:enabled')?.focus();
+            }}
+            type='button'
+          >
+            {isReadOnly ? '내 의견 보기' : form.savedResponseId ? '의견 확인하기' : '의견 남기기'}
+          </button>
+        )}
       </div>
       <dialog aria-label={`${candidate.place.name} 의견`} className='mp-dialog' ref={dialogRef}>
       <div className='space-y-3 p-4 sm:p-6'>

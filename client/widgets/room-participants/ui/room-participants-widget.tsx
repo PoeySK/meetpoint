@@ -5,7 +5,7 @@ import type {
   PublicParticipant,
   RoomDetailsResponse,
 } from '@/entities/room';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 
 const roleLabels: Record<PublicParticipant['role'], string> = {
   HOST: '방장',
@@ -41,6 +41,7 @@ export function RoomParticipantsWidget({
   const [kickConfirmationId, setKickConfirmationId] = useState<string | null>(
     null
   );
+  const leaveDialogRef = useRef<HTMLDialogElement>(null);
   const canChangeParticipants = ![
     'CALCULATING',
     'CONFIRMED',
@@ -82,13 +83,14 @@ export function RoomParticipantsWidget({
           </p>
           {!isHost && (
             <button
-              className='mp-button mp-button-secondary w-fit px-3 py-1.5 text-xs'
+              aria-haspopup='dialog'
+              className='mp-button mp-button-secondary min-h-11 w-fit px-3 py-1.5 text-xs'
               disabled={
                 !canChangeParticipants ||
                 isLeaving ||
                 Boolean(removingParticipantId)
               }
-              onClick={() => void onLeave()}
+              onClick={() => leaveDialogRef.current?.showModal()}
               type='button'
             >
               {isLeaving ? '나가는 중...' : '방 나가기'}
@@ -96,6 +98,36 @@ export function RoomParticipantsWidget({
           )}
         </div>
       </div>
+
+      {!isHost && (
+        <dialog aria-labelledby='leave-room-heading' className='mp-dialog max-w-md space-y-4 p-4 sm:p-6' ref={leaveDialogRef}>
+          <h3 className='text-xl font-extrabold tracking-tight' id='leave-room-heading'>방에서 나갈까요?</h3>
+          <p className='break-keep text-sm leading-6 text-[var(--mp-muted)]'>
+            나가면 지금 참여 정보로는 이 방에 다시 들어올 수 없어요.
+          </p>
+          <div className='flex flex-col gap-2 sm:flex-row sm:justify-end'>
+            <button
+              autoFocus
+              className='mp-button mp-button-secondary min-h-11'
+              onClick={() => leaveDialogRef.current?.close()}
+              type='button'
+            >
+              계속 참여하기
+            </button>
+            <button
+              className='mp-button min-h-11 bg-rose-700 text-white hover:bg-rose-800'
+              disabled={!canChangeParticipants || isLeaving}
+              onClick={() => {
+                leaveDialogRef.current?.close();
+                void onLeave();
+              }}
+              type='button'
+            >
+              방에서 나가기
+            </button>
+          </div>
+        </dialog>
+      )}
 
       {!canChangeParticipants && (
         <p className='mt-3 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700'>
