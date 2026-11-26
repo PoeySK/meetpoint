@@ -22,11 +22,15 @@ type FieldErrors = {
   displayName?: string;
 };
 
+const roomCodePattern = /^[A-Z0-9]{6}$/;
+
 function validateForm(roomCode: string, displayName: string) {
   const errors: FieldErrors = {};
 
-  if (!/^[A-Z0-9]{6}$/.test(roomCode)) {
-    errors.roomCode = '방 코드는 영문 대문자와 숫자 6자리로 입력해 주세요.';
+  if (!roomCode) {
+    errors.roomCode = '방 코드를 입력해 주세요.';
+  } else if (!roomCodePattern.test(roomCode)) {
+    errors.roomCode = '방 코드를 영문과 숫자 6자리로 입력해 주세요.';
   }
 
   if (!displayName) {
@@ -48,7 +52,7 @@ function describeJoinError(error: unknown, hasInviteCode: boolean) {
     }
 
     if (error.code === 'ROOM_STATE_CONFLICT') {
-      return '이 방은 현재 입장할 수 없습니다. 정원이 가득 찼거나 입장이 닫힌 방일 수 있습니다.';
+      return '지금은 새로 들어갈 수 없는 방이에요. 이미 참여했다면 기존 참여를 이어가 주세요.';
     }
 
     if (error.code === 'VALIDATION_ERROR') {
@@ -56,7 +60,7 @@ function describeJoinError(error: unknown, hasInviteCode: boolean) {
     }
   }
 
-  return '방에 입장하지 못했습니다. 잠시 후 다시 시도해 주세요.';
+  return '방에 들어가지 못했어요. 잠시 후 다시 시도해 주세요.';
 }
 
 export function ParticipantJoinForm({
@@ -64,7 +68,7 @@ export function ParticipantJoinForm({
 }: ParticipantJoinFormProps) {
   const router = useRouter();
   const inviteCode = initialRoomCode.toUpperCase();
-  const hasInviteCode = /^[A-Z0-9]{6}$/.test(inviteCode);
+  const hasInviteCode = roomCodePattern.test(inviteCode);
   const [roomCode, setRoomCode] = useState(hasInviteCode ? inviteCode : '');
   const [displayName, setDisplayName] = useState('');
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -74,14 +78,27 @@ export function ParticipantJoinForm({
   const [joiningAsNew, setJoiningAsNew] = useState(false);
   const displayNameRef = useRef<HTMLInputElement>(null);
   const checkingInvite = hasInviteCode && existingRoomId === undefined;
-  const showJoinForm = !hasInviteCode || (!checkingInvite && (!existingRoomId || joiningAsNew));
+  const showNameFields = !existingRoomId || joiningAsNew;
   useEffect(() => {
-    const timer = window.setTimeout(() => setExistingRoomId(getRememberedRoomAddress(roomCode.trim().toUpperCase())), 0);
+    if (!hasInviteCode) return;
+    const timer = window.setTimeout(() => setExistingRoomId(getRememberedRoomAddress(inviteCode)), 0);
     return () => window.clearTimeout(timer);
-  }, [roomCode]);
+  }, [hasInviteCode, inviteCode]);
+
+  function updateRoomCode(value: string) {
+    const nextCode = value.replace(/\s/g, '').toUpperCase();
+    if (nextCode === roomCode) return;
+    setRoomCode(nextCode);
+    setExistingRoomId(roomCodePattern.test(nextCode) ? getRememberedRoomAddress(nextCode) : null);
+    setJoiningAsNew(false);
+    setFormError('');
+    if (fieldErrors.roomCode) setFieldErrors((errors) => ({ ...errors, roomCode: undefined }));
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (checkingInvite || !showNameFields || isSubmitting) return;
+    const form = event.currentTarget;
 
     const normalizedRoomCode = roomCode.trim().toUpperCase();
     const normalizedDisplayName = displayName.trim();
@@ -91,7 +108,6 @@ export function ParticipantJoinForm({
     setFormError('');
 
     if (Object.keys(errors).length > 0) {
-      const form = event.currentTarget;
       window.requestAnimationFrame(() => form.querySelector<HTMLInputElement>(errors.roomCode ? '#roomCode' : '#displayName')?.focus());
       return;
     }
@@ -124,125 +140,126 @@ export function ParticipantJoinForm({
       router.push(`/rooms/${encodeURIComponent(response.room.id)}`);
     } catch (error) {
       setFormError(describeJoinError(error, hasInviteCode));
+      if (!hasInviteCode && error instanceof RoomApiError && error.code === 'ROOM_NOT_FOUND_OR_INVALID_CODE') {
+        window.requestAnimationFrame(() => form.querySelector<HTMLInputElement>('#roomCode')?.focus());
+      }
     } finally {
       setIsSubmitting(false);
     }
   }
 
   return (
-    <main className='mp-page px-3 py-4 font-sans text-slate-950 sm:px-6 sm:py-6'>
-      <div className='mx-auto w-full max-w-lg space-y-3'>
-        <header>
-          <Link className='font-bold tracking-tight' href='/'>
-            MeetPoint
-          </Link>
-        </header>
-
-        <section aria-labelledby='join-room-heading' className='mp-card space-y-5 rounded-xl p-4 sm:p-6'>
-          <h1 className='text-2xl font-bold tracking-tight sm:text-3xl' id='join-room-heading'>
-            {hasInviteCode ? '모임에 참여하기' : '방 코드로 참여하기'}
+    <div className='space-y-3'>
+      <section aria-labelledby='join-room-heading' className='mp-card space-y-5 p-4 sm:p-6'>
+        <header className='space-y-1'>
+          <h1 className='text-2xl font-extrabold tracking-tight sm:text-3xl' id='join-room-heading'>
+            {hasInviteCode ? '모임에 참여하기' : '방 코드로 입장하기'}
           </h1>
-          {checkingInvite && <p className='text-sm text-slate-600' role='status'>참여 기록을 확인하는 중…</p>}
-          {initialRoomCode && !hasInviteCode && (
-            <p className='rounded-lg bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700' role='alert'>
-              초대 링크의 방 코드를 읽을 수 없어요. 코드를 직접 입력하거나 방장에게 새 링크를 요청해 주세요.
-            </p>
-          )}
-          {existingRoomId && (
-            <div className={`space-y-3 ${showJoinForm ? 'border-b border-slate-200 pb-4' : ''}`}>
-              <p className='text-sm text-slate-700'>이미 이 모임에 참여한 기록이 있어요.</p>
-              <Link
-                className={`mp-button flex min-h-11 w-full items-center justify-center rounded-lg ${showJoinForm ? 'mp-button-secondary' : 'mp-button-accent'}`}
-                href={`/rooms/${encodeURIComponent(existingRoomId)}`}
-              >
-                기존 참여 이어가기
-              </Link>
-              {!showJoinForm && (
-                <button
-                  className='mp-button mp-button-secondary min-h-11 w-full rounded-lg'
-                  onClick={() => {
-                    setJoiningAsNew(true);
-                    window.requestAnimationFrame(() => displayNameRef.current?.focus());
-                  }}
-                  type='button'
-                >
-                  새 참여자로 입장
-                </button>
-              )}
-            </div>
-          )}
-
-          {showJoinForm && (
-            <form className='space-y-4' onSubmit={handleSubmit} noValidate>
-              {!hasInviteCode && (
-                <div className='grid gap-1.5'>
-                  <label className='text-sm font-semibold text-slate-800' htmlFor='roomCode'>방 코드</label>
-                  <input
-                    aria-describedby={fieldErrors.roomCode ? 'room-code-error' : undefined}
-                    aria-invalid={Boolean(fieldErrors.roomCode)}
-                    autoCapitalize='characters'
-                    autoComplete='off'
-                    className='mp-input min-h-11 rounded-lg text-base font-semibold uppercase tracking-[0.2em] placeholder:normal-case placeholder:tracking-normal aria-invalid:border-rose-600'
-                    id='roomCode'
-                    maxLength={6}
-                    onChange={(event) => {
-                      setRoomCode(event.target.value.toUpperCase());
-                      if (fieldErrors.roomCode) setFieldErrors((errors) => ({ ...errors, roomCode: undefined }));
-                    }}
-                    placeholder='예: A7K9P2'
-                    required
-                    value={roomCode}
-                  />
-                  {fieldErrors.roomCode && <p className='text-sm text-rose-600' id='room-code-error'>{fieldErrors.roomCode}</p>}
-                </div>
-              )}
-
-              <div className='grid gap-1.5'>
-                <label className='text-sm font-semibold text-slate-800' htmlFor='displayName'>이름</label>
-                <input
-                  aria-describedby={fieldErrors.displayName ? 'display-name-error join-name-hint' : 'join-name-hint'}
-                  aria-invalid={Boolean(fieldErrors.displayName)}
-                  autoComplete='nickname'
-                  className='mp-input min-h-11 rounded-lg text-base aria-invalid:border-rose-600'
-                  id='displayName'
-                  maxLength={30}
-                  onChange={(event) => {
-                    setDisplayName(event.target.value);
-                    if (fieldErrors.displayName) setFieldErrors((errors) => ({ ...errors, displayName: undefined }));
-                  }}
-                  placeholder='예: 지수'
-                  ref={displayNameRef}
-                  required
-                  value={displayName}
-                />
-                {fieldErrors.displayName && <p className='text-sm text-rose-600' id='display-name-error'>{fieldErrors.displayName}</p>}
-                <p className='text-xs leading-5 text-slate-600' id='join-name-hint'>방장과 다른 참가자에게 보이는 이름이에요.</p>
-              </div>
-
-              {formError && (
-                <p className='rounded-lg bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700' role='alert'>
-                  {formError}
-                </p>
-              )}
-              <button
-                className='mp-button mp-button-accent min-h-11 w-full rounded-lg'
-                disabled={isSubmitting}
-                type='submit'
-              >
-                {isSubmitting ? '입장하는 중...' : '방에 입장하기'}
-              </button>
-              <p className='break-keep text-sm leading-5 text-slate-600'>
-                입장하면 방장이 올린 모임 후보에 의견을 남길 수 있어요.
-              </p>
-            </form>
-          )}
-        </section>
-        {hasInviteCode && (
-          <Link className='inline-flex min-h-11 items-center rounded-lg px-1 text-sm font-semibold text-slate-800 underline underline-offset-4' href='/join'>
-            다른 방 코드 입력
-          </Link>
+          <p className='break-keep text-sm leading-5 text-[var(--mp-muted)]'>
+            입장하면 방장이 올린 모임 후보에 의견을 남길 수 있어요.
+          </p>
+        </header>
+        {initialRoomCode && !hasInviteCode && (
+          <p className='rounded-lg bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700' role='alert'>
+            초대 링크의 방 코드를 읽을 수 없어요. 코드를 직접 입력하거나 방장에게 새 링크를 요청해 주세요.
+          </p>
         )}
-      </div>
-    </main>
+        {checkingInvite ? (
+          <p className='text-sm text-[var(--mp-muted)]' role='status'>참여 기록을 확인하는 중…</p>
+        ) : (
+          <form className='space-y-4' onSubmit={handleSubmit} noValidate>
+            {!hasInviteCode && (
+              <div className='grid gap-1.5'>
+                <div className='flex flex-wrap items-baseline justify-between gap-x-2'>
+                  <label className='text-sm font-semibold' htmlFor='roomCode'>방 코드</label>
+                  <p className='text-sm text-[var(--mp-muted)]' id='join-code-hint'>영문·숫자 6자리</p>
+                </div>
+                <input
+                  aria-describedby={fieldErrors.roomCode ? 'room-code-error join-code-hint' : 'join-code-hint'}
+                  aria-invalid={Boolean(fieldErrors.roomCode)}
+                  autoCapitalize='characters'
+                  autoComplete='off'
+                  className='mp-input min-h-11 text-base font-semibold tracking-widest placeholder:tracking-normal aria-invalid:border-rose-600'
+                  disabled={isSubmitting}
+                  id='roomCode'
+                  onChange={(event) => updateRoomCode(event.target.value)}
+                  placeholder='예: A7K9P2'
+                  required
+                  spellCheck={false}
+                  value={roomCode}
+                />
+                {fieldErrors.roomCode && <p className='text-sm text-rose-700' id='room-code-error'>{fieldErrors.roomCode}</p>}
+              </div>
+            )}
+            {existingRoomId && (
+              <div className='space-y-3 rounded-2xl bg-[var(--mp-lilac)] p-3'>
+                <p className='text-sm font-semibold' role='status'>이미 이 모임에 참여한 기록이 있어요.</p>
+                <Link
+                  className={`mp-button flex min-h-11 items-center justify-center ${joiningAsNew ? 'mp-button-secondary' : 'mp-button-primary'}`}
+                  href={`/rooms/${encodeURIComponent(existingRoomId)}`}
+                >
+                  기존 참여 이어가기
+                </Link>
+                {!joiningAsNew && (
+                  <button
+                    className='mp-button mp-button-secondary min-h-11 w-full'
+                    onClick={() => {
+                      setJoiningAsNew(true);
+                      setFieldErrors((errors) => ({ ...errors, displayName: undefined }));
+                      window.requestAnimationFrame(() => displayNameRef.current?.focus());
+                    }}
+                    type='button'
+                  >
+                    새 참여자로 입장
+                  </button>
+                )}
+              </div>
+            )}
+            {showNameFields && (
+              <>
+                <div className='grid gap-1.5'>
+                  <div className='flex flex-wrap items-baseline justify-between gap-x-2'>
+                    <label className='text-sm font-semibold' htmlFor='displayName'>이름</label>
+                    <p className='text-sm text-[var(--mp-muted)]' id='join-name-hint'>모임에 표시될 이름</p>
+                  </div>
+                  <input
+                    aria-describedby={fieldErrors.displayName ? 'display-name-error join-name-hint' : 'join-name-hint'}
+                    aria-invalid={Boolean(fieldErrors.displayName)}
+                    autoComplete='nickname'
+                    className='mp-input min-h-11 text-base aria-invalid:border-rose-600'
+                    disabled={isSubmitting}
+                    id='displayName'
+                    maxLength={30}
+                    onChange={(event) => {
+                      setDisplayName(event.target.value);
+                      setFormError('');
+                      if (fieldErrors.displayName) setFieldErrors((errors) => ({ ...errors, displayName: undefined }));
+                    }}
+                    placeholder='예: 지수'
+                    ref={displayNameRef}
+                    required
+                    value={displayName}
+                  />
+                  {fieldErrors.displayName && <p className='text-sm text-rose-700' id='display-name-error'>{fieldErrors.displayName}</p>}
+                </div>
+                {formError && (
+                  <p className='rounded-lg bg-rose-50 px-3 py-2.5 text-sm leading-5 text-rose-700' role='alert'>
+                    {formError}
+                  </p>
+                )}
+                <button className='mp-button mp-button-primary min-h-11 w-full' disabled={isSubmitting} type='submit'>
+                  {isSubmitting ? '입장하는 중…' : '방에 입장하기'}
+                </button>
+              </>
+            )}
+          </form>
+        )}
+      </section>
+      {hasInviteCode && (
+        <Link className='inline-flex min-h-11 items-center rounded-lg px-1 text-sm font-semibold text-[var(--mp-purple)] underline underline-offset-4' href='/join'>
+          다른 방 코드 입력
+        </Link>
+      )}
+    </div>
   );
 }

@@ -490,7 +490,7 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(member).toHaveURL(/\/join$/);
   await expect(member.locator('input[required]:visible')).toHaveCount(2);
   await member.goto('/join/invalid-link');
-  const manualJoin = member.getByRole('region', { name: '방 코드로 참여하기', exact: true });
+  const manualJoin = member.getByRole('region', { name: '방 코드로 입장하기', exact: true });
   await expect(manualJoin.getByRole('alert')).toContainText('방장에게 새 링크를 요청해 주세요');
   await expect(member.getByLabel('방 코드', { exact: true })).toHaveValue('');
 });
