@@ -17,7 +17,7 @@ type FieldErrors = {
   windows?: string;
   budget?: string;
   preferences?: string;
-  windowErrors: Record<number, string>;
+  windowErrors: Partial<Record<number, { field: keyof ConditionWindowDraft; message: string }>>;
 };
 
 type ParticipantConditionPanelProps = {
@@ -96,10 +96,17 @@ function validateDraft(
   }
 
   windows.forEach((window, index) => {
-    if (!window.date || !window.startsAt || !window.endsAt) {
-      errors.windowErrors[index] = '날짜와 시작·종료 시간을 모두 입력해 주세요.';
+    const missingField = !window.date ? 'date' : !window.startsAt ? 'startsAt' : !window.endsAt ? 'endsAt' : null;
+    if (missingField) {
+      errors.windowErrors[index] = {
+        field: missingField,
+        message: '날짜와 시작·종료 시간을 모두 입력해 주세요.',
+      };
     } else if (window.endsAt <= window.startsAt) {
-      errors.windowErrors[index] = '종료 시간은 시작 시간보다 늦어야 합니다.';
+      errors.windowErrors[index] = {
+        field: 'endsAt',
+        message: '종료 시간은 시작 시간보다 늦어야 해요.',
+      };
     }
   });
 
@@ -210,7 +217,7 @@ export function ParticipantConditionPanel({
     setFieldErrors((current) => ({
       ...current,
       windows: undefined,
-      windowErrors: { ...current.windowErrors, [index]: '' },
+      windowErrors: { ...current.windowErrors, [index]: undefined },
     }));
     setFormMessage(null);
   }
@@ -236,6 +243,8 @@ export function ParticipantConditionPanel({
       errors.preferences ||
       Object.values(errors.windowErrors).some(Boolean)
     ) {
+      const form = event.currentTarget;
+      window.requestAnimationFrame(() => form.querySelector<HTMLElement>('[aria-invalid="true"]')?.focus());
       return;
     }
 
@@ -267,15 +276,13 @@ export function ParticipantConditionPanel({
   }
 
   return (
-    <section className='border-t border-slate-200 p-4'>
+    <section className='p-4 sm:p-6 lg:border-t lg:border-[var(--mp-line)]'>
       <div className='space-y-1.5'>
-        <div className='flex flex-wrap items-center gap-2'>
-          <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-            원하는 조건을 알려주세요
-          </h2>
-        </div>
-        <p className='text-sm leading-6 text-slate-600'>
-          후보를 비교할 때 참고할 내 기준이에요. 다른 참여자에게는 공개되지 않아요.
+        <h2 className='text-xl font-semibold tracking-tight'>
+          원하는 조건을 알려주세요
+        </h2>
+        <p className='break-keep text-sm leading-6 text-[var(--mp-muted)]'>
+          후보를 비교할 때 참고해요. 입력은 선택이고 나만 볼 수 있어요.
         </p>
       </div>
 
@@ -284,38 +291,40 @@ export function ParticipantConditionPanel({
           일정이 확정되었거나 종료된 방에서는 선택 조건을 수정할 수 없습니다.
         </p>
       ) : (
-        <form className='mt-5 space-y-5' onSubmit={handleSubmit}>
+        <form className='mt-4 space-y-4 sm:space-y-5' onSubmit={handleSubmit} noValidate>
           <fieldset className='space-y-3'>
-            <legend className='text-sm font-semibold text-slate-800'>
-              언제 시간이 괜찮아요? <span className='font-normal text-slate-600'>(조건 저장에 필요)</span>
-            </legend>
+            <legend className='mb-2 font-bold'>가능한 시간</legend>
             {windows.map((window, index) => (
               <div
-                className='rounded-xl border border-slate-200 bg-white/80 p-3'
+                className={index > 0 ? 'border-t border-[var(--mp-line)] pt-3' : undefined}
                 key={`condition-window-${index}`}
               >
-                <div className='mb-2 flex items-center justify-between gap-2'>
-                    <p className='text-xs font-semibold text-slate-600'>가능한 시간 {index + 1}</p>
-                  <button
-                    className='text-xs font-semibold text-slate-500 underline disabled:cursor-not-allowed disabled:no-underline disabled:opacity-40'
-                    disabled={windows.length === 1 || isSubmitting}
-                    onClick={() =>
-                      setWindows((current) =>
-                        current.filter((_, windowIndex) => windowIndex !== index),
-                      )
-                    }
-                    type='button'
-                  >
-                    삭제
-                  </button>
-                </div>
-                <div className='grid grid-cols-2 gap-2'>
+                {windows.length > 1 && (
+                  <div className='mb-1 flex items-center justify-between gap-2'>
+                    <p className='text-sm font-medium text-[var(--mp-muted)]'>시간 {index + 1}</p>
+                    <button
+                      aria-label={`시간 ${index + 1} 삭제`}
+                      className='min-h-11 px-2 text-sm font-semibold text-[var(--mp-muted)] underline-offset-4 hover:underline disabled:opacity-50'
+                      disabled={isSubmitting}
+                      onClick={() => {
+                        setWindows((current) =>
+                          current.filter((_, windowIndex) => windowIndex !== index),
+                        );
+                        setFieldErrors((current) => ({ ...current, windowErrors: {} }));
+                      }}
+                      type='button'
+                    >
+                      삭제
+                    </button>
+                  </div>
+                )}
+                <div className='grid grid-cols-2 gap-2 sm:grid-cols-4'>
                   <label className='col-span-2 space-y-1 text-sm font-medium text-slate-700'>
                     날짜
                     <input
                       aria-describedby={fieldErrors.windowErrors[index] ? `condition-window-error-${index}` : undefined}
-                      aria-invalid={Boolean(fieldErrors.windowErrors[index])}
-                      className='mp-input'
+                      aria-invalid={fieldErrors.windowErrors[index]?.field === 'date'}
+                      className='mp-input aria-invalid:border-rose-600'
                       disabled={isSubmitting}
                       onChange={(event) => updateWindow(index, { date: event.target.value })}
                       type='date'
@@ -325,8 +334,9 @@ export function ParticipantConditionPanel({
                   <label className='min-w-0 space-y-1 text-sm font-medium text-slate-700'>
                     시작
                     <input
-                      aria-invalid={Boolean(fieldErrors.windowErrors[index])}
-                      className='mp-input'
+                      aria-describedby={fieldErrors.windowErrors[index] ? `condition-window-error-${index}` : undefined}
+                      aria-invalid={fieldErrors.windowErrors[index]?.field === 'startsAt'}
+                      className='mp-input aria-invalid:border-rose-600'
                       disabled={isSubmitting}
                       onChange={(event) => updateWindow(index, { startsAt: event.target.value })}
                       type='time'
@@ -336,8 +346,9 @@ export function ParticipantConditionPanel({
                   <label className='min-w-0 space-y-1 text-sm font-medium text-slate-700'>
                     종료
                     <input
-                      aria-invalid={Boolean(fieldErrors.windowErrors[index])}
-                      className='mp-input'
+                      aria-describedby={fieldErrors.windowErrors[index] ? `condition-window-error-${index}` : undefined}
+                      aria-invalid={fieldErrors.windowErrors[index]?.field === 'endsAt'}
+                      className='mp-input aria-invalid:border-rose-600'
                       disabled={isSubmitting}
                       onChange={(event) => updateWindow(index, { endsAt: event.target.value })}
                       type='time'
@@ -350,7 +361,7 @@ export function ParticipantConditionPanel({
                     className='mt-2 text-xs leading-5 text-rose-600'
                     id={`condition-window-error-${index}`}
                   >
-                    {fieldErrors.windowErrors[index]}
+                    {fieldErrors.windowErrors[index]?.message}
                   </p>
                 )}
               </div>
@@ -359,23 +370,24 @@ export function ParticipantConditionPanel({
               <p className='text-xs leading-5 text-rose-600'>{fieldErrors.windows}</p>
             )}
             <button
-              className='mp-button mp-button-secondary px-3 py-2 text-xs'
+              className='min-h-11 rounded-lg text-sm font-semibold text-[var(--mp-purple)] underline-offset-4 hover:underline disabled:opacity-50'
               disabled={windows.length >= 10 || isSubmitting}
               onClick={() => setWindows((current) => [...current, emptyWindow()])}
               type='button'
             >
-              + 가능한 시간 추가
+              + 시간 추가
             </button>
           </fieldset>
 
-          <details className='rounded-xl border border-stone-200 bg-stone-50' ref={extraConditionsRef}>
-            <summary className='cursor-pointer px-3 py-3 text-sm font-semibold'>예산·장소 특징 (선택)</summary>
-            <div className='space-y-4 border-t border-stone-200 p-3'>
+          <details className='border-t border-[var(--mp-line)] pt-2' ref={extraConditionsRef}>
+            <summary className='cursor-pointer py-2 text-sm font-semibold'>예산·장소 특징 (선택)</summary>
+            <div className='mt-2 grid gap-4 md:grid-cols-2'>
               <fieldset className='space-y-2'>
-                <legend className='text-sm font-semibold text-slate-800'>예산 <span className='font-normal text-slate-500'>예산을 넘는 후보도 의견으로 남길 수 있습니다.</span></legend>
+                <legend className='mb-1 text-sm font-semibold'>예산</legend>
                 <label className='flex items-center gap-2 text-sm text-slate-700'>
                   <input
                     checked={noBudgetLimit}
+                    className='accent-[var(--mp-purple)]'
                     disabled={isSubmitting}
                     onChange={(event) => setNoBudgetLimit(event.target.checked)}
                     type='checkbox'
@@ -389,7 +401,7 @@ export function ParticipantConditionPanel({
                       <input
                         aria-describedby={fieldErrors.budget ? 'condition-budget-error' : undefined}
                         aria-invalid={Boolean(fieldErrors.budget)}
-                        className='mp-input'
+                        className='mp-input aria-invalid:border-rose-600'
                         disabled={isSubmitting}
                         inputMode='numeric'
                         min='0'
@@ -412,11 +424,13 @@ export function ParticipantConditionPanel({
               </fieldset>
 
               <fieldset className='space-y-3'>
-                <legend className='text-sm font-semibold text-slate-800'>선호하는 특징 <span className='font-normal text-slate-500'>추천 결과에 참고합니다. 쉼표로 구분해 입력해 주세요.</span></legend>
+                <legend className='mb-1 text-sm font-semibold'>장소 특징 <span className='font-normal text-[var(--mp-muted)]'>쉼표로 구분</span></legend>
                 <label className='block space-y-1 text-sm font-medium text-slate-700'>
                   꼭 필요한 특징
                   <input
-                    className='mp-input'
+                    aria-describedby={fieldErrors.preferences ? 'condition-preferences-error' : undefined}
+                    aria-invalid={Boolean(fieldErrors.preferences)}
+                    className='mp-input aria-invalid:border-rose-600'
                     disabled={isSubmitting}
                     onChange={(event) => setRequiredTags(event.target.value)}
                     placeholder='예: 실내, 조용한 곳'
@@ -426,6 +440,7 @@ export function ParticipantConditionPanel({
                 <label className='block space-y-1 text-sm font-medium text-slate-700'>
                   있으면 좋은 특징
                   <input
+                    aria-describedby={fieldErrors.preferences ? 'condition-preferences-error' : undefined}
                     className='mp-input'
                     disabled={isSubmitting}
                     onChange={(event) => setPreferredTags(event.target.value)}
@@ -436,6 +451,7 @@ export function ParticipantConditionPanel({
                 <label className='block space-y-1 text-sm font-medium text-slate-700'>
                   피하고 싶은 특징
                   <input
+                    aria-describedby={fieldErrors.preferences ? 'condition-preferences-error' : undefined}
                     className='mp-input'
                     disabled={isSubmitting}
                     onChange={(event) => setAvoidTags(event.target.value)}
@@ -444,14 +460,14 @@ export function ParticipantConditionPanel({
                   />
                 </label>
                 {fieldErrors.preferences && (
-                  <p className='text-xs leading-5 text-rose-600'>{fieldErrors.preferences}</p>
+                  <p className='text-xs leading-5 text-rose-600' id='condition-preferences-error'>{fieldErrors.preferences}</p>
                 )}
               </fieldset>
             </div>
           </details>
 
           {formMessage && (
-            <p aria-live='polite' className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-700'>
+            <p aria-live='polite' className='text-sm leading-5 text-[var(--mp-muted)]'>
               {formMessage}
             </p>
           )}
@@ -469,11 +485,6 @@ export function ParticipantConditionPanel({
         </form>
       )}
 
-      {!isReadOnly && !condition && !formMessage && (
-        <p className='mt-4 text-xs leading-5 text-slate-500'>
-          선택 조건은 나중에 입력해도 됩니다. 먼저 후보별 의견을 남겨 보세요.
-        </p>
-      )}
     </section>
   );
 }

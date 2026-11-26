@@ -178,7 +178,7 @@ async function addCandidate(page: Page, name: string, second: boolean, withDetai
   await management.getByLabel('주소', { exact: true }).fill('서울 중구 테스트길 1');
   await management.getByLabel('1인 예상 비용 (원)', { exact: true }).fill(second ? '40000' : '10000');
   if (withDetails) {
-    await openDisclosure(management, '지역·장소 특징 (선택)');
+    await openDisclosure(management, '추가 항목과 입력 도구');
     await management.getByLabel('지역', { exact: true }).fill('중구');
     await management.getByLabel('특징', { exact: true }).fill(second ? '야외' : '실내, 카페');
   }
@@ -346,13 +346,7 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await host.keyboard.press('Escape');
   await expect(openCreate).toBeFocused();
   await openCreate.click();
-  const nextSteps = host.getByText('시간과 장소 후보를 올리고 친구들에게 링크를 보내요.', { exact: false });
-  const nextStepsToggle = host.getByText('방을 만든 뒤엔?', { exact: true });
-  await expect(nextSteps).toBeHidden();
-  await nextStepsToggle.click();
-  await expect(nextSteps).toBeVisible();
-  await nextStepsToggle.click();
-  await expect(nextSteps).toBeHidden();
+  await expect(host.getByText('방을 만든 뒤 후보를 올리고 친구를 초대할 수 있어요.', { exact: true })).toBeVisible();
   const createButton = host.getByRole('button', { name: '방 만들기', exact: true });
   const hostName = host.getByLabel('방장 이름', { exact: true });
   await expect(createButton).toBeInViewport({ ratio: 1 });
@@ -417,8 +411,7 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(management.getByLabel('장소명', { exact: true })).toHaveValue('첫 번째 후보');
   await expect(management.getByLabel('주소', { exact: true })).toHaveValue('서울 중구 테스트길 1');
   const directStart = management.getByLabel('시작 시간', { exact: true });
-  await expect(directStart).toBeHidden();
-  await openDisclosure(management, '직접 시간 입력');
+  await expect(directStart).toBeVisible();
   await expect(directStart).toHaveValue('');
   await directStart.fill('18:30');
   await management.getByLabel('종료 시간', { exact: true }).fill('20:30');
