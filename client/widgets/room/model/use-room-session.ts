@@ -27,21 +27,20 @@ function describeRoomError(error: unknown): RoomLoadError {
   if (error instanceof RoomApiError) {
     if (error.code === 'RECOVERY_UNAVAILABLE') {
       return {
-        title: '기존 참여자의 접근을 복구할 수 없습니다.',
+        title: '이 브라우저에서 방을 바로 열 수 없어요',
         requiresRecovery: true,
         message:
-          '자동 복구를 완료하지 못했습니다. 복구 정보가 없거나 만료·폐기되었거나, 이 화면의 자동 복구 시도를 이미 사용했을 수 있습니다. 다시 불러오기로 명시적으로 재시도하거나 보관한 개인 복구 코드를 입력해 주세요. 모든 인증 정보를 잃었다면 기존 권한은 복구할 수 없습니다. 방 코드 입장은 새 MEMBER를 만들며 기존 조건·응답과 HOST 권한을 복구하지 않습니다.',
+          '다시 불러오거나, 보관해 둔 개인 복구 코드를 아래에 입력해 주세요. 초대받을 때 받은 방 코드로 들어가면 새 참여자로 입장해요.',
       };
     }
     const accessMessage = getRoomAccessErrorMessage(error);
     if (accessMessage) {
-      return { title: '방 접근 정보를 확인해 주세요.', requiresRecovery: true, message: accessMessage };
+      return { title: '방을 다시 열어 주세요', requiresRecovery: true, message: accessMessage };
     }
     if (error.status === 404) {
       return {
         title: '방을 찾을 수 없습니다.',
-        message:
-          '보관한 방 주소를 확인해 주세요. 일반 방 코드 입장은 기존 권한을 복구하지 않습니다.',
+        message: '보관한 방 주소가 맞는지 확인해 주세요.',
       };
     }
 
@@ -134,7 +133,7 @@ export function useRoomSession(roomId: string) {
         })
         .catch(() => {
           setRecoveryRegistrationError(
-            '개인 복구 수단의 등록 상태를 확인하지 못했습니다. 개인 복구 파일 보관 버튼에서 다시 등록하거나 보관한 파일을 확인해 주세요.'
+            '개인 복구 파일을 받을 수 있는지 확인하지 못했어요. ‘개인 복구 파일 보관’을 누르거나 전에 받아 둔 파일을 확인해 주세요.'
           );
         });
     } catch (requestError) {

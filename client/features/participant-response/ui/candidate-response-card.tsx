@@ -47,74 +47,80 @@ export function CandidateResponseCard({
   );
   const isDisabled = isReadOnly || form.isSubmitting || isBulkSubmitting;
   const showTravel = Boolean(form.availabilityStatus || form.travelBurden || isReadOnly);
+  const [featuredTag, ...otherTags] = candidate.tags;
+  const cardHighlight = featuredTag || (candidate.place.area !== candidate.place.address ? candidate.place.area : '');
 
   function updateResponse(update: ResponseSaveOverrides) {
     onUpdate({ ...update, message: '', messageKind: null });
   }
 
   return (
-    <article
-      className='min-w-0 overflow-hidden rounded-xl border border-stone-200 bg-white'
-    >
-      <div className='space-y-2 border-b border-stone-200 bg-stone-50 p-4'>
-        <p className='break-keep text-sm font-semibold text-stone-700'>{formatCandidateTime(candidate)}</p>
-        <div className='flex items-start justify-between gap-3'>
-          <h3 className='min-w-0 text-lg font-bold tracking-tight text-slate-950 [overflow-wrap:anywhere]'>
+    <article className='mp-card mp-candidate flex min-w-0 flex-col gap-2.5 p-3.5 sm:p-4'>
+      <div className='space-y-1'>
+        <div className='flex flex-wrap items-baseline justify-between gap-x-2 gap-y-1'>
+          <h3 className='min-w-0 text-xl font-extrabold tracking-tight [overflow-wrap:anywhere]'>
             {candidate.place.name}
           </h3>
-          <span
-            className='shrink-0 rounded-md bg-white px-2 py-1 text-xs font-semibold text-stone-700'
-          >
-            {responseState === 'dirty' && !form.savedResponseId
-              ? form.autoFill && !form.manuallyEdited
-                ? '자동 초안 · 미제출'
-                : '편집 초안 · 미제출'
-              : responseStateLabel(responseState)}
-          </span>
+          {cardHighlight && <p className='mp-candidate-tag'>{cardHighlight}</p>}
         </div>
-        {form.reconfirmRequired && (
-          <p role='status' className='text-sm leading-6 text-slate-700'>
-            후보가 변경되어 의견 재확인이 필요합니다. 이전 의견은 초안으로 남아 있습니다.
-            현재 시간·장소·비용·특징을 확인하고 다시 저장해 주세요.
-          </p>
-        )}
-        <p className='text-sm text-slate-600 [overflow-wrap:anywhere]'>
+        <p className='text-sm font-medium text-[var(--mp-muted)] [overflow-wrap:anywhere]'>{formatCandidateTime(candidate)}</p>
+        <p className='text-sm text-[var(--mp-muted)] [overflow-wrap:anywhere]'>
           {candidate.place.address} · 1인 {candidate.estimatedCostPerPersonKrw.toLocaleString('ko-KR')}원
         </p>
-        {candidate.tags.length > 0 && (
-          <div className='flex flex-wrap gap-2 pt-1'>
-            {candidate.tags.map((tag) => (
-              <span
-                className='text-xs text-slate-600'
-                key={tag}
-              >
-                #{tag}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
-
-      <div className='p-4'>
-        <button className='mp-button mp-button-accent min-h-11 w-full rounded-lg' onClick={() => dialogRef.current?.showModal()} type='button'>
+      {form.reconfirmRequired && (
+        <p role='status' className='text-sm leading-6 text-slate-700'>
+          후보가 변경되어 의견 재확인이 필요합니다. 이전 의견은 초안으로 남아 있습니다.
+          현재 시간·장소·비용·특징을 확인하고 다시 저장해 주세요.
+        </p>
+      )}
+      {otherTags.length > 0 && (
+        <div className='flex min-w-0 flex-wrap gap-x-2 gap-y-1'>
+          {otherTags.map((tag) => (
+            <span
+              className='text-xs text-[var(--mp-muted)] [overflow-wrap:anywhere]'
+              key={tag}
+            >
+              #{tag}
+            </span>
+          ))}
+        </div>
+      )}
+      <div className='mt-auto space-y-2'>
+        <p className={`text-sm font-semibold ${responseState === 'saved' ? 'text-[#315d44]' : 'text-[var(--mp-muted)]'}`}>
+          {responseState === 'dirty' && !form.savedResponseId
+            ? form.autoFill && !form.manuallyEdited
+              ? '자동으로 채움 · 저장 전'
+              : '작성 중 · 저장 전'
+            : responseStateLabel(responseState)}
+        </p>
+        <button
+          className={`mp-button min-h-11 w-full ${isReadOnly || responseState === 'saved' ? 'mp-button-secondary' : 'mp-button-primary'}`}
+          onClick={() => {
+            const dialog = dialogRef.current;
+            dialog?.showModal();
+            dialog?.querySelector<HTMLButtonElement>('fieldset button:enabled')?.focus();
+          }}
+          type='button'
+        >
           {isReadOnly ? '내 의견 보기' : form.savedResponseId ? '의견 확인하기' : '의견 남기기'}
         </button>
       </div>
-      <dialog aria-label={`${candidate.place.name} 의견`} className='m-auto max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg overflow-y-auto rounded-xl bg-white p-0 shadow-xl backdrop:bg-slate-950/50' ref={dialogRef}>
+      <dialog aria-label={`${candidate.place.name} 의견`} className='mp-dialog' ref={dialogRef}>
       <div className='space-y-3 p-4 sm:p-6'>
         <div className='flex items-start justify-between gap-3'>
-          <h3 className='text-lg font-bold'>{candidate.place.name}에 대한 내 의견</h3>
-          <button aria-label='의견 창 닫기' className='mp-button mp-button-secondary rounded-lg' onClick={() => dialogRef.current?.close()} type='button'>닫기</button>
+          <h3 className='min-w-0 text-xl font-extrabold tracking-tight [overflow-wrap:anywhere]'>{candidate.place.name}에 대한 내 의견</h3>
+          <button aria-label='의견 창 닫기' className='mp-button mp-button-secondary min-h-11 min-w-11 shrink-0 p-0 text-xl' onClick={() => dialogRef.current?.close()} type='button'>×</button>
         </div>
         <fieldset className='space-y-2'>
           <legend className='text-sm font-semibold text-slate-800'>
-            이 일정에 올 수 있나요?
+            이 시간에 갈 수 있나요?
           </legend>
           <div className='grid grid-cols-3 gap-2'>
             {availabilityOptions.map((option) => (
               <button
                 aria-pressed={form.availabilityStatus === option.value}
-                className='mp-button mp-button-secondary min-h-11 rounded-lg px-2.5 aria-pressed:border-teal-600 aria-pressed:bg-teal-50 aria-pressed:text-teal-900'
+                className='mp-button mp-button-secondary min-h-12 px-1 text-xs break-keep aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)] sm:text-sm'
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() =>
@@ -142,7 +148,7 @@ export function CandidateResponseCard({
             {travelOptions.map((option) => (
               <button
                 aria-pressed={form.travelBurden === option.value}
-                className='mp-button mp-button-secondary min-h-11 rounded-lg px-2.5 aria-pressed:border-teal-600 aria-pressed:bg-teal-50 aria-pressed:text-teal-900'
+                className='mp-button mp-button-secondary min-h-12 px-1 text-xs break-keep aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)] sm:text-sm'
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() => updateResponse({ travelBurden: option.value })}
@@ -197,8 +203,12 @@ export function CandidateResponseCard({
           </p>
         )}
 
+        {!isReadOnly && !form.isSubmitting && form.manuallyEdited && responseState === 'dirty' && (
+          <p className='text-sm text-[var(--mp-muted)]'>닫아도 이 후보의 입력은 초안으로 남아요.</p>
+        )}
+
         {showTravel && responseState !== 'saved' && !isReadOnly && <button
-          className={`mp-button min-h-10 rounded-lg px-3 py-1.5 text-xs ${form.availabilityStatus && form.travelBurden ? 'mp-button-accent' : 'mp-button-secondary'}`}
+          className={`mp-button min-h-11 w-full ${form.availabilityStatus && form.travelBurden ? 'mp-button-primary' : 'mp-button-secondary'}`}
           disabled={isDisabled}
           onClick={() => onSave()}
           type='button'
@@ -207,9 +217,7 @@ export function CandidateResponseCard({
             ? '저장 중...'
             : isBulkSubmitting
               ? '전체 저장 중...'
-              : responseState === 'dirty' || responseState === 'reconfirm'
-                ? '변경 저장'
-                : '의견 저장'}
+              : '이 후보 의견 저장'}
         </button>}
       </div>
       </dialog>

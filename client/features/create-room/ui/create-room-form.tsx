@@ -104,10 +104,10 @@ export function CreateRoomForm() {
   }
 
   return (
-    <section aria-labelledby="create-room-heading" className="mp-card rounded-xl border-stone-200 p-4 shadow-[0_14px_32px_-24px_#44302350] sm:p-6 lg:rounded-none lg:border-0 lg:bg-transparent lg:p-9 lg:shadow-none xl:p-12">
-      <div className="mb-5">
-        <h1 className="break-keep text-2xl font-extrabold tracking-tight text-stone-950 sm:text-3xl" id="create-room-heading">약속 잡아 볼까요?</h1>
-        <p className="mt-1 text-sm leading-5 text-stone-600">만날 시간과 장소를 같이 정해요.</p>
+    <section className="p-4 sm:p-6">
+      <div className="mb-5 pr-12">
+        <h2 className="break-keep text-2xl font-extrabold tracking-tight" id="create-room-heading">약속 방 만들기</h2>
+        <p className="mt-1 text-sm leading-5 text-[var(--mp-muted)]">만날 시간과 장소를 같이 정해요.</p>
       </div>
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div className="grid gap-1.5">
@@ -174,11 +174,11 @@ export function CreateRoomForm() {
         )}
 
         <button
-          className="mp-button mp-button-accent min-h-11 w-full rounded-lg"
+          className="mp-button mp-button-primary min-h-11 w-full"
           disabled={isSubmitting}
           type="submit"
         >
-          {isSubmitting ? "약속 방을 만드는 중..." : "약속 방 만들기"}
+          {isSubmitting ? "약속 방을 만드는 중..." : "방 만들기"}
         </button>
       </form>
       <details className="group mt-2 border-t border-stone-200">

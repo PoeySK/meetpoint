@@ -50,11 +50,8 @@ function getInitialStep(
   return "responses";
 }
 
-function getSectionClassName(
-  isActiveOnMobile: boolean,
-  desktopPlacement: string,
-) {
-  return `${isActiveOnMobile ? "block" : "hidden"} lg:block ${desktopPlacement}`;
+function getSectionClassName(isActiveOnMobile: boolean) {
+  return `${isActiveOnMobile ? "block" : "hidden"} min-w-0 scroll-mt-4 lg:block`;
 }
 
 function getNextAction({ status, isHost, candidateCount, responseCount, participantCount, respondedCount }: {
@@ -175,6 +172,7 @@ export function RoomWorkspaceWidget({
     respondedCount: respondedParticipantCount,
   });
   const actionLink = nextAction?.link;
+  const isResponseStepActive = actionLink?.target === "responses" && mobileStep === "responses";
 
   const mobileSteps: WorkspaceStep[] = [
     ...(isHost ? ["candidates" as const] : []),
@@ -203,29 +201,24 @@ export function RoomWorkspaceWidget({
     setWorkingStep("responses");
   }
 
-  const responsePlacement = isHost
-    ? "lg:col-span-8 lg:col-start-1 lg:row-start-1"
-    : "lg:col-span-8 lg:col-start-1";
-  const conditionPlacement = isHost
-    ? "lg:col-span-4 lg:col-start-9 lg:row-start-1"
-    : "lg:col-span-4 lg:col-start-9";
-
   return (
-    <section className="space-y-4">
+    <section className="space-y-3 sm:space-y-5">
       {nextAction && (
         <section
           aria-labelledby="room-next-action-heading"
-          className="border-b border-slate-200 px-1 pb-4 pt-1 sm:flex sm:items-center sm:justify-between sm:gap-5"
+          className={`flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-2xl border border-[var(--mp-line)] bg-[var(--mp-surface)] px-4 py-3 sm:px-5 ${isResponseStepActive ? "hidden lg:flex" : "flex"}`}
         >
           <div>
-            <h2 className="text-lg font-bold tracking-tight" id="room-next-action-heading">
+            <h2 className="font-bold tracking-tight" id="room-next-action-heading">
               {nextAction.title}
             </h2>
-            <p className="mt-1 text-sm leading-5 text-slate-700">{nextAction.message}</p>
+            <p className="mt-0.5 text-sm leading-5 text-[var(--mp-muted)]">
+              {nextAction.message}
+            </p>
           </div>
           {actionLink && (
             <button
-              className="mp-button mp-button-primary mt-3 w-full sm:mt-0 sm:w-auto sm:shrink-0"
+              className="mp-button mp-button-secondary min-h-11 text-[var(--mp-purple)]"
               onClick={() => goToTarget(actionLink.target)}
               type="button"
             >
@@ -235,20 +228,18 @@ export function RoomWorkspaceWidget({
         </section>
       )}
 
-      {roomTools}
-
       <nav aria-label="방 진행 단계" className="lg:hidden">
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1 border-b border-[var(--mp-line)] pb-2">
           {mobileSteps.map((step) => {
             const isActive = step === mobileStep;
 
             return (
               <button
                 aria-current={isActive ? "step" : undefined}
-                className={`mp-button rounded-lg border px-2.5 py-2 text-xs ${
+                className={`mp-button min-h-11 grow rounded-lg border px-2 py-2 text-xs ${
                   isActive
-                    ? "border-teal-600 bg-teal-50 text-teal-900"
-                    : "border-transparent text-slate-600 hover:bg-slate-100"
+                    ? "border-[var(--mp-line)] bg-[var(--mp-lilac)] text-[var(--mp-purple-hover)]"
+                    : "border-transparent text-[var(--mp-muted)] hover:bg-[var(--mp-lilac)]"
                 }`}
                 key={step}
                 onClick={() => selectStep(step)}
@@ -261,13 +252,30 @@ export function RoomWorkspaceWidget({
         </div>
       </nav>
 
-      <div className="grid items-start gap-5 lg:grid-cols-12">
+      <div className="grid gap-4 sm:gap-5">
+        <div
+          className={getSectionClassName(mobileStep === "responses")}
+          id="room-responses"
+          tabIndex={-1}
+        >
+          <ParticipantResponsePanel
+            candidates={room.candidates}
+            condition={room.myCondition}
+            isReadOnly={
+              room.room.status === "CALCULATING" ||
+              room.room.status === "CONFIRMED" || room.room.status === "CLOSED"
+            }
+            onRoomRefresh={onRoomRefresh}
+            participantId={participantId}
+            responses={room.myResponses}
+            roomId={roomId}
+            token={token}
+          />
+        </div>
+
         {isHost && (
           <div
-            className={getSectionClassName(
-              mobileStep === "candidates",
-              "scroll-mt-4 lg:col-span-12 lg:row-start-2",
-            )}
+            className={getSectionClassName(mobileStep === "candidates")}
             id="room-candidates"
             tabIndex={-1}
           >
@@ -305,29 +313,23 @@ export function RoomWorkspaceWidget({
         )}
 
         <div
-          className={getSectionClassName(mobileStep === "responses", `scroll-mt-4 ${responsePlacement}`)}
-          id="room-responses"
+          className={getSectionClassName(mobileStep === "result")}
+          id="room-result"
           tabIndex={-1}
         >
-          <section className="mp-card p-4 sm:p-6">
-            <ParticipantResponsePanel
-              candidates={room.candidates}
-              condition={room.myCondition}
-              isReadOnly={
-                room.room.status === "CALCULATING" ||
-                room.room.status === "CONFIRMED" || room.room.status === "CLOSED"
-              }
-              onRoomRefresh={onRoomRefresh}
-              participantId={participantId}
-              responses={room.myResponses}
-              roomId={roomId}
-              token={token}
-            />
-          </section>
+          <CalculationResultPanel
+            decision={decision}
+            latestScoreResult={latestScoreResult}
+            onRoomReload={onRoomReload}
+            participantId={participantId}
+            room={room}
+            roomId={roomId}
+            token={token}
+          />
         </div>
 
         <div
-          className={getSectionClassName(mobileStep === "condition", conditionPlacement)}
+          className={getSectionClassName(mobileStep === "condition")}
         >
           <details className="mp-card" onToggle={(event) => setIsConditionPanelOpen(event.currentTarget.open)} open={isConditionPanelOpen}>
             <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-slate-600">
@@ -345,27 +347,9 @@ export function RoomWorkspaceWidget({
             />
           </details>
         </div>
-
-        <div
-          className={getSectionClassName(
-            mobileStep === "result",
-            "scroll-mt-4 lg:col-span-12",
-          )}
-          id="room-result"
-          tabIndex={-1}
-        >
-          <CalculationResultPanel
-            decision={decision}
-            latestScoreResult={latestScoreResult}
-            onRoomReload={onRoomReload}
-            participantId={participantId}
-            room={room}
-            roomId={roomId}
-            token={token}
-          />
-        </div>
       </div>
 
+      {roomTools}
     </section>
   );
 }

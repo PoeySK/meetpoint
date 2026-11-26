@@ -7,9 +7,9 @@ import {
   getRoomRecoveryStorageKey,
   getRoomTokenStorageKey,
 } from '@/shared/lib/room-session';
+import { MeetPointBrand } from '@/shared/ui/meetpoint-brand';
 import { RoomParticipantsWidget } from '@/widgets/room-participants';
 import { RoomWorkspaceWidget } from '@/widgets/room-workspace';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 import { useRoomSession } from '../model/use-room-session';
@@ -59,9 +59,9 @@ export function RoomWidget({ roomId }: { roomId: string }) {
   const requiresRecovery = Boolean(refreshError?.requiresRecovery) || !accessToken;
   const isConfirmed = room?.room.status === 'CONFIRMED';
   const roomTools = !requiresRecovery && (
-    <details className='group rounded-xl border border-slate-200 bg-white/70' open={Boolean(recoveryRegistrationError)}>
+    <details className='mp-card group' open={Boolean(recoveryRegistrationError)}>
       <summary className='flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 focus-visible:outline-2 focus-visible:outline-slate-600 [&::-webkit-details-marker]:hidden'>
-        방 접근 및 복구
+        방 다시 열기와 복구
         <span aria-hidden='true' className='transition-transform group-open:rotate-180'>⌄</span>
       </summary>
       <div className='space-y-3 border-t border-slate-200 px-3 py-3'>
@@ -79,26 +79,22 @@ export function RoomWidget({ roomId }: { roomId: string }) {
   );
 
   return (
-    <main className='mp-page px-3 py-4 font-sans text-slate-950 sm:px-6 sm:py-6'>
-      <div className='mx-auto w-full max-w-7xl'>
-        <div className='mb-3'>
-          <Link className='text-base font-bold tracking-tight' href='/'>
-            MeetPoint
-          </Link>
-        </div>
+    <div className='mp-appointment mp-page'>
+      <header className='mp-shell py-4 sm:py-6'>
+        <MeetPointBrand />
+      </header>
 
+      <main className='mp-shell pb-10'>
         {isLoading && <LoadingView />}
         {!isLoading && error && (
-          <>
-            <ErrorView error={error} onRetry={() => void retryRoom()} />
-            <RoomRecoveryPanel
-              roomId={roomId}
-              onRecovered={() => void loadRoom()}
-            />
-          </>
+          <ErrorView
+            error={error}
+            onRetry={() => void retryRoom()}
+            recovery={<RoomRecoveryPanel roomId={roomId} onRecovered={() => void loadRoom()} />}
+          />
         )}
         {!isLoading && !error && room && (
-          <div className='space-y-3'>
+          <div className='space-y-4 sm:space-y-5'>
             <RoomSummary decision={decision} room={room} />
             {refreshError && (
               <div className='space-y-2 rounded-xl bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700'>
@@ -133,9 +129,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
                   />
                 ) : (
                   <section className='mp-card border-slate-200 bg-slate-50 p-4 text-sm leading-5 text-slate-700'>
-                    이 브라우저에서 방 입장 정보를 찾을 수 없어 후보 등록과 의견
-                    작성을 사용할 수 없습니다. 개인 복구 수단으로 기존 참여자의
-                    접근을 복구해 주세요.
+                    후보를 올리거나 의견을 남기려면 개인 복구 코드로 방을 다시 열어 주세요.
                   </section>
                 )}
                 <div className='scroll-mt-4' id='room-participants' tabIndex={-1}>
@@ -154,7 +148,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
             </details>
           </div>
         )}
-      </div>
-    </main>
+      </main>
+    </div>
   );
 }

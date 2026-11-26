@@ -141,7 +141,7 @@ export function ParticipantResponsePanel({
     );
     setForms(result.forms);
     setFillMessage(
-      `${result.applied}개 후보의 가능 여부를 초안으로 채웠습니다. ${result.excluded}개는 저장된 의견·직접 편집·저장 중 상태로 제외했습니다. 아직 제출되지 않았습니다.`
+      `${result.applied}개 후보의 참석 가능 여부를 채웠어요. 입력 중이거나 저장한 의견 등 ${result.excluded}개는 건너뛰었어요. 내용을 확인한 뒤 저장해 주세요.`
     );
   }
 
@@ -320,19 +320,24 @@ export function ParticipantResponsePanel({
   }
 
   return (
-    <section className='space-y-4'>
-      <div className='space-y-2'>
-        <h2 className='text-xl font-semibold tracking-tight text-slate-950'>
-          후보별 의견
-        </h2>
+    <section aria-labelledby='candidate-responses-heading' className='space-y-3 sm:space-y-4'>
+      <div className='flex flex-wrap items-center justify-between gap-x-4 gap-y-2 sm:items-end sm:gap-x-6'>
+        <div>
+          <h2 className='text-xl font-extrabold tracking-tight sm:text-2xl' id='candidate-responses-heading'>
+            어디가 괜찮아요?
+          </h2>
+          {!isReadOnly && activeCandidates.length > 0 && (
+            <p className='mt-1 hidden text-sm text-[var(--mp-muted)] sm:block'>갈 수 있는 시간과 이동 부담을 알려 주세요.</p>
+          )}
+        </div>
         {!isReadOnly && activeCandidates.length > 0 && (
-          <div className='space-y-1.5'>
-            <p className='text-sm font-medium text-slate-700'>{activeCandidates.length}개 후보 중 {savedCount}개에 의견을 남겼어요</p>
-            <progress aria-label='내 의견 저장 진행률' className='block h-1.5 w-full max-w-xs accent-stone-700' max={activeCandidates.length} value={savedCount} />
+          <div className='space-y-1'>
+            <p className='text-sm font-medium text-[var(--mp-muted)]'>내 의견 {savedCount}/{activeCandidates.length}개</p>
+            <progress aria-label='내 의견 저장 진행률' className='mp-progress max-w-56' max={activeCandidates.length} value={savedCount} />
           </div>
         )}
         {isReadOnly && (
-          <p className='rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600'>
+          <p className='basis-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600'>
             현재 방 상태에서는 의견을 수정할 수 없습니다. 계산 중에는 완료를
             기다리고, 확정된 방은 방장이 다시 살펴보기를 시작해야 합니다.
           </p>
@@ -340,12 +345,12 @@ export function ParticipantResponsePanel({
       </div>
 
       {activeCandidates.length === 0 ? (
-        <div className='rounded-xl border border-dashed border-slate-300 bg-white/65 p-4 text-sm leading-5 text-slate-500'>
+        <div className='rounded-2xl border border-dashed border-[var(--mp-line)] bg-[var(--mp-surface)] p-5 text-sm leading-5 text-[var(--mp-muted)]'>
           방장이 후보를 등록하면 이곳에서 의견을 남길 수 있습니다.
         </div>
       ) : (
         <>
-          <div className='grid grid-cols-[repeat(auto-fit,minmax(min(100%,21rem),1fr))] items-start gap-3'>
+          <div className='grid gap-3 sm:grid-cols-2 lg:grid-cols-3'>
             {candidateForms.map(({ candidate, form }) => (
               <CandidateResponseCard
                 candidate={candidate}
@@ -371,16 +376,16 @@ export function ParticipantResponsePanel({
           </div>
           {!isReadOnly && activeCandidates.length > 1 && (
             <button
-              className='mp-button mp-button-primary w-full'
+              className='mp-button mp-button-primary min-h-11 w-full sm:w-auto'
               disabled={isInteractionDisabled || readyToSave.length === 0}
               onClick={() => void saveAllResponses()}
               type='button'
             >
-              작성한 의견 저장{readyToSave.length > 0 ? ` (${readyToSave.length}개)` : ''}
+              작성한 의견 한꺼번에 저장{readyToSave.length > 0 ? ` (${readyToSave.length}개)` : ''}
             </button>
           )}
           {!isReadOnly && (
-            <details className='overflow-hidden rounded-xl border border-slate-200'>
+            <details className='mp-card overflow-hidden'>
               <summary className='cursor-pointer px-4 py-3 text-sm font-semibold'>빠른 입력 도구</summary>
               <div className='space-y-3 border-t border-slate-200 p-3'>
                 {condition && (

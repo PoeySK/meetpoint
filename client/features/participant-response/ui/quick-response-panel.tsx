@@ -52,11 +52,7 @@ export function QuickResponsePanel({
             {availabilityOptions.map((option) => (
               <button
                 aria-pressed={availabilityStatus === option.value}
-                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
-                  availabilityStatus === option.value
-                    ? "border-slate-800 bg-slate-100 text-slate-950"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
-                }`}
+                className="mp-button mp-button-secondary min-h-12 break-keep px-1 text-xs aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)] sm:text-sm"
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() => onAvailabilityChange(option.value)}
@@ -76,11 +72,7 @@ export function QuickResponsePanel({
             {travelOptions.map((option) => (
               <button
                 aria-pressed={travelBurden === option.value}
-                className={`rounded-lg border px-2 py-2 text-sm font-semibold transition focus:outline-none focus:ring-4 focus:ring-slate-200 disabled:cursor-not-allowed disabled:opacity-60 ${
-                  travelBurden === option.value
-                    ? "border-slate-800 bg-slate-100 text-slate-950"
-                    : "border-slate-200 bg-white text-slate-700 hover:border-slate-400"
-                }`}
+                className="mp-button mp-button-secondary min-h-12 break-keep px-1 text-xs aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)] sm:text-sm"
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() => onTravelChange(option.value)}
@@ -100,7 +92,7 @@ export function QuickResponsePanel({
           onClick={onSave}
           type="button"
         >
-          이 선택을 모든 후보에 저장
+          같은 의견을 모든 후보에 저장
         </button>
       </div>
 
