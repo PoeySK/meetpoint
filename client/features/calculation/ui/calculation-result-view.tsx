@@ -206,8 +206,8 @@ export function CompletedResult({
           const isSelected = selectedCandidateId === candidate.candidateId;
           const issues = groupCandidateIssues(candidate);
           const selectionClassName = isSelected
-            ? "mp-button mt-4 w-full border border-slate-600 bg-slate-800 px-3 py-2.5 text-sm text-white hover:bg-slate-800"
-            : "mp-button mp-button-secondary mt-4 w-full px-3 py-2.5 text-sm hover:border-slate-600 hover:text-slate-700";
+            ? "mp-button mt-4 w-full rounded-lg border border-teal-600 bg-teal-50 px-3 py-2.5 text-sm text-teal-900"
+            : "mp-button mp-button-secondary mt-4 w-full rounded-lg px-3 py-2.5 text-sm hover:border-slate-600 hover:text-slate-700";
 
           return (
             <article

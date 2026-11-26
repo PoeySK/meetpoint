@@ -134,6 +134,7 @@ export function useDecisionConfirmation({
       });
       setDecisionNotice("일정을 확정했습니다.");
       await onRoomReload();
+      return true;
     } catch (requestError) {
       setDecisionError(describeDecisionError(requestError));
     } finally {

@@ -156,14 +156,13 @@ export function CalculationResultPanel({
             비교합니다. 선택 조건을 입력하지 않은 사람의 의견도 반영됩니다.
           </p>
         </div>
-        {isHost && (
+        {isHost && room.room.status !== 'CONFIRMED' && (
           <button
             className='mp-button mp-button-primary'
             disabled={
               isStarting ||
               isRunning(calculation?.status) ||
-              room.room.status === 'CALCULATING' ||
-              room.room.status === 'CONFIRMED'
+              room.room.status === 'CALCULATING'
             }
             onClick={() => void handleStart()}
             type='button'
@@ -228,7 +227,7 @@ export function CalculationResultPanel({
         isHost={isHost}
         isReopening={isReopening}
         onAcknowledgeIssuesChange={setAcknowledgeIssues}
-        onConfirm={() => void handleConfirm()}
+        onConfirm={handleConfirm}
         onDecisionNoteChange={setDecisionNote}
         onReopen={() => void handleReopen()}
         onReopenReasonChange={setReopenReason}
@@ -236,13 +235,9 @@ export function CalculationResultPanel({
         roomStatus={room.room.status}
         selectedCandidate={selectedCandidate}
         selectedCandidateHasIssues={selectedCandidateHasIssues}
-        selectedCandidateName={
-          selectedCandidate
-            ? (room.candidates.find(
-                (candidate) => candidate.id === selectedCandidate.candidateId
-              )?.place.name ?? null)
-            : null
-        }
+        selectedSchedule={room.candidates.find(
+          (candidate) => candidate.id === selectedCandidate?.candidateId
+        )}
       />
     </section>
   );

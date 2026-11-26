@@ -148,9 +148,12 @@ export function RoomWorkspaceWidget({
   roomTools,
 }: RoomWorkspaceWidgetProps) {
   const isHost = participantId === room.room.hostParticipantId;
-  const [mobileStep, setMobileStep] = useState<WorkspaceStep>(() =>
+  const isConfirmed = room.room.status === "CONFIRMED";
+  const [workingStep, setWorkingStep] = useState<WorkspaceStep>(() =>
     getInitialStep(room, isHost),
   );
+  const [confirmedStep, setConfirmedStep] = useState<WorkspaceStep>("result");
+  const mobileStep = isConfirmed ? confirmedStep : workingStep;
   const [isCandidatePanelOpen, setIsCandidatePanelOpen] = useState(
     () => isHost && room.candidates.length === 0,
   );
@@ -180,7 +183,8 @@ export function RoomWorkspaceWidget({
     "result",
   ];
   function selectStep(step: WorkspaceStep) {
-    setMobileStep(step);
+    if (isConfirmed) setConfirmedStep(step);
+    else setWorkingStep(step);
     if (step === "candidates") setIsCandidatePanelOpen(true);
     if (step === "condition") setIsConditionPanelOpen(true);
   }
@@ -196,14 +200,14 @@ export function RoomWorkspaceWidget({
 
   async function refreshAfterConditionSave() {
     await onRoomRefresh();
-    setMobileStep("responses");
+    setWorkingStep("responses");
   }
 
   const responsePlacement = isHost
-    ? "lg:col-span-8 lg:col-start-1 lg:row-start-2"
+    ? "lg:col-span-8 lg:col-start-1 lg:row-start-1"
     : "lg:col-span-8 lg:col-start-1";
   const conditionPlacement = isHost
-    ? "lg:col-span-4 lg:col-start-9 lg:row-start-2"
+    ? "lg:col-span-4 lg:col-start-9 lg:row-start-1"
     : "lg:col-span-4 lg:col-start-9";
 
   return (
@@ -243,7 +247,7 @@ export function RoomWorkspaceWidget({
                 aria-current={isActive ? "step" : undefined}
                 className={`mp-button rounded-lg border px-2.5 py-2 text-xs ${
                   isActive
-                    ? "border-slate-800 bg-slate-100 text-slate-950"
+                    ? "border-teal-600 bg-teal-50 text-teal-900"
                     : "border-transparent text-slate-600 hover:bg-slate-100"
                 }`}
                 key={step}
@@ -262,7 +266,7 @@ export function RoomWorkspaceWidget({
           <div
             className={getSectionClassName(
               mobileStep === "candidates",
-              "scroll-mt-4 lg:col-span-12 lg:row-start-1",
+              "scroll-mt-4 lg:col-span-12 lg:row-start-2",
             )}
             id="room-candidates"
             tabIndex={-1}
