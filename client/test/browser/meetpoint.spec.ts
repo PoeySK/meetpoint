@@ -178,7 +178,7 @@ async function addCandidate(page: Page, name: string, second: boolean, withDetai
   await management.getByLabel('주소', { exact: true }).fill('서울 중구 테스트길 1');
   await management.getByLabel('1인 예상 비용 (원)', { exact: true }).fill(second ? '40000' : '10000');
   if (withDetails) {
-    await openDisclosure(management, '지역·장소 특징 (선택)');
+    await openDisclosure(management, '추가 항목과 입력 도구');
     await management.getByLabel('지역', { exact: true }).fill('중구');
     await management.getByLabel('특징', { exact: true }).fill(second ? '야외' : '실내, 카페');
   }
@@ -320,6 +320,7 @@ test('모바일에서 방장과 참가자가 후보 카드에 의견을 남기�
 });
 
 test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 도구를 제공한다', async ({ world }) => {
+  world.allowResourceErrors([404]);
   const host = await world.page({ isMobile: true, hasTouch: true, viewport: { width: 320, height: 740 } });
   await host.context().grantPermissions(['clipboard-read', 'clipboard-write']);
   await host.goto('/');
@@ -346,13 +347,7 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await host.keyboard.press('Escape');
   await expect(openCreate).toBeFocused();
   await openCreate.click();
-  const nextSteps = host.getByText('시간과 장소 후보를 올리고 친구들에게 링크를 보내요.', { exact: false });
-  const nextStepsToggle = host.getByText('방을 만든 뒤엔?', { exact: true });
-  await expect(nextSteps).toBeHidden();
-  await nextStepsToggle.click();
-  await expect(nextSteps).toBeVisible();
-  await nextStepsToggle.click();
-  await expect(nextSteps).toBeHidden();
+  await expect(host.getByText('방을 만든 뒤 후보를 올리고 친구를 초대할 수 있어요.', { exact: true })).toBeVisible();
   const createButton = host.getByRole('button', { name: '방 만들기', exact: true });
   const hostName = host.getByLabel('방장 이름', { exact: true });
   await expect(createButton).toBeInViewport({ ratio: 1 });
@@ -366,6 +361,11 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await action(host, createButton, 'POST', /\/rooms$/, 201);
   await expect(host).toHaveURL(/\/rooms\/[0-9a-f-]+$/);
 
+  const hostSteps = host.getByRole('navigation', { name: '방 진행 단계' }).getByRole('button');
+  await expect(hostSteps).toHaveCount(4);
+  const tabRows = await hostSteps.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect().top));
+  expect(tabRows.length).toBe(4);
+  expect(new Set(tabRows).size).toBe(1);
   await host.setViewportSize({ width: 390, height: 844 });
   await expect(host.getByRole('progressbar', { name: '의견을 모두 남긴 사람' })).toHaveAttribute('value', '0');
   const register = host.getByRole('button', { name: '후보 등록하기', exact: true });
@@ -383,9 +383,22 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(recoveryFile).toBeVisible();
   await recoveryToggle.press('Enter');
   await expect(recoveryFile).toBeHidden();
+  await hostSteps.filter({ hasText: '결과 확인' }).click();
+  await expect(host.getByRole('button', { name: '추천 결과 만들기', exact: true })).toBeDisabled();
   await register.click();
   await expect(host.locator('#room-candidates')).toBeFocused();
-  await expect(section(host, '모임 후보 관리')).toBeInViewport();
+  const hostCandidates = section(host, '모임 후보 관리');
+  await expect(hostCandidates).toBeInViewport();
+  const pickDate = hostCandidates.getByRole('button', { name: '모임 날짜를 선택해 주세요', exact: true });
+  await pickDate.click();
+  const calendar = hostCandidates.getByRole('dialog', { name: '모임 날짜 선택' });
+  await expect(calendar).toBeVisible();
+  await expect(calendar.getByRole('button', { name: /\d+년 \d+월 \d+일/ }).first()).toBeFocused();
+  await host.keyboard.press('Escape');
+  await expect(pickDate).toBeFocused();
+  await expect(calendar).toBeHidden();
+  await hostCandidates.getByRole('button', { name: '후보 등록', exact: true }).click();
+  await expect(hostCandidates.getByLabel('장소명', { exact: true })).toBeFocused();
 
   const member = await world.page({ isMobile: true, hasTouch: true, viewport: { width: 390, height: 844 } });
   await member.goto(inviteLink);
@@ -413,12 +426,30 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(host.getByRole('heading', { name: '후보를 하나 더 등록해 주세요', exact: true })).toBeVisible();
   const management = section(host, '모임 후보 관리');
   await expect(management.getByLabel('장소명', { exact: true })).toBeHidden();
+  const add = management.getByRole('button', { name: '후보 추가', exact: true });
+  const addForm = management.getByRole('region', { name: '후보 올리기' });
+  await add.click();
+  await expect(addForm.getByLabel('장소명', { exact: true })).toBeFocused();
+  expect(await addForm.evaluate((form) => {
+    const firstCandidate = form.parentElement?.querySelector('article');
+    return Boolean(firstCandidate && (form.compareDocumentPosition(firstCandidate) & Node.DOCUMENT_POSITION_FOLLOWING));
+  })).toBe(true);
+  await addForm.getByRole('button', { name: '닫기', exact: true }).click();
+  await expect(add).toBeFocused();
+
+  const edit = management.getByRole('button', { name: '수정', exact: true });
+  await edit.click();
+  const editForm = management.getByRole('region', { name: '후보 수정' });
+  await expect(editForm.getByLabel('장소명', { exact: true })).toBeFocused();
+  await editForm.getByRole('button', { name: '수정 취소', exact: true }).click();
+  await expect(edit).toBeFocused();
+
   await management.getByRole('button', { name: '다른 시간 추가', exact: true }).click();
   await expect(management.getByLabel('장소명', { exact: true })).toHaveValue('첫 번째 후보');
   await expect(management.getByLabel('주소', { exact: true })).toHaveValue('서울 중구 테스트길 1');
   const directStart = management.getByLabel('시작 시간', { exact: true });
-  await expect(directStart).toBeHidden();
-  await openDisclosure(management, '직접 시간 입력');
+  await expect(directStart).toBeFocused();
+  await expect(management.getByLabel('종료 시간', { exact: true })).toBeVisible();
   await expect(directStart).toHaveValue('');
   await directStart.fill('18:30');
   await management.getByLabel('종료 시간', { exact: true }).fill('20:30');
@@ -436,6 +467,11 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(firstVote).toBeInViewport({ ratio: 1 });
   await member.setViewportSize({ width: 390, height: 844 });
   await steps.getByRole('button', { name: '선택 조건', exact: true }).click();
+  const condition = section(member, '원하는 조건을 알려주세요');
+  await condition.getByRole('button', { name: '선택 조건 저장', exact: true }).click();
+  await expect(condition.getByLabel('날짜', { exact: true })).toBeFocused();
+  await expect(condition.getByLabel('날짜', { exact: true })).toHaveAccessibleDescription('날짜와 시작·종료 시간을 모두 입력해 주세요.');
+  await member.evaluate(() => window.scrollTo(0, 0));
   const respond = member.getByRole('button', { name: '내 의견 남기기', exact: true });
   await expect(respond).toBeInViewport({ ratio: 1 });
   await respond.click();
@@ -450,6 +486,7 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(memberOpinions.getByRole('region', { name: '한 번에 의견 입력' })).toBeHidden();
   const firstResponse = await openResponseDialogFromCard(cards.first());
   await expect(firstResponse.getByRole('button', { name: '갈 수 있어요', exact: true })).toBeFocused();
+  await expect(firstResponse.getByRole('button', { name: '편해요', exact: true })).toBeVisible();
   await firstResponse.getByRole('button', { name: '갈 수 있어요', exact: true }).click();
   await firstResponse.getByRole('button', { name: '편해요', exact: true }).click();
   await expect(firstResponse.getByRole('button', { name: '이 후보 의견 저장', exact: true })).toBeVisible();
@@ -490,9 +527,85 @@ test('모바일 방 첫 화면에서 역할별 다음 행동과 접힌 복구 �
   await expect(member).toHaveURL(/\/join$/);
   await expect(member.locator('input[required]:visible')).toHaveCount(2);
   await member.goto('/join/invalid-link');
-  const manualJoin = member.getByRole('region', { name: '방 코드로 참여하기', exact: true });
+  const manualJoin = member.getByRole('region', { name: '방 코드로 입장하기', exact: true });
   await expect(manualJoin.getByRole('alert')).toContainText('방장에게 새 링크를 요청해 주세요');
   await expect(member.getByLabel('방 코드', { exact: true })).toHaveValue('');
+
+  const manual = await world.page({ isMobile: true, hasTouch: true, viewport: { width: 320, height: 740 } });
+  const homeJoinLink = manual.getByRole('link', { name: '방 코드로 입장하기', exact: true });
+  await manual.goto('/');
+  await homeJoinLink.click();
+  await expect(manual).toHaveURL(/\/join$/);
+  const codeInput = manual.getByLabel('방 코드', { exact: true });
+  const manualName = manual.getByLabel('이름', { exact: true });
+  const manualJoinButton = manual.getByRole('button', { name: '방에 입장하기', exact: true });
+  await expect(manual.getByRole('link', { name: 'MeetPoint 홈', exact: true })).toBeVisible();
+  await expect(manualJoinButton).toBeInViewport({ ratio: 1 });
+  await manualJoinButton.click();
+  await expect(codeInput).toBeFocused();
+  await expect(codeInput).toHaveAttribute('aria-invalid', 'true');
+  await codeInput.fill(initialRoom.room.roomCode === 'ABC123' ? 'ABC124' : 'ABC123');
+  await manualName.fill('코드로 입장');
+  await action(manual, manualJoinButton, 'POST', /\/participants$/, 404);
+  await expect(manual.getByRole('main').getByRole('alert')).toContainText('입력한 방 코드를 확인해 주세요');
+  await expect(codeInput).toBeFocused();
+  await codeInput.fill(` ${initialRoom.room.roomCode.toLowerCase()} `);
+  await expect(codeInput).toHaveValue(initialRoom.room.roomCode);
+  await expect(manual.getByRole('main').getByRole('alert')).toHaveCount(0);
+  await action(manual, manualJoinButton, 'POST', /\/participants$/, 201);
+  await expect(manual).toHaveURL(host.url());
+  const manualParticipant = (await room(manual)).currentParticipant.id;
+
+  await manual.getByRole('link', { name: 'MeetPoint 홈', exact: true }).click();
+  await homeJoinLink.click();
+  await codeInput.fill(initialRoom.room.roomCode);
+  const continueManual = manual.getByRole('link', { name: '기존 참여 이어가기', exact: true });
+  await expect(continueManual).toBeInViewport({ ratio: 1 });
+  await expect(manualJoinButton).toBeHidden();
+  await manual.getByRole('button', { name: '새 참여자로 입장', exact: true }).click();
+  await expect(manualName).toBeFocused();
+  await continueManual.click();
+  await expect(manual).toHaveURL(host.url());
+  expect((await room(manual)).currentParticipant.id).toBe(manualParticipant);
+
+  const leaveRoom = manual.getByRole('button', { name: '방 나가기', exact: true });
+  await leaveRoom.click();
+  const leaveDialog = manual.getByRole('dialog', { name: '방에서 나갈까요?' });
+  await expect(leaveDialog.getByRole('button', { name: '계속 참여하기' })).toBeFocused();
+  await manual.keyboard.press('Escape');
+  await expect(leaveRoom).toBeFocused();
+  expect((await room(manual)).currentParticipant.id).toBe(manualParticipant);
+  await leaveRoom.click();
+  await action(manual, leaveDialog.getByRole('button', { name: '방에서 나가기' }), 'POST', /\/leave$/, 200);
+  await expect(manual).toHaveURL(new URL('/', host.url()).href);
+  await homeJoinLink.click();
+  await codeInput.fill(initialRoom.room.roomCode);
+  await expect(continueManual).toHaveCount(0);
+  await expect(manualJoinButton).toBeVisible();
+
+  await host.bringToFront();
+  await expect.poll(async () => (await room(host)).participants.length).toBe(2);
+  const memberRow = host.getByRole('listitem').filter({ has: host.getByText('참가자', { exact: true }) });
+  await memberRow.getByRole('button', { name: '참여 제외', exact: true }).click();
+  await memberRow.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(memberRow.getByRole('button', { name: '제외 확인', exact: true })).toBeHidden();
+  await memberRow.getByRole('button', { name: '참여 제외', exact: true }).click();
+  await action(host, memberRow.getByRole('button', { name: '제외 확인', exact: true }), 'POST', /\/kick$/, 200);
+  await expect(memberRow).toHaveCount(0);
+
+  await hostSteps.filter({ hasText: '후보 준비' }).click();
+  const firstCandidate = hostCandidates.getByRole('article').first();
+  await firstCandidate.getByRole('button', { name: '새 추천에서 제외', exact: true }).click();
+  await firstCandidate.getByRole('button', { name: '취소', exact: true }).click();
+  await expect(firstCandidate.getByRole('button', { name: '후보 제외 확인', exact: true })).toBeHidden();
+  await firstCandidate.getByRole('button', { name: '새 추천에서 제외', exact: true }).click();
+  await action(host, firstCandidate.getByRole('button', { name: '후보 제외 확인', exact: true }), 'DELETE', /\/candidates\/[^/]+$/, 200);
+  await expect(hostCandidates.getByRole('article')).toHaveCount(1);
+
+  await manual.goto('/rooms/not-a-room');
+  await expect(manual.getByRole('heading', { name: '페이지를 찾을 수 없어요' })).toBeVisible();
+  await homeJoinLink.click();
+  await expect(codeInput).toBeVisible();
 });
 
 test('생성·참여 → 조건·자동 초안·수동 수정·저장 → 실제 계산·확정 → 재검토·재계산', async ({ world }) => {

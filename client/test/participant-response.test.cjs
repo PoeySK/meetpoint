@@ -210,7 +210,8 @@ test('default and fill do not call API; manual edits are drafts until explicit s
   function find(node, label) {
     if (!node || typeof node !== 'object') return null;
     if (Array.isArray(node)) return node.map((n) => find(n, label)).find(Boolean);
-    if (node.type === 'button' && node.props.children === label) return node;
+    const content = node.props?.children;
+    if (node.type === 'button' && (content?.props?.children ?? content) === label) return node;
     return find(node.props?.children, label);
   }
   find(rendered, '어려워요').props.onClick();
@@ -326,7 +327,7 @@ test('candidate and quick options expose MAYBE as 아직 몰라요 including acc
   h.cards()[0].props.onUpdate({ availabilityStatus: 'MAYBE' });
   const cardHtml = renderToStaticMarkup(React.createElement(h.card.CandidateResponseCard, h.cards()[0].props));
   const quick = h.quick(); const quickHtml = renderToStaticMarkup(React.createElement(quick.type, { ...quick.props, availabilityStatus: 'MAYBE' }));
-  for (const html of [cardHtml, quickHtml]) { assert.match(html, /aria-pressed="true"[^>]*>아직 몰라요<\/button>/); assert.doesNotMatch(html, /아마 가능/); }
+  for (const html of [cardHtml, quickHtml]) { assert.match(html, /aria-pressed="true"[^>]*><span[^>]*>아직 몰라요<\/span><\/button>/); assert.doesNotMatch(html, /아마 가능/); }
 });
 test('authentication failure retains response draft and requires recovery before an explicit retry', async () => {
   const h = panelHarness(); h.fill().props.onClick(); h.cards()[0].props.onUpdate({ travelBurden: 'NORMAL', note: 'Auth failure draft' });

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { MEETPOINT_TIMEZONE } from "@/shared/config/meetpoint";
 
 type CalendarMonth = {
@@ -169,7 +169,17 @@ export function CandidateDatePicker({
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const [visibleMonth, setVisibleMonth] = useState<CalendarMonth | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
+  const calendarId = useId();
   const selectedDate = parseDateValue(value);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const calendar = calendarRef.current;
+    const selected = calendar?.querySelector<HTMLButtonElement>('[aria-pressed="true"]');
+    (selected ?? calendar?.querySelector<HTMLButtonElement>('[data-calendar-day]'))?.focus();
+  }, [isOpen]);
 
   function openCalendar() {
     const dateToShow = selectedDate ?? getKstDateParts();
@@ -191,18 +201,34 @@ export function CandidateDatePicker({
     });
   }
 
+  function closeCalendar() {
+    setIsOpen(false);
+    triggerRef.current?.focus();
+  }
+
   return (
-    <div className="relative">
+    <div
+      onKeyDown={(event) => {
+        if (event.key === "Escape" && isOpen) {
+          event.preventDefault();
+          closeCalendar();
+        }
+      }}
+    >
       <button
+        aria-controls={isOpen ? calendarId : undefined}
+        aria-describedby={error ? `${calendarId}-error` : undefined}
         aria-expanded={isOpen}
         aria-haspopup="dialog"
+        data-invalid={error ? true : undefined}
         className={`mp-input flex items-center justify-between text-left ${
           error
             ? "border-rose-400"
             : "border-slate-300 focus:border-slate-600"
         }`}
-        onClick={() => (isOpen ? setIsOpen(false) : openCalendar())}
+        onClick={() => (isOpen ? closeCalendar() : openCalendar())}
         disabled={disabled}
+        ref={triggerRef}
         type="button"
       >
         <span className={selectedDate ? "text-slate-950" : "text-slate-400"}>
@@ -216,8 +242,9 @@ export function CandidateDatePicker({
       {isOpen && visibleMonth && (
         <div
           aria-label="모임 날짜 선택"
-          className="absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white p-3 shadow-lg shadow-slate-200/50"
-          id="candidate-date-calendar"
+          className="mt-2 rounded-xl border border-[var(--mp-line)] bg-[var(--mp-surface)] p-3"
+          id={calendarId}
+          ref={calendarRef}
           role="dialog"
         >
           <div className="mb-3 flex items-center justify-between">
@@ -242,7 +269,7 @@ export function CandidateDatePicker({
             </button>
           </div>
 
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-400">
+          <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-[var(--mp-muted)]">
             {WEEKDAYS.map((weekday) => (
               <span key={weekday}>{weekday}</span>
             ))}
@@ -266,13 +293,14 @@ export function CandidateDatePicker({
                   aria-pressed={isSelected}
                   className={`rounded-lg px-1 py-2 text-sm transition focus:outline-none focus:ring-2 focus:ring-slate-200 ${
                     isSelected
-                      ? "bg-slate-200 font-semibold text-white"
-                      : "text-slate-700 hover:bg-slate-50 hover:text-slate-700"
+                      ? "bg-[var(--mp-purple)] font-semibold text-white"
+                      : "text-slate-700 hover:bg-[var(--mp-lilac)]"
                   }`}
+                  data-calendar-day
                   key={dayValue}
                   onClick={() => {
                     onChange(dayValue);
-                    setIsOpen(false);
+                    closeCalendar();
                   }}
                   type="button"
                 >
@@ -285,7 +313,7 @@ export function CandidateDatePicker({
       )}
 
       {error && (
-        <p className="mt-2 text-xs font-normal text-rose-600">{error}</p>
+        <p className="mt-2 text-xs font-normal text-rose-700" id={`${calendarId}-error`}>{error}</p>
       )}
     </div>
   );

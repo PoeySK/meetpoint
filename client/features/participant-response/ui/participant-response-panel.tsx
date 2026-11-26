@@ -338,15 +338,14 @@ export function ParticipantResponsePanel({
         )}
         {isReadOnly && (
           <p className='basis-full rounded-xl bg-slate-100 px-3 py-2.5 text-sm leading-5 text-slate-600'>
-            현재 방 상태에서는 의견을 수정할 수 없습니다. 계산 중에는 완료를
-            기다리고, 확정된 방은 방장이 다시 살펴보기를 시작해야 합니다.
+            지금은 의견을 수정할 수 없어요. 남긴 의견은 후보 카드에서 볼 수 있어요.
           </p>
         )}
       </div>
 
       {activeCandidates.length === 0 ? (
         <div className='rounded-2xl border border-dashed border-[var(--mp-line)] bg-[var(--mp-surface)] p-5 text-sm leading-5 text-[var(--mp-muted)]'>
-          방장이 후보를 등록하면 이곳에서 의견을 남길 수 있습니다.
+          {isReadOnly ? '볼 수 있는 후보가 없어요.' : '방장이 후보를 올리면 이곳에서 의견을 남길 수 있어요.'}
         </div>
       ) : (
         <>

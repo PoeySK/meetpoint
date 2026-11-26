@@ -3,6 +3,7 @@
 import { useParticipantLifecycle } from '@/features/participant-lifecycle';
 import { RoomRecoveryPanel } from '@/features/room-recovery';
 import {
+  forgetRoomAddress,
   getRoomParticipantStorageKey,
   getRoomRecoveryStorageKey,
   getRoomTokenStorageKey,
@@ -32,6 +33,7 @@ export function RoomWidget({ roomId }: { roomId: string }) {
     retryRoom,
     room,
   } = useRoomSession(roomId);
+  const roomCode = room?.room.roomCode;
   const handleLeft = useCallback(() => {
     try {
       window.sessionStorage.removeItem(getRoomTokenStorageKey(roomId));
@@ -40,8 +42,9 @@ export function RoomWidget({ roomId }: { roomId: string }) {
     } catch {
       // 서버의 탈퇴는 완료됐으므로 저장소 정리 실패와 관계없이 화면을 이동한다.
     }
+    if (roomCode) forgetRoomAddress(roomCode, roomId);
     router.replace('/');
-  }, [roomId, router]);
+  }, [roomCode, roomId, router]);
   const {
     handleKick,
     handleLeave,

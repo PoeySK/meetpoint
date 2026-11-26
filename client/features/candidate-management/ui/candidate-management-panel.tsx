@@ -184,6 +184,8 @@ export function CandidateManagementPanel({
   const [isAddingCandidate, setIsAddingCandidate] = useState(false);
   const composerRef = useRef<HTMLElement>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
+  const composerTriggerRef = useRef<HTMLButtonElement>(null);
+  const addButtonRef = useRef<HTMLButtonElement>(null);
   const [editingCandidateId, setEditingCandidateId] = useState<string | null>(
     null,
   );
@@ -255,15 +257,18 @@ export function CandidateManagementPanel({
     setFormNotice('');
   }
 
-  function addAnotherTime(candidate: Candidate) {
+  function addAnotherTime(candidate: Candidate, trigger: HTMLButtonElement) {
     setEditingCandidateId(null);
     populateCandidateForm({ ...getCandidateFormValues(candidate), startTime: '', endTime: '' });
-    openComposer();
+    openComposer(trigger, 'input[type="time"]');
   }
 
-  function openComposer() {
+  function openComposer(trigger: HTMLButtonElement, fieldSelector = 'input') {
+    composerTriggerRef.current = trigger;
     setIsAddingCandidate(true);
-    window.requestAnimationFrame(() => composerRef.current?.focus());
+    window.requestAnimationFrame(() => {
+      composerRef.current?.querySelector<HTMLInputElement>(fieldSelector)?.focus();
+    });
   }
 
   function applyTimePreset(start: string, end: string) {
@@ -301,6 +306,8 @@ export function CandidateManagementPanel({
     setFormError('');
 
     if (Object.keys(errors).length > 0) {
+      const form = event.currentTarget;
+      window.requestAnimationFrame(() => form.querySelector<HTMLElement>('[aria-invalid="true"], [data-invalid="true"]')?.focus());
       return;
     }
 
@@ -367,18 +374,21 @@ export function CandidateManagementPanel({
     }
   }
 
-  function startEditing(candidate: Candidate) {
+  function startEditing(candidate: Candidate, trigger: HTMLButtonElement) {
     setArchiveCandidateId(null);
     setEditingCandidateId(candidate.id);
     populateCandidateForm(getCandidateFormValues(candidate));
-    openComposer();
+    openComposer(trigger);
   }
 
   function closeComposer() {
+    const trigger = composerTriggerRef.current;
     setEditingCandidateId(null);
     setIsAddingCandidate(false);
     clearCandidateForm();
-    window.requestAnimationFrame(() => headingRef.current?.focus());
+    window.requestAnimationFrame(() => {
+      (trigger?.isConnected ? trigger : addButtonRef.current ?? headingRef.current)?.focus();
+    });
   }
 
   async function handleArchive(candidate: Candidate) {
@@ -425,7 +435,7 @@ export function CandidateManagementPanel({
         <div className='flex items-center gap-3'>
           <span className='text-xs font-semibold text-slate-600'>후보 {room.candidates.length}/5</span>
           {!showComposer && !hasReachedCandidateLimit && !isCandidateMutationDisabled && (
-            <button className='mp-button mp-button-accent min-h-11 rounded-lg' onClick={openComposer} type='button'>
+            <button className='mp-button mp-button-accent min-h-11 rounded-lg' onClick={(event) => openComposer(event.currentTarget)} ref={addButtonRef} type='button'>
               후보 추가
             </button>
           )}
@@ -447,6 +457,49 @@ export function CandidateManagementPanel({
         >
           {panelError}
         </p>
+      )}
+
+      {isCandidateMutationDisabled ? (
+        <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
+          {room.room.status === 'CALCULATING'
+            ? '추천 결과를 준비 중이라 후보를 바꿀 수 없습니다.'
+            : '일정이 확정되었거나 종료된 방에서는 후보를 변경할 수 없습니다.'}
+        </p>
+      ) : hasReachedCandidateLimit && !editingCandidateId ? (
+        <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
+          후보 5개가 이미 등록되어 더 추가할 수 없습니다. 기존 후보를 제외하면 새 후보를 등록할 수 있습니다.
+        </p>
+      ) : showComposer && (
+        <section aria-label={editingCandidateId ? '후보 수정' : '후보 올리기'} className='scroll-mt-4' ref={composerRef} tabIndex={-1}>
+          <CandidateForm
+            address={address}
+            area={area}
+            cost={cost}
+            date={date}
+            endTime={endTime}
+            fieldErrors={fieldErrors}
+            formError={formError}
+            isSubmitting={isSubmitting}
+            mode={editingCandidateId ? 'edit' : 'create'}
+            nextCandidateNumber={candidateNumber}
+            onAddressChange={setAddress}
+            onAreaChange={setArea}
+            onCancel={editingCandidateId || room.candidates.length > 0 ? closeComposer : undefined}
+            onClear={clearCandidateForm}
+            onCostChange={setCost}
+            onDateChange={applyDate}
+            onEndTimeChange={(value) => applyTimeChange(setEndTime, value)}
+            onFillExample={fillExample}
+            onPlaceNameChange={setPlaceName}
+            onStartTimeChange={(value) => applyTimeChange(setStartTime, value)}
+            onSubmit={handleSubmit}
+            onTagsChange={setTags}
+            onTimePreset={applyTimePreset}
+            placeName={placeName}
+            startTime={startTime}
+            tags={tags}
+          />
+        </section>
       )}
 
       <div className='space-y-2 empty:hidden'>
@@ -485,7 +538,7 @@ export function CandidateManagementPanel({
                     <button
                       className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
                       disabled={isSubmitting || isArchiving}
-                      onClick={() => addAnotherTime(candidate)}
+                      onClick={(event) => addAnotherTime(candidate, event.currentTarget)}
                       type='button'
                     >
                       다른 시간 추가
@@ -494,7 +547,7 @@ export function CandidateManagementPanel({
                   <button
                     className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
                     disabled={isCandidateMutationDisabled || isSubmitting || isArchiving}
-                    onClick={() => startEditing(candidate)}
+                    onClick={(event) => startEditing(candidate, event.currentTarget)}
                     type='button'
                   >
                     수정
@@ -527,7 +580,7 @@ export function CandidateManagementPanel({
                       onClick={() => void handleArchive(candidate)}
                       type='button'
                     >
-                      {isArchiving ? '처리 중...' : '새 추천에서 제외'}
+                      {isArchiving ? '처리 중...' : '후보 제외 확인'}
                     </button>
                     <button
                       className='mp-button mp-button-secondary px-3 py-1.5 text-xs'
@@ -543,54 +596,6 @@ export function CandidateManagementPanel({
             </article>
           ))}
       </div>
-
-      {isCandidateMutationDisabled ? (
-        <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          {room.room.status === 'CALCULATING'
-            ? '추천 결과를 준비 중이라 후보를 바꿀 수 없습니다.'
-            : '일정이 확정되었거나 종료된 방에서는 후보를 변경할 수 없습니다.'}
-        </p>
-      ) : hasReachedCandidateLimit && !editingCandidateId ? (
-        <p className='rounded-xl bg-white px-3 py-2.5 text-sm leading-5 text-slate-600'>
-          후보 5개가 이미 등록되어 더 추가할 수 없습니다. 기존 후보를 제외하면 새 후보를 등록할 수 있습니다.
-        </p>
-      ) : showComposer && (
-        <section aria-label={editingCandidateId ? '후보 수정' : '후보 올리기'} className='scroll-mt-4 rounded-xl border border-stone-200 bg-white p-3 sm:p-4' ref={composerRef} tabIndex={-1}>
-          <CandidateForm
-            address={address}
-            area={area}
-            cost={cost}
-            date={date}
-            endTime={endTime}
-            fieldErrors={fieldErrors}
-            formError={formError}
-            isSubmitting={isSubmitting}
-            mode={editingCandidateId ? 'edit' : 'create'}
-            nextCandidateNumber={candidateNumber}
-            onAddressChange={setAddress}
-            onAreaChange={setArea}
-            onCancel={editingCandidateId || room.candidates.length > 0 ? closeComposer : undefined}
-            onCostChange={setCost}
-            onDateChange={applyDate}
-            onEndTimeChange={(value) => applyTimeChange(setEndTime, value)}
-            onPlaceNameChange={setPlaceName}
-            onStartTimeChange={(value) => applyTimeChange(setStartTime, value)}
-            onSubmit={handleSubmit}
-            onTagsChange={setTags}
-            onTimePreset={applyTimePreset}
-            placeName={placeName}
-            startTime={startTime}
-            tags={tags}
-          />
-          <details className='mt-3 text-sm text-slate-700'>
-            <summary className='cursor-pointer py-1 font-semibold'>입력 도구</summary>
-            <div className='mt-2 flex flex-wrap gap-2'>
-              <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={fillExample} type='button'>예시로 채우기</button>
-              <button className='mp-button mp-button-secondary' disabled={isSubmitting} onClick={clearCandidateForm} type='button'>입력 지우기</button>
-            </div>
-          </details>
-        </section>
-      )}
     </section>
   );
 }

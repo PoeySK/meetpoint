@@ -61,7 +61,7 @@ function DecisionReview({
       </button>
       <dialog
         aria-labelledby="decision-review-heading"
-        className="m-auto max-h-[calc(100dvh-1.5rem)] w-[calc(100%-1.5rem)] max-w-md overflow-y-auto overscroll-contain rounded-xl border border-slate-200 bg-white p-4 text-slate-950 shadow-xl transition-opacity duration-150 backdrop:bg-slate-950/40 sm:p-6 motion-reduce:transition-none starting:open:opacity-0"
+        className="mp-dialog max-w-md p-4 sm:p-6"
         onCancel={(event) => { if (isConfirming) event.preventDefault(); }}
         ref={dialogRef}
       >
@@ -261,7 +261,7 @@ export function DecisionConfirmationPanel({
                   <label className="flex items-start gap-3 text-sm leading-6 text-slate-700">
                     <input
                       checked={acknowledgeIssues}
-                      className="mt-1 h-4 w-4 shrink-0 accent-teal-700"
+                      className="mt-1 size-4 shrink-0 accent-[var(--mp-purple)]"
                       onChange={(event) =>
                         onAcknowledgeIssuesChange(event.target.checked)
                       }

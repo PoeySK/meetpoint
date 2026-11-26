@@ -229,14 +229,14 @@ export function RoomWorkspaceWidget({
       )}
 
       <nav aria-label="방 진행 단계" className="lg:hidden">
-        <div className="flex flex-wrap gap-1 border-b border-[var(--mp-line)] pb-2">
+        <div className="grid auto-cols-fr grid-flow-col gap-1 border-b border-[var(--mp-line)] pb-2">
           {mobileSteps.map((step) => {
             const isActive = step === mobileStep;
 
             return (
               <button
                 aria-current={isActive ? "step" : undefined}
-                className={`mp-button min-h-11 grow rounded-lg border px-2 py-2 text-xs ${
+                className={`mp-button min-h-11 min-w-0 rounded-lg border px-0 py-2 text-xs whitespace-nowrap ${
                   isActive
                     ? "border-[var(--mp-line)] bg-[var(--mp-lilac)] text-[var(--mp-purple-hover)]"
                     : "border-transparent text-[var(--mp-muted)] hover:bg-[var(--mp-lilac)]"
@@ -286,7 +286,7 @@ export function RoomWorkspaceWidget({
               }
               open={isCandidatePanelOpen}
             >
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-slate-600 sm:px-5 [&::-webkit-details-marker]:hidden">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-xl px-4 py-3.5 focus-visible:outline-2 focus-visible:outline-slate-600 group-open:hidden sm:px-5 lg:group-open:flex [&::-webkit-details-marker]:hidden">
                 <span>
                   <span className="block text-sm font-semibold text-slate-950">
                     후보 관리
@@ -299,7 +299,7 @@ export function RoomWorkspaceWidget({
                   ⌄
                 </span>
               </summary>
-              <div className="border-t border-slate-200">
+              <div className="lg:border-t lg:border-[var(--mp-line)]">
                 <CandidateManagementPanel
                   onRoomRefresh={onRoomRefresh}
                   participantId={participantId}
@@ -331,9 +331,10 @@ export function RoomWorkspaceWidget({
         <div
           className={getSectionClassName(mobileStep === "condition")}
         >
-          <details className="mp-card" onToggle={(event) => setIsConditionPanelOpen(event.currentTarget.open)} open={isConditionPanelOpen}>
-            <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-slate-600">
+          <details className="mp-card group" onToggle={(event) => setIsConditionPanelOpen(event.currentTarget.open)} open={isConditionPanelOpen}>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 rounded-xl px-4 py-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-slate-600 group-open:hidden lg:group-open:flex [&::-webkit-details-marker]:hidden">
               선택 조건 {room.myCondition ? "보기" : "추가"}
+              <span aria-hidden="true" className="mr-1 size-2 shrink-0 rotate-45 border-r border-b border-current transition-transform group-open:-rotate-135 motion-reduce:transition-none" />
             </summary>
             <ParticipantConditionPanel
             condition={room.myCondition}

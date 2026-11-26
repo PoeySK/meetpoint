@@ -105,9 +105,9 @@ export function CreateRoomForm() {
 
   return (
     <section className="p-4 sm:p-6">
-      <div className="mb-5 pr-12">
+      <div className="mb-4 pr-12">
         <h2 className="break-keep text-2xl font-extrabold tracking-tight" id="create-room-heading">약속 방 만들기</h2>
-        <p className="mt-1 text-sm leading-5 text-[var(--mp-muted)]">만날 시간과 장소를 같이 정해요.</p>
+        <p className="mt-1 break-keep text-sm leading-5 text-[var(--mp-muted)]">방을 만든 뒤 후보를 올리고 친구를 초대할 수 있어요.</p>
       </div>
       <form className="space-y-4" onSubmit={handleSubmit} noValidate>
         <div className="grid gap-1.5">
@@ -181,15 +181,6 @@ export function CreateRoomForm() {
           {isSubmitting ? "약속 방을 만드는 중..." : "방 만들기"}
         </button>
       </form>
-      <details className="group mt-2 border-t border-stone-200">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 rounded-lg text-sm font-semibold text-stone-700 hover:text-stone-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-stone-700 [&::-webkit-details-marker]:hidden">
-          <span>방을 만든 뒤엔?</span>
-          <span aria-hidden="true" className="transition-transform group-open:rotate-180 motion-reduce:transition-none">⌄</span>
-        </summary>
-        <p className="pb-2 break-keep text-sm leading-6 text-stone-600">
-          시간과 장소 후보를 올리고 친구들에게 링크를 보내요. 모인 의견을 보고 약속을 정해요.
-        </p>
-      </details>
     </section>
   );
 }

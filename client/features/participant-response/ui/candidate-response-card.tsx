@@ -46,7 +46,6 @@ export function CandidateResponseCard({
     condition
   );
   const isDisabled = isReadOnly || form.isSubmitting || isBulkSubmitting;
-  const showTravel = Boolean(form.availabilityStatus || form.travelBurden || isReadOnly);
   const [featuredTag, ...otherTags] = candidate.tags;
   const cardHighlight = featuredTag || (candidate.place.area !== candidate.place.address ? candidate.place.area : '');
 
@@ -94,22 +93,27 @@ export function CandidateResponseCard({
               : '작성 중 · 저장 전'
             : responseStateLabel(responseState)}
         </p>
-        <button
-          className={`mp-button min-h-11 w-full ${isReadOnly || responseState === 'saved' ? 'mp-button-secondary' : 'mp-button-primary'}`}
-          onClick={() => {
-            const dialog = dialogRef.current;
-            dialog?.showModal();
-            dialog?.querySelector<HTMLButtonElement>('fieldset button:enabled')?.focus();
-          }}
-          type='button'
-        >
-          {isReadOnly ? '내 의견 보기' : form.savedResponseId ? '의견 확인하기' : '의견 남기기'}
-        </button>
+        {(!isReadOnly || responseState !== 'missing') && (
+          <button
+            className={`mp-button min-h-11 w-full ${isReadOnly || responseState === 'saved' ? 'mp-button-secondary' : 'mp-button-primary'}`}
+            onClick={() => {
+              const dialog = dialogRef.current;
+              dialog?.showModal();
+              dialog?.querySelector<HTMLButtonElement>('fieldset button:enabled')?.focus();
+            }}
+            type='button'
+          >
+            {isReadOnly ? '내 의견 보기' : form.savedResponseId ? '의견 확인하기' : '의견 남기기'}
+          </button>
+        )}
       </div>
       <dialog aria-label={`${candidate.place.name} 의견`} className='mp-dialog' ref={dialogRef}>
       <div className='space-y-3 p-4 sm:p-6'>
         <div className='flex items-start justify-between gap-3'>
-          <h3 className='min-w-0 text-xl font-extrabold tracking-tight [overflow-wrap:anywhere]'>{candidate.place.name}에 대한 내 의견</h3>
+          <div className='min-w-0 space-y-1'>
+            <h3 className='text-xl font-extrabold tracking-tight [overflow-wrap:anywhere]'>{candidate.place.name}</h3>
+            <p className='break-keep text-balance text-sm text-[var(--mp-muted)]'>{formatCandidateTime(candidate)}</p>
+          </div>
           <button aria-label='의견 창 닫기' className='mp-button mp-button-secondary min-h-11 min-w-11 shrink-0 p-0 text-xl' onClick={() => dialogRef.current?.close()} type='button'>×</button>
         </div>
         <fieldset className='space-y-2'>
@@ -120,7 +124,7 @@ export function CandidateResponseCard({
             {availabilityOptions.map((option) => (
               <button
                 aria-pressed={form.availabilityStatus === option.value}
-                className='mp-button mp-button-secondary min-h-12 px-1 text-xs break-keep aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)] sm:text-sm'
+                className='mp-button mp-button-secondary min-h-12 break-keep px-1 aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)]'
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() =>
@@ -128,19 +132,13 @@ export function CandidateResponseCard({
                 }
                 type='button'
               >
-                {option.label}
+                <span className='text-sm leading-tight'>{option.label}</span>
               </button>
             ))}
           </div>
         </fieldset>
 
-        {autoFillDescription && (
-          <p className='text-sm leading-5 text-slate-700'>
-            {autoFillDescription} 아직 저장하지 않은 초안입니다.
-          </p>
-        )}
-
-        {showTravel && <fieldset className='space-y-2'>
+        <fieldset className='space-y-2'>
           <legend className='text-sm font-semibold text-slate-800'>
             여기까지 오는 길은 어때요?
           </legend>
@@ -148,37 +146,40 @@ export function CandidateResponseCard({
             {travelOptions.map((option) => (
               <button
                 aria-pressed={form.travelBurden === option.value}
-                className='mp-button mp-button-secondary min-h-12 px-1 text-xs break-keep aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)] sm:text-sm'
+                className='mp-button mp-button-secondary min-h-12 break-keep px-1 aria-pressed:border-[var(--mp-purple)] aria-pressed:bg-[var(--mp-lilac)] aria-pressed:text-[var(--mp-purple-hover)]'
                 disabled={isDisabled}
                 key={option.value}
                 onClick={() => updateResponse({ travelBurden: option.value })}
                 type='button'
               >
-                {option.label}
+                <span className='text-sm leading-tight'>{option.label}</span>
               </button>
             ))}
           </div>
-        </fieldset>}
+        </fieldset>
+
+        {autoFillDescription && (
+          <p className='text-sm leading-5 text-slate-700'>
+            {autoFillDescription} 저장 전이에요.
+          </p>
+        )}
 
         {condition && (
           <div
             aria-live='polite'
-            className='rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm leading-5 text-slate-700'
+            className='border-t border-[var(--mp-line)] pt-3 text-sm leading-5 text-[var(--mp-muted)]'
           >
             <p className='font-semibold'>저장된 선택 조건과 비교</p>
             <p className='mt-1'>
               {timeMatchDescription(getTimeMatch(candidate, condition))}
             </p>
-            <ul className='mt-1 list-disc space-y-0.5 pl-5'>
-              {conditionWarnings.map((warning) => (
-                <li key={warning}>{warning}</li>
-              ))}
-            </ul>
-            <p className='mt-1 text-xs'>
-              시간·예산·특징에 대한 안내입니다. 이동 부담과 실제 참석 가능
-              여부를 확인해 주세요. 충돌이 있어도 직접 선택한 의견은 저장할 수
-              있습니다.
-            </p>
+            {conditionWarnings.length > 0 && (
+              <ul className='mt-1 list-disc space-y-0.5 pl-5'>
+                {conditionWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            )}
           </div>
         )}
 
@@ -207,7 +208,7 @@ export function CandidateResponseCard({
           <p className='text-sm text-[var(--mp-muted)]'>닫아도 이 후보의 입력은 초안으로 남아요.</p>
         )}
 
-        {showTravel && responseState !== 'saved' && !isReadOnly && <button
+        {responseState !== 'saved' && !isReadOnly && <button
           className={`mp-button min-h-11 w-full ${form.availabilityStatus && form.travelBurden ? 'mp-button-primary' : 'mp-button-secondary'}`}
           disabled={isDisabled}
           onClick={() => onSave()}

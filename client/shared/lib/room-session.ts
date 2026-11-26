@@ -17,6 +17,13 @@ export function getRememberedRoomAddress(roomCode: string) {
   catch { return null; }
 }
 
+export function forgetRoomAddress(roomCode: string, roomId: string) {
+  try {
+    const key = `meetpoint:room-address:${roomCode}`;
+    if (window.localStorage.getItem(key) === roomId) window.localStorage.removeItem(key);
+  } catch { /* 브라우저 저장소에 접근할 수 없어도 방 나가기는 완료된다. */ }
+}
+
 export function getRoomTokenStorageKey(roomId: string) {
   return `${ROOM_TOKEN_STORAGE_PREFIX}${roomId}`;
 }
