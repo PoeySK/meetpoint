@@ -39,11 +39,12 @@
 - Room 조회 응답의 `hostParticipant`에는 생성된 HOST Participant의 공개 정보만 반환한다.
 - Room 조회 응답의 `currentParticipant`에는 Bearer token으로 인증·확인한 현재 Participant의 공개 정보만 반환한다.
 - Room 조회의 `participants`에는 현재 활성 상태(`JOINED` 또는 `RESPONDED`)인 HOST·MEMBER Participant의 공개 정보를 반환한다. `LEFT`·`REMOVED` Participant의 이력은 이 응답에 포함하지 않는다.
-- Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다. 아직 구현하지 않은 계산·결정 데이터는 각각 `null`, `null`로 반환한다.
+- Room 조회의 `candidates`에는 현재 활성 Candidate를 `displayOrder` 순서로 반환한다.
+- Room 조회 응답의 `latestScoreResult`와 `decision` 필드는 `null`이다. 최신 계산 결과는 `GET /api/v1/rooms/{roomId}/score-results/latest`, 현재 결정은 `GET /api/v1/rooms/{roomId}/decision`에서 조회한다.
 - Room 조회의 `myResponses`에는 Authorization 토큰으로 확인한 현재 참여자가 현재 방의 활성 Candidate에 저장한 응답만 `candidates` 순서로 반환한다. 저장된 응답이 없으면 빈 배열을 반환하며, 다른 참여자의 응답과 `ARCHIVED` Candidate의 과거 응답은 반환하지 않는다.
 - ParticipantCondition은 선택 사항이다. 조건을 저장하지 않아도 활성 Candidate에 모두 응답하면 `participantStatus`를 `RESPONDED`로 반환하며, Candidate가 추가되면 새 응답이 필요하므로 다시 `JOINED`가 된다.
 - Participant lifecycle API는 MEMBER 본인의 leave와 HOST의 활성 MEMBER kick을 제공한다. 상태 변경 시 `LEFT`·`REMOVED` Participant는 활성 목록·계산 snapshot·coverage에서 제외하고 기존 Response와 계산·Decision 이력은 보존한다.
-- `TOKEN_EXPIRED`는 Room 만료가 아니라 24시간이 지난 방 범위 접근 토큰을 의미한다.
+- `TOKEN_EXPIRED`는 발급 후 24시간이 지났거나 폐기된 방 범위 접근 토큰에 반환한다.
 - Decision 확정은 최신 `COMPLETED` ScoreResult만 사용하며, `STALE`·`FAILED` 결과와 100% 미만 응답 coverage는 거부한다. 서버는 점수·순위를 다시 계산하지 않고 snapshot의 ID·상태·응답 존재만 재검증한다.
 - `POST /decision`과 `POST /decision/reopen`은 HOST만 수행할 수 있고, `GET /decision`은 유효한 Room Participant가 읽을 수 있다. 결정이 없을 때의 `404 DECISION_NOT_FOUND`는 정상적인 미확정 상태다.
 
@@ -151,8 +152,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | 409 | `ROOM_STATE_CONFLICT`, `CALCULATION_IN_PROGRESS`, `STALE_RESULT`, `DUPLICATE_RESPONSE`, `CANDIDATE_VERSION_CONFLICT` | 현재 상태 또는 오래된 Candidate 버전과 충돌 |
 | 422 | `BUSINESS_RULE_VIOLATION`, `NO_ACTIVE_CANDIDATES`, `CANDIDATE_LIMIT_EXCEEDED`, `CONDITION_INCOMPLETE`, `PARTICIPANT_COUNT_OUT_OF_RANGE`, `RESPONSE_FIELD_MISSING` | JSON은 맞지만 MeetPoint 규칙 위반. `CONDITION_INCOMPLETE`은 조건을 보냈을 때의 형식·범위 오류이며 미입력을 뜻하지 않는다. 후보와 조건의 시간 충돌은 응답 제출을 거부하지 않고 계산 결과에 표시한다. |
 | 429 | `RATE_LIMITED` | 요청 quota 초과 또는 제한 저장소 포화. `Retry-After`와 `details.retryAfterSeconds`로 남은 시간 안내 |
-| 502 | `SOLVER_ERROR`, `API_UPSTREAM_UNAVAILABLE` | Solver가 계산 실패를 반환했거나, 동일 출처 프록시가 NestJS의 응답을 받지 못함 |
-| 503 | `SOLVER_UNAVAILABLE`, `API_PROXY_UNAVAILABLE` | Solver 연결 실패·타임아웃 또는 동일 출처 프록시의 내부 연결 설정 오류 |
+| 502 | `API_UPSTREAM_UNAVAILABLE` | 동일 출처 프록시가 NestJS의 응답을 받지 못함 |
+| 503 | `API_PROXY_UNAVAILABLE` | 동일 출처 프록시의 내부 연결 설정 오류 |
 | 500 | `INTERNAL_ERROR` | 예상하지 못한 서버 오류 |
 
 ---
@@ -755,7 +756,7 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 }
 ```
 
-`status`가 `RUNNING`이면 `candidates`가 없을 수 있다. `FAILED`이면 `calculation.error`에 Solver 오류 코드와 재시도 가능 여부를 담고, 해당 계산 요청으로 `Room`은 `OPEN`으로 돌아간다. `coverage`는 API 호환성을 위한 필드명이며, 화면에서는 “의견 작성 현황”으로 표시한다. `reasons`와 참가자별 `reasons`는 화면에 바로 보여줄 수 있는 한국어 설명 문장으로 반환한다.
+`status`가 `RUNNING`이면 `candidates`가 없을 수 있다. `FAILED`인 계산도 조회 요청 자체는 `200 OK`를 반환한다. `calculation.error`에는 실패 코드와 재시도 가능 분류를 담고, 해당 계산의 `Room`은 `OPEN`으로 돌아간다. `coverage`는 API 호환성을 위한 필드명이며, 화면에서는 “의견 작성 현황”으로 표시한다. `reasons`와 참가자별 `reasons`는 화면에 바로 보여줄 수 있는 한국어 설명 문장으로 반환한다.
 
 위 JSON은 설명을 위해 `participantBreakdown`을 한 명만 보인 축약 예시다. 실제 `COMPLETED` 응답에서는 `coverage.totalParticipants`에 해당하는 모든 참가자의 breakdown을 반환한다.
 
@@ -1088,12 +1089,13 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 
 `overallScore`는 0~100 범위의 한 자리 소수다. `participantBreakdown`은 후보별로 모든 참가자에 대해 만들며, 응답이 없으면 `score: 0`, `blockingIssues: ["MISSING_RESPONSE"]`로 표시한다. `MISSING_RESPONSE`는 조건 충돌 수에 포함하지 않는다.
 
-### 계산 실패 출력 — `422 Unprocessable Entity` 또는 `500 Internal Server Error`
+### 계산 실패 출력 — `400 Bad Request` 또는 `422 Unprocessable Entity`
 
 ```json
 {
   "requestId": "score_20260813_03",
   "policyVersion": "condition-aware-1",
+  "scoringProfile": "CONDITION_AWARE",
   "status": "FAILED",
   "error": {
     "code": "NO_CANDIDATES",
@@ -1108,16 +1110,14 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | --- | --- | --- | --- |
 | 400 | `INVALID_JSON`, `INVALID_SCHEMA` | 아니오 | JSON 또는 필드 구조 오류 |
 | 422 | `NO_PARTICIPANTS`, `NO_CANDIDATES`, `INVALID_TIME_RANGE`, `RESPONSE_FIELD_MISSING`, `INVALID_CONDITION` | 아니오 | 입력 스냅샷으로 계산할 수 없음. 개인 조건 `null`은 허용한다. |
-| 500 | `SOLVER_INTERNAL_ERROR` | 한 번 | 계산 내부 오류 |
-| 503 | `SOLVER_OVERLOADED` | 한 번 | 일시적으로 계산할 수 없음 |
 
-NestJS는 Solver의 `requestId`와 오류 코드를 보존하여 외부 API의 `SOLVER_ERROR` 또는 `SOLVER_UNAVAILABLE`로 매핑한다. Solver가 만든 결과를 임의로 재점수화하지 않는다.
+NestJS는 Solver의 실패 응답과 응답 형식 오류를 `SOLVER_ERROR`, 네트워크 오류와 타임아웃을 `SOLVER_UNAVAILABLE`로 기록한다. Solver가 오류 코드를 반환했으면 `details.solverCode`에 담는다. 워커는 재시도 가능 분류와 시도 한도에 따라 상태를 갱신하고, Client는 계산 조회 응답에서 `calculation.error`를 확인한다.
 
 ## 확정 사항과 미결정 사항 요약
 
 - **확정**: 외부 API의 책임은 NestJS가 가지며, Solver API는 계산 입력과 출력에만 집중한다.
 - **확정**: 결과에는 숫자 점수뿐 아니라 참가자별 breakdown, 근거, 충돌, 커버리지를 포함한다.
-- **확정**: 토큰은 불투명 난수이며 24시간 후 만료되고, 현재 토큰 갱신 API가 없다. 구현 시 원문 대신 해시만 저장한다.
-- **확정**: Room 자체는 자동 만료되지 않으며 `TOKEN_EXPIRED`는 만료된 방 범위 토큰에만 적용한다.
+- 방 범위 접근 토큰은 불투명 난수이며 발급 후 24시간 동안 유효하다. 서버는 토큰의 해시를 저장한다. 개인 복구는 별도의 복구 자격 증명으로 새 접근 토큰을 발급한다.
+- Room 자체에 자동 만료 정책을 적용하는 작업은 현재 구현 범위 밖이다.
 - **미결정**: 방 데이터 삭제·보존 기간, API 버전별 호환 기간, 계산 결과 페이지의 이력 조회 범위
 - **확정**: Candidate 수정·보관에는 `If-Match-Version`을 필수로 사용하며, 버전이 다르면 `CANDIDATE_VERSION_CONFLICT`를 반환한다.

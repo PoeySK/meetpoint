@@ -9,9 +9,7 @@
 
 ## 배경
 
-현재 `Participant`는 `JOINED`, `RESPONDED`, `LEFT`, `REMOVED` 상태를 이미 표현할 수 있고, `tokenRevokedAt`으로 방 범위 토큰을 폐기할 수 있다. 계산과 Decision 검증도 `LEFT`·`REMOVED`를 활성 Participant에서 제외하는 기준을 사용한다.
-
-그러나 Participant가 스스로 나가거나 HOST가 제거하는 외부 API와 Room 사용자 흐름은 아직 구현하지 않았다. 이 결정은 기존 계산·Decision 이력 보존 원칙을 유지하면서 Participant의 활성 생명주기를 정의한다.
+이 결정을 작성할 당시 `Participant`는 `JOINED`, `RESPONDED`, `LEFT`, `REMOVED` 상태와 토큰 폐기를 표현할 수 있었다. 계산과 Decision 검증은 `LEFT`·`REMOVED`를 활성 Participant에서 제외했다. 이 결정으로 계산·Decision 이력 보존 원칙을 유지하면서 MEMBER의 방 나가기와 HOST의 강퇴 정책을 정했고, 현재 API와 화면에 구현되어 있다.
 
 ## 결정
 

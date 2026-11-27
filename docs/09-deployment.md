@@ -99,13 +99,13 @@ dc exec -T postgres rm /tmp/meetpoint-backup.dump
 
 ## 격리 검증과 정리
 
-검증용 project는 `meetpoint-deploy-test-<고유ID>`, DB는 `meetpoint_deploy_test_<고유ID>`, release tag도 고유하게 지정하고 비어 있는 loopback port를 사용한다. 예시 env에서 만든 **새 임시 파일**에만 test credential을 넣는다. 개발 `.env`·DB·실행 중 서비스를 재사용하지 않는다. 위 설정/build/migration/readiness 순서로 확인한다.
+검증용 project는 `meetpoint-deploy-test-<고유ID>`, DB는 `meetpoint_deploy_test_<고유ID>`로 만들고, 고유한 release tag와 비어 있는 루프백 포트를 사용한다. 테스트용 자격 증명과 설정은 Docker Compose 프로세스에 전달한다. Compose의 기본 `.env` 로딩과 기존 셸의 배포 설정 상속은 끈다.
 
-`node infra/test-deployment.cjs`는 이 과정을 자동화한다. Docker Engine 접근 권한이 필요하며 frozen image build, compiled migration, live/ready, Client HTTP, API 생성·입장·조건·응답·실제 Solver 계산·확정·개인 복구와 production 쿠키 속성을 확인한다. custom dump를 별도 소유 DB에 복원해 Room 보존도 확인한다. 성공·실패 후 소유 project/volume/image와 임시 설정을 정리하며 민감한 응답·원본 로그는 출력하지 않는다. 실제 HTTPS 브라우저 쿠키 전송 검증은 별도다.
+`node infra/test-deployment.cjs`는 이 과정을 자동화한다. Docker Engine 접근 권한이 필요하다. 이미지 빌드, 마이그레이션, 상태 검사, 화면 응답, 방 생성·입장·조건·응답·실제 Solver 계산·확정·개인 복구와 운영 쿠키 속성을 확인한다. 후보 수정·보관은 현재 버전에서 성공하고 이전 버전에서 `409`를 받는지 검사한다. DB 덤프는 별도 테스트 DB에 복원한다. 테스트 종료 시 소유한 Compose 프로젝트·볼륨·이미지를 정리하고, 결과는 민감한 응답과 원본 로그를 제외한 요약으로 표시한다.
 
 HTTPS 테스트 도메인/인증서를 가진 소유 프록시가 준비되면 별도 브라우저에서 생성 → 입장 → 조건 → 후보별 응답 → 계산 완료 → 확정 → 접근 복구를 실행한다. 기존 `pnpm --dir client test:e2e`는 자체 소유 DB·호스트 프로세스로 테스트하며 배포 이미지 E2E 결과로 간주하지 않는다.
 
-성공·실패 후 대상 project와 volume label을 확인하고 해당 **임시 project에만** `dc down --volumes --remove-orphans`를 실행한다. 운영 project에는 volume 삭제 명령을 사용하지 않는다. 고유 테스트 image와 임시 env/backup도 자신의 산출물만 제거한다. build cache나 기존 image를 전역 prune하지 않는다.
+테스트 자원을 수동으로 정리할 때는 대상 프로젝트와 볼륨 라벨을 확인한 뒤 해당 **임시 프로젝트에만** `dc down --volumes --remove-orphans`를 실행한다. 고유 테스트 이미지와 직접 만든 임시 백업도 해당 테스트의 산출물만 제거한다.
 
 남은 작업과 완료 기준은 [현재 작업 계획](07-implementation-plan.md)에 기록한다. rate limit은 Server 프로세스 안에서 실행하며 별도 인프라가 없다. 삭제 배치, 관측 시스템, 외부 provider는 이 구성에 추가하지 않는다.
 

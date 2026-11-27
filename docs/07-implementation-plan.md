@@ -6,7 +6,7 @@
 조건을 관리한다. 기간이나 작업 일수로 범위를 고정하지 않고, 각 작업이
 제품 흐름·데이터 정합성·운영 안정성에 미치는 영향을 기준으로 순서를 정한다.
 
-## 현재 시스템 구성
+## 로컬 개발 구성
 
 ```text
 Browser
@@ -41,6 +41,7 @@ NestJS Server :3001
 | Client 화면 | 구현·자동 검증 완료 | 생성·입장·조건·후보 lifecycle·응답·계산·확정·재검토·leave/kick·개인 접근 복구 및 Node/Chromium 테스트가 있다. 실제 사용자 검증은 남아 있다. |
 | 계약·문서 | 완료(P0-2 범위) | 조건 API, Candidate lifecycle, Room의 `myCondition`, condition-aware Solver snapshot·결과와 현재 구현을 정렬했다. |
 | 검증 | 자동 검증 구성 완료 | Client Node·격리 Chromium E2E, Server 단위·HTTP·격리 PostgreSQL/실제 Solver 통합, Solver 단위·HTTP 테스트와 GitHub Actions가 있다. 원격 CI 실행 성공과 운영 환경 검증은 별도 확인한다. |
+| 배포 | Oracle 구성·로컬 검증 완료 | 운영 Compose와 Oracle 오버레이를 제공한다. Funnel이 HTTPS를 종료하고 Next.js가 동일 출처 API 요청을 내부 NestJS에 전달한다. 실제 Oracle VM과 휴대폰 검증은 남아 있다. |
 
 ## 우선순위 작업
 
@@ -98,19 +99,9 @@ Client 수정·보관·실패 복구 UI와 관련 HTTP·PostgreSQL 통합 테스
 
 #### 3. API 계약과 실제 구현 정렬
 
-현재 상태: 구현된 핵심 route는 `docs/04-api-contract.md`, HTTP/controller 테스트와 PostgreSQL 통합 테스트로 관리한다. OpenAPI는 도입하지 않았으며 계약 문서를 유지한다. 이번 정렬은 기능 상태와 배포 절차를 갱신하며 새로운 API나 계산 정책 버전을 추가하지 않는다.
+[API 계약](04-api-contract.md), HTTP·컨트롤러 테스트, PostgreSQL 통합 테스트로 핵심 API를 관리한다. 조건 저장과 후보 수정·보관을 구현했고, 공통 오류 응답·상태 코드·공개 응답 필드를 테스트한다. Oracle 배포의 동일 출처 프록시도 같은 오류 형식을 사용하며, 운영 Compose 검증으로 후보 수정·보관과 버전 충돌을 확인한다.
 
-- `docs/04-api-contract.md`, DTO/validation, controller, view model, Client 타입의
-  차이를 한 항목씩 정리한다.
-- 구현되지 않은 조건·후보 lifecycle을 “설계”와 “구현됨”으로 구분하지 않고 현재
-  상태에 맞게 표시한다.
-- 공통 오류 envelope와 `requestId`, HTTP 상태, 공개 필드를 실제 응답 테스트로
-  고정한다.
-- OpenAPI 도입 여부와 생성·검증 방식을 정하고, 도입하지 않으면 현재 계약 문서를
-  검증 기준으로 유지한다.
-
-완료 조건: 주요 외부 route의 요청·응답·오류 예시가 실제 controller와 일치하고,
-Server e2e가 계약의 성공·실패 사례를 검증한다.
+API를 변경할 때마다 계약, 입력 검증, 컨트롤러, 응답 매핑, Client 타입을 함께 대조한다. 성공·실패 응답은 해당 HTTP·통합 테스트에서 확인한다.
 
 ### P1 — 서비스 신뢰성과 운영 기반
 
@@ -141,12 +132,11 @@ Node 테스트, 격리 Chromium E2E와 CI job은 구현되어 있다. 로컬 자
 2026-10-08 검증: Client Node 35개, lint·typecheck·build 및 격리 Chromium 4개 시나리오가 통과했다. 320px 모바일의 긴 이름 가로 넘침을 수정하고 확인했다. 실제 기기·스크린 리더·Firefox/WebKit 검증은 남아 있다.
 완료 기준: 실제 사용자와 모바일에서 생성부터 확정·재검토·접근 복구까지 실행하고, 실패·동시 변경·접근성 문제를 기록·해결한다. Firefox/WebKit과 실제 HTTPS·CORS·쿠키도 확인한다.
 
-#### 7. 배포 — 최소 구성 추가, 운영 검증 필요
+#### 7. 배포 — Oracle 구성·로컬 검증 완료, 운영 확인 대기
 
-`infra/docker-compose.deploy.yml`과 각 서비스 Dockerfile, 환경 예시 및 [운영 절차](09-deployment.md)를 제공한다.
-개발 Compose는 PostgreSQL 전용으로 유지한다. 자동 migration/synchronize는 사용하지 않는다.
-완료 기준: 격리 project에서 이미지 build → DB 준비 → 명시적 migration → 서비스 readiness → 생성·입장·조건·응답·계산·확정·복구가 통과한다.
-실제 배포의 완료 기준은 도메인·HTTPS 프록시·secret 주입·백업 위치 결정과 실제 HTTPS 브라우저 검증이다. 이 작업은 실제 배포를 수행하지 않는다.
+기본 운영 Compose에 `infra/docker-compose.oracle.yml`을 추가해 Oracle VM 한 대에서 웹과 내부 서비스를 실행하도록 구성했다. HTTPS는 Tailscale Funnel에서 종료하고, 배포 환경 파일은 VM의 저장소 밖에서 관리한다. 생성·참여·조건·응답·계산·확정·복구, 후보 수정·보관과 버전 충돌, DB 백업·복원을 격리 Docker에서 검증했다. PR용 CI에 같은 Oracle 검증 명령을 연결했다. [Oracle 배포 절차](10-oracle-deployment.md) · [공통 운영 절차](09-deployment.md)
+
+실제 Always Free VM에서 명시적 마이그레이션과 서비스 기동을 마치고, 공인 HTTPS 주소에서 PC와 휴대폰의 모임 흐름·복구 쿠키를 확인하면 운영 검증을 완료한다. DB 백업은 VM 밖에도 보관한다.
 
 #### 8. 데이터 lifecycle — 후속 정책·구현
 
@@ -173,7 +163,7 @@ Server `/live`·DB 기반 `/ready`, Solver `/health`, 안전한 계산 job 오�
 
 ## 작업 순서의 기준
 
-1. 최소 배포 구성을 격리 환경에서 검증하고 HTTPS·backup·rollback 결정을 마무리한다.
+1. 검증한 Oracle 구성을 VM에 배포하고 공인 HTTPS·실기기 흐름·백업을 확인한다.
 2. 남용 방지와 실제 사용자 검증을 진행한다.
 3. 데이터 lifecycle과 운영 관측을 정책·테스트와 함께 구현한다.
 4. 확장 기능은 별도 요구사항과 결정 문서를 만든 뒤 진행한다.
