@@ -5,6 +5,9 @@ export function validateEnvironment(env: Record<string, string | undefined>) {
     throw new Error(`Invalid environment variable: ${name}`);
   };
   const production = env.NODE_ENV === 'production';
+  const proxySecret = env.API_PROXY_SHARED_SECRET;
+  if (proxySecret !== undefined && !/^[0-9a-f]{64}$/.test(proxySecret))
+    fail('API_PROXY_SHARED_SECRET');
   if (env.TRUSTED_PROXY_IPS) {
     for (const ip of env.TRUSTED_PROXY_IPS.split(',')) {
       if (!isIP(ip.trim())) fail('TRUSTED_PROXY_IPS');
