@@ -10,7 +10,8 @@
 
 ## 문서 상태와 공통 원칙
 
-- **확정**: 브라우저는 Next.js 화면에서 NestJS REST API만 호출한다. Next.js API Route와 Server Action은 사용하지 않는다.
+- **확정**: NestJS가 REST API와 도메인 권한을 소유한다. Oracle 배포에서는 공개 웹의 동일 출처 `/api/v1` 경로를 통해 Next.js가 비공개 NestJS로 요청을 전달한다. [운영 배포 절차](10-oracle-deployment.md)
+- **확정**: Oracle 배포에서 NestJS는 Next.js와 공유한 내부 자격 증명을 확인한다. 비공개 네트워크의 요청도 자격 증명이 없거나 일치하지 않으면 HTTP 403을 반환한다. `GET /ready`는 내부 Compose 상태 확인에 사용한다. 참가자 토큰과 방별 권한은 NestJS가 검증한다.
 - **확정**: 외부 클라이언트용 API와 내부 Rust Solver API를 분리한다. PostgreSQL은 NestJS 서버만 접근한다.
 - **확정**: 모든 날짜·시간은 ISO 8601 문자열로 전달하고, 시간대가 필요한 값에는 `timezone`을 함께 둔다.
 - **확정**: 금액은 부동소수점이 아닌 KRW 정수(`estimatedCostPerPersonKrw`, `maxBudgetKrw`)로 전달한다.
@@ -150,8 +151,8 @@ Room API의 실패 응답은 항상 위 구조를 사용한다. `details`에 전
 | 409 | `ROOM_STATE_CONFLICT`, `CALCULATION_IN_PROGRESS`, `STALE_RESULT`, `DUPLICATE_RESPONSE`, `CANDIDATE_VERSION_CONFLICT` | 현재 상태 또는 오래된 Candidate 버전과 충돌 |
 | 422 | `BUSINESS_RULE_VIOLATION`, `NO_ACTIVE_CANDIDATES`, `CANDIDATE_LIMIT_EXCEEDED`, `CONDITION_INCOMPLETE`, `PARTICIPANT_COUNT_OUT_OF_RANGE`, `RESPONSE_FIELD_MISSING` | JSON은 맞지만 MeetPoint 규칙 위반. `CONDITION_INCOMPLETE`은 조건을 보냈을 때의 형식·범위 오류이며 미입력을 뜻하지 않는다. 후보와 조건의 시간 충돌은 응답 제출을 거부하지 않고 계산 결과에 표시한다. |
 | 429 | `RATE_LIMITED` | 요청 quota 초과 또는 제한 저장소 포화. `Retry-After`와 `details.retryAfterSeconds`로 남은 시간 안내 |
-| 502 | `SOLVER_ERROR` | Solver가 계산 실패를 반환함 |
-| 503 | `SOLVER_UNAVAILABLE` | Solver에 연결할 수 없음 또는 타임아웃 |
+| 502 | `SOLVER_ERROR`, `API_UPSTREAM_UNAVAILABLE` | Solver가 계산 실패를 반환했거나, 동일 출처 프록시가 NestJS의 응답을 받지 못함 |
+| 503 | `SOLVER_UNAVAILABLE`, `API_PROXY_UNAVAILABLE` | Solver 연결 실패·타임아웃 또는 동일 출처 프록시의 내부 연결 설정 오류 |
 | 500 | `INTERNAL_ERROR` | 예상하지 못한 서버 오류 |
 
 ---

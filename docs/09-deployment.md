@@ -1,5 +1,9 @@
 # 최소 배포와 운영 절차
 
+Oracle Always Free에 배포하는 경우 [Oracle 배포 절차](10-oracle-deployment.md)를 따른다. 이 문서는 별도 HTTPS 프록시를 쓰는 기본 Compose 구성과 공통 운영 절차를 다룬다.
+
+Oracle 구성을 격리된 로컬 Docker에서 확인하려면 `node infra/test-deployment.cjs --oracle`을 실행한다. CI에서도 같은 명령으로 포트 격리, PROXY v2 헤더, 후보 수정·삭제의 버전 충돌, 요청 제한, 계산, 복구 쿠키 전달을 검증한다. 공인 HTTPS와 실제 휴대폰 접속은 Oracle 배포 뒤 확인한다.
+
 ## 범위와 전제
 
 전체 서비스는 `infra/docker-compose.deploy.yml`로 실행한다. 기존 PostgreSQL 전용 개발 Compose, 개발 DB·환경 파일·프로세스는 그대로 둔다. 이 구성은 단일 호스트의 최소 구성이며 HA를 제공하지 않는다. Client/Server/Solver 이미지는 non-root로 실행한다. DB와 Solver는 internal network에서만 접근하며 호스트 포트를 공개하지 않는다. Client/Server는 호스트 loopback에만 바인딩한다.

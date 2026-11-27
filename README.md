@@ -138,7 +138,7 @@ pnpm dev
 | Rust Solver   | `http://localhost:4000` | `GET /health`      |
 | PostgreSQL    | `localhost:5432`        | Docker healthcheck |
 
-개발 Compose는 PostgreSQL만 실행합니다. 전체 서비스의 최소 배포 구성은 `infra/docker-compose.deploy.yml`이며 개발 자원과 분리된 project 이름을 사용합니다. 새 환경 설정, 명시적 migration, HTTPS 같은 site 구성, backup/restore 및 rollback은 [배포 운영 절차](docs/09-deployment.md)를 따릅니다. 격리 배포 검증은 `node infra/test-deployment.cjs`로 실행합니다.
+개인 테스트 공개는 [Oracle Always Free 배포 절차](docs/10-oracle-deployment.md)를 따릅니다. 개발 Compose는 PostgreSQL만 실행합니다. 운영 Compose는 개발 자원과 분리된 project 이름을 사용합니다. 백업·복원과 롤백은 [공통 운영 절차](docs/09-deployment.md)를 참고하세요. 격리 배포 검증은 `node infra/test-deployment.cjs`로 실행합니다.
 
 ## 자동 검증
 
