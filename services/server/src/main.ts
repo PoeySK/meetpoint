@@ -2,12 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import type { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
+import { requireApiProxy } from './common/api-proxy';
 import { trustedProxy } from './config/trusted-proxy';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
   app.enableShutdownHooks(['SIGINT', 'SIGTERM']);
   const configService = app.get(ConfigService);
+  const proxySecret = configService.get<string>('API_PROXY_SHARED_SECRET');
+  if (proxySecret) app.use(requireApiProxy(proxySecret));
   app.set(
     'trust proxy',
     trustedProxy(configService.get<string>('TRUSTED_PROXY_IPS'))

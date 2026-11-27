@@ -1,0 +1,32 @@
+services:
+  ingress:
+    image: nginx/nginx-unprivileged:stable-alpine
+    restart: unless-stopped
+    ports: ['127.0.0.1:${CLIENT_BIND_PORT:-10081}:8080']
+    networks: [oracle-ingress]
+    volumes:
+      - ./nginx.oracle.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      client: {condition: service_healthy}
+  client:
+    build:
+      args:
+        NEXT_PUBLIC_API_BASE_URL: '/'
+    environment:
+      API_PROXY_SHARED_SECRET: ${API_PROXY_SHARED_SECRET:?required}
+    ports: !reset []
+    networks: [edge, oracle-ingress]
+    healthcheck:
+      test: [CMD, node, -e, 'fetch("http://localhost:10081/").then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  server:
+    environment:
+      API_PROXY_SHARED_SECRET: ${API_PROXY_SHARED_SECRET:?required}
+      TRUSTED_PROXY_IPS: ''
+    ports: !reset []
+    healthcheck:
+      test: [CMD, node, -e, 'fetch("http://localhost:3001/ready").then(async r=>{if(!r.ok||(await r.json()).dependencies.database.status!=="up")process.exit(1)}).catch(()=>process.exit(1))']
+networks:
+  oracle-ingress:

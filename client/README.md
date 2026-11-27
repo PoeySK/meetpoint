@@ -11,13 +11,15 @@ pnpm dev
 
 브라우저에서 http://localhost:10081 으로 접속합니다.
 
+운영 배포는 [Oracle Always Free 배포 절차](../docs/10-oracle-deployment.md)를 따릅니다.
+
 ## 검증
 
 Node 24.12.0, pnpm 11.21.0을 사용합니다. 저장소 루트 [README](../README.md#자동-검증)에 전체 서비스와 CI 실행 방법이 있습니다.
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm test          # 기존 의견 입력 16개 + 접근 복구 13개 (Node 직접 실행)
+pnpm test
 pnpm lint
 pnpm typecheck
 pnpm build

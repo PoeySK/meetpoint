@@ -77,16 +77,16 @@ meetpoint/
 ## 기본 통신 구조
 
 ```text
-사용자
-  ↓
-Next.js Client
-  ↓
-NestJS Server
-  ├─ 데이터베이스
-  └─ Rust Solver
+로컬 개발
+브라우저 ── 화면 ──→ Next.js
+    └── /api/v1 ──→ NestJS ──→ PostgreSQL · Rust Solver
+
+Oracle 배포
+브라우저 → HTTPS(Funnel) → NGINX → Next.js
+                                     └── /api/v1 → 내부 NestJS
 ```
 
-현재 핵심 사용자 흐름과 자동 검증·CI가 구현되어 있습니다. 다음 작업은 배포, 남용 방지, 실제 사용자 검증, 데이터 lifecycle과 운영 관측입니다. 구체적인 작업 순서는 [현재 작업 계획](docs/07-implementation-plan.md)에 기록합니다.
+핵심 사용자 흐름과 요청 제한, 자동 검증·CI, Oracle 배포 구성이 준비되어 있습니다. 다음 작업은 실제 배포와 사용자 검증, 운영 요청 제한 조정, 데이터 보존과 운영 관측입니다. 구체적인 작업 순서는 [현재 작업 계획](docs/07-implementation-plan.md)에 기록합니다.
 
 ## 권장 로컬 포트
 
@@ -138,7 +138,7 @@ pnpm dev
 | Rust Solver   | `http://localhost:4000` | `GET /health`      |
 | PostgreSQL    | `localhost:5432`        | Docker healthcheck |
 
-개발 Compose는 PostgreSQL만 실행합니다. 전체 서비스의 최소 배포 구성은 `infra/docker-compose.deploy.yml`이며 개발 자원과 분리된 project 이름을 사용합니다. 새 환경 설정, 명시적 migration, HTTPS 같은 site 구성, backup/restore 및 rollback은 [배포 운영 절차](docs/09-deployment.md)를 따릅니다. 격리 배포 검증은 `node infra/test-deployment.cjs`로 실행합니다.
+개인 테스트 공개는 [Oracle Always Free 배포 절차](docs/10-oracle-deployment.md)를 따릅니다. 개발 Compose는 PostgreSQL만 실행합니다. 운영 Compose는 개발 자원과 분리된 project 이름을 사용합니다. 백업·복원과 롤백은 [공통 운영 절차](docs/09-deployment.md)를 참고하세요. 기본 운영 구성은 `node infra/test-deployment.cjs`, Oracle 구성은 `node infra/test-deployment.cjs --oracle`로 격리 검증합니다.
 
 ## 자동 검증
 
@@ -172,7 +172,7 @@ cargo check --locked
 cargo test --locked
 ```
 
-Server의 `pnpm lint`는 기존대로 `--fix`를 포함하므로 CI/읽기 전용 검증에는 `lint:check`를 사용합니다. Client Node 테스트는 기존 두 파일을 직접 실행하며 `node --test` subprocess에 의존하지 않습니다.
+Server의 `pnpm lint`는 `--fix`를 포함하므로 CI와 읽기 전용 검증에는 `lint:check`를 사용합니다. Client의 `pnpm test`는 의견 입력, 접근 복구, 계산 결과, API 프록시 테스트를 각각 Node로 실행합니다.
 
 실제 브라우저 검증은 저장소 루트에서 아래 한 명령으로 기동·migration·readiness·테스트·정리를 수행합니다. 개발 서비스를 종료하거나 재사용하지 않습니다.
 
@@ -204,4 +204,4 @@ PowerShell에서는 같은 변수들을 `$env:MEETPOINT_TEST_DB_PORT = '15432'`,
 
 CI artifact는 자격 증명이 없는 `browser-safe-summary`만 7일 보관합니다. trace/HAR, 다운로드한 복구 파일, 원본 오류/로그, DOM, storageState, 영상·스크린샷은 업로드하지 않습니다. 강제 OS 종료처럼 runner 정리가 불가능했던 경우 실행 ID가 붙은 테스트 project만 확인해 제거합니다.
 
-현재 브라우저 검증은 Chromium 데스크톱·localhost HTTP의 개발 쿠키 정책입니다. HTTPS의 production Secure 쿠키, 실제 배포 CORS/프록시, 모바일·Firefox·WebKit은 별도 검증이 필요합니다. 로컬 통과는 GitHub Actions 실행 성공을 의미하지 않습니다. 커밋/push 후 실제 Actions 결과를 따로 확인해야 합니다.
+Chromium E2E는 데스크톱과 모바일 화면을 localhost HTTP에서 검증합니다. Oracle Docker 테스트는 내부 요청 전달과 운영 복구 쿠키의 속성을 확인합니다. 공인 HTTPS에서의 복구 쿠키 전송, 실제 휴대폰·Firefox·WebKit 동작, GitHub Actions 실행 결과는 각각 확인합니다.

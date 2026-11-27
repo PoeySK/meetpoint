@@ -187,7 +187,7 @@ Room과 Participant는 논리적으로 양방향 관계다. `Participant.roomId`
 - 방 생성 때 호스트 참여자를 생성한다.
 - 초대 링크 또는 코드로 입장할 때 멤버 참여자를 생성한다.
 - 참여자가 조건을 제출하거나 수정할 때 `participant_conditions`의 조건과 제출·수정 시각을 갱신한다.
-- Participant 이탈·강제 제거 mutation은 `ParticipantLifecycleService`가 소유하며, Room row lock을 포함한 짧은 transaction에서 상태 변경, token 폐기, 최신 완료 ScoreResult의 `STALE` 처리를 함께 수행한다. leave/kick 요청은 별도 입력 DTO 없이 Bearer token과 경로의 대상 ID를 사용한다.
+- Participant의 나가기는 `LeaveRoomUseCase`, 강퇴는 `KickParticipantUseCase`가 처리한다. Room row lock을 포함한 트랜잭션에서 상태 변경, 토큰 폐기, 최신 완료 ScoreResult의 `STALE` 처리를 함께 수행한다. 요청은 Bearer 토큰과 경로의 대상 ID를 사용한다.
 
 ## Candidate
 

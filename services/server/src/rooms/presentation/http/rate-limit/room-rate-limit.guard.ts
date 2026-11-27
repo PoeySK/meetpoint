@@ -11,7 +11,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import type { Request } from 'express';
+import type { ApiProxyRequest } from '../../../../common/api-proxy';
 import {
   ROOM_ACCESS,
   type RoomAccessPort,
@@ -49,8 +49,13 @@ export class RoomRateLimitGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext) {
     const policy = this.reflector.get<Policy>(POLICY, context.getHandler());
-    const request = context.switchToHttp().getRequest<Request>();
-    const ip = normalizeIp(request.ip ?? request.socket.remoteAddress ?? '');
+    const request = context.switchToHttp().getRequest<ApiProxyRequest>();
+    const ip = normalizeIp(
+      request.proxiedClientIp ??
+        request.ip ??
+        request.socket.remoteAddress ??
+        ''
+    );
     const ipLimit =
       policy === 'create'
         ? ROOM_LIMITS.create

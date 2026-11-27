@@ -19,7 +19,17 @@ describe('deployment environment', () => {
       ).toThrow(name);
     }
   );
+  it('accepts a private proxy credential when supplied by Compose', () => {
+    expect(() =>
+      validateEnvironment({
+        ...production,
+        API_PROXY_SHARED_SECRET: 'a'.repeat(64),
+      })
+    ).not.toThrow();
+  });
   it.each([
+    ['API_PROXY_SHARED_SECRET', ''],
+    ['API_PROXY_SHARED_SECRET', 'short-test-value'],
     ['DATABASE_URL', 'http://private:secret@postgres/db'],
     ['DATABASE_URL', 'postgresql://test:test@postgres'],
     ['CLIENT_ORIGIN', 'http://meet.example.com'],
